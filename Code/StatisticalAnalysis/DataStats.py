@@ -6,20 +6,32 @@ raw_file_path = '../Datasets/BioASQ/RawData/raw_data.json'
 
 def get_summary_stats(data_frame: pd.DataFrame):
     column_names = [x for x in data_frame.columns]
+    number_of_questions = len(data_frame)
+
+    total_question_length = 0
 
     type_dict = {}
 
     for index, row in data_frame.iterrows():
         for col in column_names:
+            content = row[col]
+
+            if col == 'body':
+                total_question_length += len(content)
 
             if col == 'type':
-                question_type = row[col]
-                if question_type in type_dict:
-                    type_dict[question_type] += 1
+                if content in type_dict:
+                    type_dict[content] += 1
                 else:
-                    type_dict[question_type] = 0
+                    type_dict[content] = 0
 
-    print(type_dict)
+    # ------ PRINT TH£ SUMMARY STATS ------
+    print('------- Question Types -------')
+    for key in type_dict.keys():
+        print(key + ':', type_dict[key])
+
+    print('\n------- Question Length -------')
+    print('Average Question Length:', round(total_question_length / number_of_questions, 2))
 
 
 if __name__ == '__main__':
