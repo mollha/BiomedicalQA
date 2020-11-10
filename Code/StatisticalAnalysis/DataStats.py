@@ -23,7 +23,7 @@ def get_summary_stats(data_frame: pd.DataFrame):
                 if content in type_dict:
                     type_dict[content] += 1
                 else:
-                    type_dict[content] = 0
+                    type_dict[content] = 1
 
     # ------ PRINT TH£ SUMMARY STATS ------
     print('------- Question Types -------')
