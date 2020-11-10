@@ -4,4 +4,5 @@ Code/Datasets
 Code/BioBERT/datasets/*
 Code/BioBERT/question-answering/runs/*
 .DS_Store
-.pyc
+*.pyc
+ question-answering/__pycache__/*.pyc

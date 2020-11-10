@@ -33,7 +33,7 @@ from transformers.data.metrics.squad_metrics import (
     squad_evaluate,
 )
 from transformers.data.processors.squad import SquadResult
-from utils_qa import transform_n2b_factoid, eval_bioasq_standard, load_and_cache_examples
+from utils_qa import transform_n2b_factoid, eval_bioasq_standard, load_and_cache_examples, EnvironmentSettings
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_QUESTION_ANSWERING_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -55,30 +55,33 @@ def to_list(tensor):
     return tensor.detach().cpu().tolist()
 
 
-def evaluate(args, model, tokenizer, prefix=""):
-    dataset, examples, features = load_and_cache_examples(args, tokenizer, evaluate=True, output_examples=True)
-
-    if not os.path.exists(output_directory) and args["local_rank"] in [-1, 0]:
-        os.makedirs(output_directory)
-
-    # Multiply the batch size per gpu by the number of GPUs to get the total batch size
-    args["eval_batch_size"] = args["per_gpu_eval_batch_size"] * max(1, args["n_gpu"])
-
-    # DistributedSampler samples randomly
-    eval_sampler = SequentialSampler(dataset)
-    eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=args["eval_batch_size"])
+def evaluate(args, model, tokenizer, settings, prefix=""):
+    eval_dataset, examples, features = load_and_cache_examples(args, tokenizer, evaluate=True, output_examples=True)
+    eval_batch_size_per_gpu, local_rank = settings.unpack_eval_settings()
 
     # multi-gpu evaluate
     if args["n_gpu"] > 1 and not isinstance(model, torch.nn.DataParallel):
         model = torch.nn.DataParallel(model)
 
-    # Evaluation
-    print("-------- Performing Evaluation {} --------".format(prefix))
-    print("Sample Size = {}\n Batch size = {}".format(len(dataset), args["eval_batch_size"]))
+    # Multiply the batch size per gpu by the number of GPUs to get the total batch size
+    evaluation_batch_size = eval_batch_size_per_gpu * max(1, args["n_gpu"])
 
-    all_results = []
+    if not os.path.exists(output_directory) and local_rank in [-1, 0]:
+        os.makedirs(output_directory)
+
+    # Create a DataLoader
+    # randomly sample the evaluation dataset with the specified batch size
+    eval_dataloader = DataLoader(eval_dataset, sampler=SequentialSampler(eval_dataset), batch_size=evaluation_batch_size)
+
+
+    # Evaluation
+    print("\n-------- Conducting Evaluation {} --------".format(prefix))
+    print("Sample Size = {}\n Batch size = {}\n".format(len(eval_dataset), evaluation_batch_size))
+
+    result_list = []
     start_time = time()
 
+    # Iterate through batches of evaluation data and collect results
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         model.eval()
         batch = tuple(t.to(args["device"]) for t in batch)
@@ -89,9 +92,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 "attention_mask": batch[1],
                 "token_type_ids": batch[2],
             }
-
             feature_indices = batch[3]
-
             outputs = model(**inputs)
 
         for i, feature_index in enumerate(feature_indices):
@@ -100,12 +101,11 @@ def evaluate(args, model, tokenizer, prefix=""):
 
             output = [to_list(output[i]) for output in outputs]
             start_logits, end_logits = output
-            result = SquadResult(unique_id, start_logits, end_logits)
+            result_list.append(SquadResult(unique_id, start_logits, end_logits))
 
-            all_results.append(result)
-
-    evalTime = time() - start_time
-    print("Evaluation done in total %f secs (%f sec per example)", evalTime, evalTime / len(dataset))
+    # -------- COLLATE SUMMARY STATISTICS --------
+    evaluation_time = time() - start_time
+    print("Evaluation time: {} seconds ({} seconds per example)".format(evaluation_time, evaluation_time / len(eval_dataset)))
 
     # Compute predictions
     output_prediction_file = os.path.join(output_directory, "predictions_{}.json".format(prefix))
@@ -116,10 +116,10 @@ def evaluate(args, model, tokenizer, prefix=""):
     else:
         output_null_log_odds_file = None
 
-    predictions = compute_predictions_logits(
+    compute_predictions_logits(
         examples,
         features,
-        all_results,
+        result_list,
         args["n_best_size"],
         args["max_answer_length"],
         args["do_lower_case"],
@@ -129,7 +129,7 @@ def evaluate(args, model, tokenizer, prefix=""):
         True,   # verbose logging
         args["version_2_with_negative"],
         args["null_score_diff_threshold"],
-        tokenizer,
+        tokenizer
     )
 
     ## Transform the prediction into the BioASQ format
@@ -146,24 +146,40 @@ def evaluate(args, model, tokenizer, prefix=""):
     print(f"   MRR         = {float(eval_score[3]) * 100:.2f}")
 
 
-def train(args, train_dataset, model, tokenizer):
-    number_of_epochs = 1.0
+def save_model_checkpoint(model, tokenizer, optimizer, scheduler, global_step, args):
+    output_dir = os.path.join(output_directory, "checkpoint-{}".format(global_step))
+    # Take care of distributed/parallel training
+    model_to_save = model.module if hasattr(model, "module") else model
+    model_to_save.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+    torch.save(args, os.path.join(output_dir, "training_args.bin"))
+    print("Saving model checkpoint to", output_dir)
+
+    torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
+    torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+    print("Saving optimizer and scheduler states to", output_dir)
+
+
+def train(args, train_dataset, model, tokenizer, settings):
+    number_of_epochs, max_steps, batch_size_per_gpu, learning_rate,\
+    adam_epsilon, local_rank, checkpoint_period = settings.unpack_train_settings()
 
     """ Train the model """
-    if args["local_rank"] in [-1, 0]:
-        tb_writer = SummaryWriter()
+    if local_rank in [-1, 0]:
+        tensorboard_writer = SummaryWriter()
 
-    training_batch_size = args["per_gpu_train_batch_size"] * max(1, args["n_gpu"])
+    training_batch_size = batch_size_per_gpu * max(1, args["n_gpu"])
 
-    train_sampler = RandomSampler(train_dataset) if args["local_rank"] == -1 else DistributedSampler(train_dataset)
+    train_sampler = RandomSampler(train_dataset) if local_rank == -1 else DistributedSampler(train_dataset)
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=training_batch_size)
 
     # If we have set an upper bound on the number of steps
-    if args["max_steps"] > 0:
-        t_total = args["max_steps"]
-        number_of_epochs = args["max_steps"] // (len(train_dataloader) // args["gradient_accumulation_steps"]) + 1
+    if max_steps > 0:
+        t_total = max_steps
+        number_of_epochs = max_steps // (len(train_dataloader) // args["gradient_acc_steps"]) + 1
     else:
-        t_total = len(train_dataloader) // args["gradient_accumulation_steps"] * number_of_epochs
+        t_total = len(train_dataloader) // args["gradient_acc_steps"] * number_of_epochs
 
     # --- Prepare optimizer and schedule (linear warmup and decay)
     no_decay = ["bias", "LayerNorm.weight"]
@@ -174,7 +190,8 @@ def train(args, train_dataset, model, tokenizer):
         },
         {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
     ]
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args["learning_rate"], eps=args["adam_epsilon"])
+
+    optimizer = AdamW(optimizer_grouped_parameters, lr=learning_rate, eps=adam_epsilon)
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps=args["warmup_steps"], num_training_steps=t_total
     )
@@ -200,21 +217,20 @@ def train(args, train_dataset, model, tokenizer):
         model = torch.nn.DataParallel(model)
 
     # Distributed training (should be after apex fp16 initialization)
-    if args["local_rank"] != -1:
+    if local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[args["local_rank"]], output_device=args["local_rank"], find_unused_parameters=True
+            model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True
         )
 
     # Conduct training
     print("-------- Performing Training --------")
     print("Sample Size = {}\n Number of Epochs = {}".format(len(train_dataset), number_of_epochs))
-    print("Instantaneous batch size per GPU = %d", args["per_gpu_train_batch_size"])
-    print("Total train batch size (w. parallel, distributed & accumulation) = %d",
+    print("Batch Size (w. parallel, distributed & accumulation) = %d",
         training_batch_size
-        * args["gradient_accumulation_steps"]
-        * (torch.distributed.get_world_size() if args["local_rank"] != -1 else 1),
+        * args["gradient_acc_steps"]
+        * (torch.distributed.get_world_size() if local_rank != -1 else 1),
     )
-    print("Gradient Accumulation steps = %d", args["gradient_accumulation_steps"])
+    print("Gradient Accumulation steps = %d", args["gradient_acc_steps"])
     print("Total optimization steps = %d", t_total)
 
     global_step = 1
@@ -227,8 +243,8 @@ def train(args, train_dataset, model, tokenizer):
             # set global_step to global_step of last saved checkpoint from model path
             checkpoint_suffix = args["model_name_or_path"].split("-")[-1].split("/")[0]
             global_step = int(checkpoint_suffix)
-            epochs_trained = global_step // (len(train_dataloader) // args["gradient_accumulation_steps"])
-            steps_trained_in_current_epoch = global_step % (len(train_dataloader) // args["gradient_accumulation_steps"])
+            epochs_trained = global_step // (len(train_dataloader) // args["gradient_acc_steps"])
+            steps_trained_in_current_epoch = global_step % (len(train_dataloader) // args["gradient_acc_steps"])
 
             print("Continuing training from checkpoint, will skip to saved global_step")
             print("Continuing training from epoch %d", epochs_trained)
@@ -240,14 +256,14 @@ def train(args, train_dataset, model, tokenizer):
     training_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
     train_iterator = trange(
-        epochs_trained, int(number_of_epochs), desc="Epoch", disable=args["local_rank"] not in [-1, 0]
+        epochs_trained, int(number_of_epochs), desc="Epoch", disable=local_rank not in [-1, 0]
     )
     # Added here for reproducibility
     set_seed(args["seed"], args["n_gpu"])
 
     for _ in train_iterator:
         # Configure the Progress Bar
-        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args["local_rank"] not in [-1, 0])
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=local_rank not in [-1, 0])
 
         for step, batch in enumerate(epoch_iterator):
 
@@ -270,23 +286,14 @@ def train(args, train_dataset, model, tokenizer):
             if args["model_type"] in ["xlm", "roberta", "distilbert", "camembert"]:
                 del inputs["token_type_ids"]
 
-            if args["model_type"] in ["xlnet", "xlm"]:
-                inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
-                if args["version_2_with_negative"]:
-                    inputs.update({"is_impossible": batch[7]})
-                if hasattr(model, "config") and hasattr(model.config, "lang2id"):
-                    inputs.update(
-                        {"langs": (torch.ones(batch[0].shape, dtype=torch.int64) * args["lang_id"]).to(args["device"])}
-                    )
-
             outputs = model(**inputs)
             # model outputs are always tuple in transformers (see doc)
             loss = outputs[0]
 
             if args["n_gpu"] > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel (not distributed) training
-            if args["gradient_accumulation_steps"] > 1:
-                loss = loss / args["gradient_accumulation_steps"]
+            if args["gradient_acc_steps"] > 1:
+                loss = loss / args["gradient_acc_steps"]
 
             if args["fp16"]:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -295,7 +302,7 @@ def train(args, train_dataset, model, tokenizer):
                 loss.backward()
 
             training_loss += loss.item()
-            if (step + 1) % args["gradient_accumulation_steps"] == 0:
+            if (step + 1) % args["gradient_acc_steps"] == 0:
                 if args["fp16"]:
                     torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args["max_grad_norm"])
                 else:
@@ -307,57 +314,39 @@ def train(args, train_dataset, model, tokenizer):
                 global_step += 1
 
                 # Log metrics
-                if args["local_rank"] in [-1, 0] and args["logging_steps"] > 0 and global_step % args["logging_steps"] == 0:
+                if local_rank in [-1, 0] and args["logging_steps"] > 0 and global_step % args["logging_steps"] == 0:
                     # Only evaluate when single GPU otherwise metrics may not average well
-                    if args["local_rank"] == -1 and args["evaluate_during_training"]:
-                        results = evaluate(args, model, tokenizer)
+                    if local_rank == -1 and args["evaluate_during_training"]:
+                        results = evaluate(args, model, tokenizer, settings)
                         for key, value in results.items():
-                            tb_writer.add_scalar("eval_{}".format(key), value, global_step)
-                    tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
-                    tb_writer.add_scalar("loss", (training_loss - logging_loss) / args["logging_steps"], global_step)
+                            tensorboard_writer.add_scalar("eval_{}".format(key), value, global_step)
+                    tensorboard_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
+                    tensorboard_writer.add_scalar("loss", (training_loss - logging_loss) / args["logging_steps"], global_step)
                     logging_loss = training_loss
 
-                # Save model checkpoint
-                if args["local_rank"] in [-1, 0] and args["save_steps"] > 0 and global_step % args["save_steps"] == 0:
-                    output_dir = os.path.join(output_directory, "checkpoint-{}".format(global_step))
-                    # Take care of distributed/parallel training
-                    model_to_save = model.module if hasattr(model, "module") else model
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
+                # ------- Save model checkpoint --------
+                if local_rank in [-1, 0] and global_step % checkpoint_period == 0:
+                    save_model_checkpoint(model, tokenizer, optimizer, scheduler, global_step, args)
 
-                    torch.save(args, os.path.join(output_dir, "training_args.bin"))
-                    print("Saving model checkpoint to", output_dir)
-
-                    torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
-                    torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
-                    print("Saving optimizer and scheduler states to", output_dir)
-
-            if args["max_steps"] > 0 and global_step > args["max_steps"]:
+            if max_steps > 0 and global_step > max_steps:
                 epoch_iterator.close()
                 break
-        if args["max_steps"] > 0 and global_step > args["max_steps"]:
+
+        if max_steps > 0 and global_step > max_steps:
             train_iterator.close()
             break
 
     if args["local_rank"] in [-1, 0]:
-        tb_writer.close()
+        tensorboard_writer.close()
 
     return global_step, training_loss / global_step
-
-
-
-
 
 
 def get_args():
     return {
         "model_type": "bert",
-        "model_name_or_path": "dmis-lab/biobert-base-cased-v1.1",
-        "do_train": True,
-        "do_eval": True,
+        "model_name_or_path": "google/electra-small-discriminator", #"dmis-lab/biobert-base-cased-v1.1",
         "train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-        "per_gpu_train_batch_size": 12,
-        "learning_rate": 8e-6,
         "max_seq_length": 384,
         "seed": 42,
         "golden_file": None,
@@ -365,24 +354,21 @@ def get_args():
         "data_dir": None,
         "predict_file": None,
         "config_name": "",
-        "tokenizer_name": "",
+        "tokenizer_name": "google/electra-small-discriminator", #"",
         "version_2_with_negative": True,
         "null_score_diff_threshold": 0.0,
         "doc_stride": 128,
         "max_query_length": 64,
         "evaluate_during_training": False,
         "do_lower_case": False,
-        "gradient_accumulation_steps": 1,
+        "gradient_acc_steps": 1,
         "weight_decay": 0.0,
         "max_grad_norm": 1.0,
-        "adam_epsilon": 1e-8,
-        "max_steps": -1,
         "warmup_steps": 0,
         "n_best_size": 20,
         "max_answer_length": 30,
         "lang_id": 0,
         "logging_steps": 500,
-        "save_steps": 500,  # Save checkpoint every X updates steps
         "eval_all_checkpoints": False,
         "no_cuda": True,    # Use CUDA if available
         "overwrite_output_dir": False,
@@ -397,6 +383,9 @@ def get_args():
 def main():
 
     args = get_args()
+    perform_training = True
+    perform_evaluation = True
+    default_settings = EnvironmentSettings()
 
     if args["doc_stride"] >= args["max_seq_length"] - args["max_query_length"]:
         print(
@@ -408,7 +397,7 @@ def main():
     if (
         os.path.exists(output_directory)
         and os.listdir(output_directory)
-        and args["do_train"]
+        and perform_training
         and not args["overwrite_output_dir"]
     ):
         raise ValueError(
@@ -479,15 +468,15 @@ def main():
             raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
 
     # Training
-    if args["do_train"]:
+    if perform_training:
         train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=False)
         train_dataset = torch.utils.data.Subset(train_dataset, list(range(0, 200)))
 
-        global_step, training_loss = train(args, train_dataset, model, tokenizer)
+        global_step, training_loss = train(args, train_dataset, model, tokenizer, default_settings)
         print(" global_step = {}, average loss = {}".format(global_step, training_loss))
 
     # Save the trained model and the tokenizer
-    if args["do_train"] and (args["local_rank"] == -1 or torch.distributed.get_rank() == 0):
+    if perform_training and (args["local_rank"] == -1 or torch.distributed.get_rank() == 0):
         print("Saving model checkpoint to", output_directory)
 
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
@@ -507,8 +496,8 @@ def main():
 
     # Evaluation - we can ask to evaluate all the checkpoints (sub-directories) in a directory
     results = {}
-    if args["do_eval"] and args["local_rank"] in [-1, 0]:
-        if args["do_train"]:
+    if perform_evaluation and args["local_rank"] in [-1, 0]:
+        if perform_training:
             print("Loading checkpoints saved during training for evaluation")
             checkpoints = [output_directory]
 
@@ -521,8 +510,7 @@ def main():
             print("Loading checkpoint %s for evaluation", args["model_name_or_path"])
             checkpoints = [args["model_name_or_path"]]
 
-        print("Evaluate the following checkpoints: %s", checkpoints)
-
+        print("Evaluate the following checkpoints:", checkpoints)
         for checkpoint in checkpoints:
             # Reload the model
             global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
@@ -530,7 +518,7 @@ def main():
             model.to(args["device"])
 
             # Evaluate
-            evaluate(args, model, tokenizer, prefix=global_step)
+            evaluate(args, model, tokenizer, default_settings, prefix=global_step)
 
 
 if __name__ == "__main__":

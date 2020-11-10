@@ -6,6 +6,7 @@ import subprocess
 import operator
 import random
 import logging
+from torch.utils.data import Subset
 
 import torch
 from transformers import squad_convert_examples_to_features
@@ -282,6 +283,7 @@ def read_squad_examples(input_file, is_training):
     else:
         return examples
 
+
 def write_predictions(all_examples, all_features, all_results, output_prediction_file):
     """Write final predictions to the json file and log-odds of null if needed."""
     logger.info("Writing predictions to: %s" % (output_prediction_file))
@@ -371,6 +373,43 @@ if __name__ == '__main__':
                         args.golden_file,
                         args.official_eval_dir)
     """
+
+
+class EnvironmentSettings:
+
+    def __init__(self):
+        self.train_settings = {
+            "number_of_epochs": 1.0,
+            "max_steps": -1,
+            "batch_size_per_gpu": 12,
+            "learning_rate": 8e-6,
+            "adam_epsilon": 1e-8,
+            "local_rank": -1,
+            "checkpoint_period": 500
+        }
+
+        self.eval_settings = {
+            "batch_size_per_gpu": 12,
+            "local_rank": -1,
+        }
+
+    def update_train_settings(self, opt_args):
+        if opt_args:
+            for key in opt_args:
+                if key in self.train_settings:
+                    self.train_settings[key] = opt_args[key]
+
+    def unpack_train_settings(self):
+        ts = self.train_settings
+        return ts["number_of_epochs"], ts["max_steps"], ts["batch_size_per_gpu"], ts["learning_rate"],\
+               ts["adam_epsilon"], ts["local_rank"], ts["checkpoint_period"]
+
+    def unpack_eval_settings(self):
+        es = self.eval_settings
+        return es["batch_size_per_gpu"], es["local_rank"]
+
+    def get_setting(self, key):
+        return self.train_settings[key]
 
 
 def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=False):
