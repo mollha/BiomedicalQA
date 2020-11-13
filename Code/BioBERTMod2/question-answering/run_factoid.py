@@ -463,7 +463,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
     return dataset
 
 
-def default_settings():
+def get_default_settings():
     return {
         # Required parameters
         "model_type": None,  # "Model type selected in the list: " + ", ".join(MODEL_TYPES)
@@ -518,8 +518,47 @@ def default_settings():
     }
 
 
+def apply_custom_settings():
+    default_settings = get_default_settings()
+
+    custom_train_settings = {
+        "model_type": "bert",
+        "model_name_or_path": "dmis-lab/biobert-base-cased-v1.1",
+        "do_train": True,
+        "train_file": "../datasets/QA/BioASQ/BioASQ-train-yesno-7b.json",
+        "per_gpu_train_batch_size": 12,
+        "learning_rate": 8e-6,
+        "num_train_epochs": 3,
+        "max_seq_length": 384,
+        "seed": 0,
+        "output_dir": "./output"
+    }
+
+    custom_eval_settings = {
+        "model_type": "bert",
+        "model_name_or_path": "./output",
+        "do_eval": True,
+        "predict_file": "../datasets/QA/BioASQ/BioASQ-test-factoid-7b.json",
+        "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
+        "per_gpu_eval_batch_size": 12,
+        "max_seq_length": 384,
+        "seed": 0,
+        "official_eval_dir": "./scripts/bioasq_eval",
+        "output_dir": "./output"
+    }
+
+    def override_settings(settings):
+        for key, value in settings.items():
+            default_settings[key] = value
+
+    override_settings(custom_train_settings)
+    override_settings(custom_eval_settings)
+
+    return default_settings
+
+
 def main():
-    args = default_settings()
+    args = apply_custom_settings()
 
     if args["doc_stride"] >= args["max_seq_length"] - args["max_query_length"]:
         logger.warning(
