@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 def transform_n2b_yesno(nbest_path, output_path):
     
-    ### Setting basic strings 
-
+    ### Setting basic strings
     #### Checking nbest_BioASQ-test prediction.json
     if not os.path.exists(nbest_path):
         print("No file exists!\n#### Fatal Error : Abort!")
@@ -33,7 +32,9 @@ def transform_n2b_yesno(nbest_path, output_path):
     with open(nbest_path, "r") as reader:
         test=json.load(reader)
 
+    print(test)
     qidDict=dict()
+
     if True: # multi output
         for multiQid in test:
             assert len(multiQid)==(24+4) # all multiQid should have length of 24 + 3
@@ -196,6 +197,7 @@ def eval_bioasq_standard(task_num, outfile, golden, cwd):
     result = [float(v) for v in stdout1.decode('utf-8').split(' ')]
     
     return result
+
 
 def read_squad_examples(input_file, is_training):
     """Read a SQuAD json file into a list of SquadExample."""
@@ -384,13 +386,13 @@ class EnvironmentSettings:
             "batch_size_per_gpu": 12,
             "learning_rate": 8e-6,
             "adam_epsilon": 1e-8,
-            "local_rank": -1,
-            "checkpoint_period": 500
+            "checkpoint_period": 500,
+            "gradient_acc_steps": 1,
+            "weight_decay": 0.0
         }
 
         self.eval_settings = {
             "batch_size_per_gpu": 12,
-            "local_rank": -1,
         }
 
     def update_train_settings(self, opt_args):
@@ -402,20 +404,17 @@ class EnvironmentSettings:
     def unpack_train_settings(self):
         ts = self.train_settings
         return ts["number_of_epochs"], ts["max_steps"], ts["batch_size_per_gpu"], ts["learning_rate"],\
-               ts["adam_epsilon"], ts["local_rank"], ts["checkpoint_period"]
+               ts["adam_epsilon"], ts["checkpoint_period"], ts["gradient_acc_steps"], ts["weight_decay"]
 
     def unpack_eval_settings(self):
         es = self.eval_settings
-        return es["batch_size_per_gpu"], es["local_rank"]
+        return es["batch_size_per_gpu"]
 
     def get_setting(self, key):
         return self.train_settings[key]
 
 
-def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=False):
-    if args["local_rank"] not in [-1, 0] and not evaluate:
-        # Make sure only the first process in distributed training process the dataset, and the others will use the cache
-        torch.distributed.barrier()
+def load_and_cache_examples(args, tokenizer, model_name_or_path, evaluate=False, output_examples=False):
 
     # Load data features from cache or dataset file
     input_dir = args["data_dir"] if args["data_dir"] else "."
@@ -423,7 +422,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
         input_dir,
         "cached_{}_{}_{}".format(
             "dev" if evaluate else "train",
-            list(filter(None, args["model_name_or_path"].split("/"))).pop(),
+            list(filter(None, model_name_or_path.split("/"))).pop(),
             str(args["max_seq_length"]),
         ),
     )
@@ -467,15 +466,11 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
             max_query_length=args["max_query_length"],
             is_training=not evaluate,
             return_dataset="pt",
-            threads=args["threads"],
+            threads=1,
         )
 
-        if args["local_rank"] in [-1, 0]:
-            logger.info("Saving features into cached file %s", cached_features_file)
-            torch.save({"features": features, "dataset": dataset, "examples": examples}, cached_features_file)
+        logger.info("Saving features into cached file %s", cached_features_file)
+        torch.save({"features": features, "dataset": dataset, "examples": examples}, cached_features_file)
 
-    if args["local_rank"] == 0 and not evaluate:
-        # Make sure only the first process in distributed training process the dataset, and the others will use the cache
-        torch.distributed.barrier()
 
     return (dataset, examples, features) if output_examples else dataset
