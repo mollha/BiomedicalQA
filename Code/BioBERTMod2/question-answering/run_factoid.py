@@ -52,7 +52,7 @@ try:
 except ImportError:
     from tensorboardX import SummaryWriter
 
-from utils_qa import transform_n2b_factoid, eval_bioasq_standard
+from utils_qa import transform_n2b_factoid, eval_bioasq_standard, to_list
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +67,6 @@ def set_seed(args):
     torch.manual_seed(args["seed"])
     if args["n_gpu"] > 0:
         torch.cuda.manual_seed_all(args["seed"])
-
-
-def to_list(tensor):
-    return tensor.detach().cpu().tolist()
 
 
 def train(args, train_dataset, model, tokenizer):
@@ -88,7 +84,7 @@ def train(args, train_dataset, model, tokenizer):
     else:
         t_total = len(train_dataloader) // args["gradient_accumulation_steps"] * args["num_train_epochs"]
 
-    # Prepare optimizer and schedule (linear warmup and decay)
+    # Prepare optimizer and schedule (linear warm up and decay)
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
@@ -166,7 +162,7 @@ def train(args, train_dataset, model, tokenizer):
     train_iterator = trange(
         epochs_trained, int(args["num_train_epochs"]), desc="Epoch", disable=args["local_rank"] not in [-1, 0]
     )
-    # Added here for reproductibility
+    # Added here for reproducibility
     set_seed(args)
 
     for _ in train_iterator:
@@ -254,10 +250,10 @@ def train(args, train_dataset, model, tokenizer):
                     torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
                     logger.info("Saving optimizer and scheduler states to %s", output_dir)
 
-            if args["max_steps"] > 0 and global_step > args["max_steps"]:
+            if 0 < args["max_steps"] < global_step:
                 epoch_iterator.close()
                 break
-        if args["max_steps"] > 0 and global_step > args["max_steps"]:
+        if 0 < args["max_steps"] < global_step:
             train_iterator.close()
             break
 
@@ -507,8 +503,6 @@ def get_default_settings():
         "overwrite_cache": False,  # Overwrite the cached training and evaluation sets
         "save_steps": 500,  # Save checkpoint every X updates steps.
         "seed": 42,  # random seed for initialization
-        "server_ip": "",  # "Can be used for distant debugging.
-        "server_port": "",  # "Can be used for distant debugging.
         "threads": 1,  # "multiple threads for converting example to features
         "tokenizer_name": "",  # Pretrained tokenizer name or path if not the same as model_name
         "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
@@ -583,15 +577,6 @@ def main():
                 )
             )
 
-        # Setup distant debugging if needed
-        if args["server_ip"] and args["server_port"]:
-            # Distant debugging - see https://code.visualstudio.com/docs/python/debugging#_attach-to-a-local-script
-            import ptvsd
-
-            print("Waiting for debugger attach")
-            ptvsd.enable_attach(address=(args["server_ip"], args["server_port"]), redirect_output=True)
-            ptvsd.wait_for_attach()
-
         # Setup CUDA, GPU & distributed training
         if args["local_rank"] == -1 or args["no_cuda"]:
             device = torch.device("cuda" if torch.cuda.is_available() and not args["no_cuda"] else "cpu")
@@ -601,6 +586,7 @@ def main():
             device = torch.device("cuda", args["local_rank"])
             torch.distributed.init_process_group(backend="nccl")
             args["n_gpu"] = 1
+
         args["device"] = device
 
         # Setup logging

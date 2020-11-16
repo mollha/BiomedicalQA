@@ -69,6 +69,9 @@ def transform_n2b_yesno(nbest_path, output_path):
         json.dump(finalformat, outfile, indent=2)
         print("outfilepath={}".format(outfilepath))
 
+def to_list(tensor):
+    return tensor.detach().cpu().tolist()
+
 def textrip(text):
     if text=="":
         return text
