@@ -69,8 +69,16 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args["seed"])
 
 
+train_args = {
+
+
+}
+
+
 def train(args, train_dataset, model, tokenizer):
     """ Train the model """
+
+    # Create a SummaryWriter()
     tb_writer = SummaryWriter()
 
     args["train_batch_size"] = args["per_gpu_train_batch_size"] * max(1, args["n_gpu"])
@@ -104,18 +112,6 @@ def train(args, train_dataset, model, tokenizer):
         # Load in optimizer and scheduler states
         optimizer.load_state_dict(torch.load(os.path.join(args["model_name_or_path"], "optimizer.pt")))
         scheduler.load_state_dict(torch.load(os.path.join(args["model_name_or_path"], "scheduler.pt")))
-
-    if args["fp16"]:
-        try:
-            from apex import amp
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
-
-        model, optimizer = amp.initialize(model, optimizer, opt_level=args["fp16_opt_level"])
-
-    # multi-gpu training (should be after apex fp16 initialization)
-    if args["n_gpu"] > 1:
-        model = torch.nn.DataParallel(model)
 
     # Start Training!
     logger.info("---------- BEGIN TRAINING ----------")
@@ -195,18 +191,12 @@ def train(args, train_dataset, model, tokenizer):
             if args["gradient_accumulation_steps"] > 1:
                 loss = loss / args["gradient_accumulation_steps"]
 
-            if args["fp16"]:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
+
+            loss.backward()
 
             tr_loss += loss.item()
             if (step + 1) % args["gradient_accumulation_steps"] == 0:
-                if args["fp16"]:
-                    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args["max_grad_norm"])
-                else:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args["max_grad_norm"])
 
                 optimizer.step()
                 scheduler.step()  # Update learning rate schedule
@@ -455,11 +445,7 @@ def get_default_settings():
         "cache_dir": "",  # Where do you want to store the pre-trained models downloaded from s3
         "config_name": "",  # Pretrained config name or path if not the same as model_name
         "data_dir": None, # The input data dir. Should contain the .json files for the task. If no data dir or train/predict files are specified, will run with tensorflow_datasets."
-        "do_train": False,  # Whether to run training.
-        "do_eval": False,  # Whether to run eval on the dev set.
         "do_lower_case": False,  # Set this flag if you are using an uncased model.
-        "fp16": False,  # Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit
-        "fp16_opt_level": "O1", # "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']." See details at https://nvidia.github.io/apex/amp.html
         "max_grad_norm": 1.0,  # Max gradient norm.
         "max_seq_length": 384,  # The maximum total input sequence length after WordPiece tokenization. Sequences " "longer than this will be truncated, and sequences shorter than this will be padded."
         "max_steps": -1,  # If > 0: set total number of training steps to perform. Override num_train_epochs.
@@ -495,14 +481,13 @@ def apply_custom_train_settings(current_settings):
     custom_train_settings = {
         "model_type": "bert",
         "model_name_or_path": "dmis-lab/biobert-base-cased-v1.1",
-        "do_train": True,
-        "train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-        "per_gpu_train_batch_size": 12,
+        "train_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+        "per_gpu_train_batch_size": 8,
         "learning_rate": 8e-6,
-        "num_train_epochs": 3,
+        "num_train_epochs": 1,
         "max_seq_length": 384,
         "seed": 0,
-        "output_dir": "./output"
+        "output_dir": "gdrive/My Drive/BioBERT/question-answering/output"
     }
 
     for key, value in custom_train_settings.items():
@@ -515,14 +500,13 @@ def apply_custom_train_settings(current_settings):
 def apply_custom_eval_settings(current_settings):
     custom_eval_settings = {
         "model_type": "bert",
-        "model_name_or_path": "./output",
-        "do_eval": True,
-        "predict_file": "../datasets/QA/BioASQ/BioASQ-test-factoid-7b.json",
-        "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
+        "model_name_or_path": "gdrive/My Drive/BioBERT/question-answering/output",
+        "predict_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/BioASQ-test-factoid-7b.json",
+        "golden_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/7B_golden.json",
         "per_gpu_eval_batch_size": 12,
         "max_seq_length": 384,
-        "official_eval_dir": "./scripts/bioasq_eval",
-        "output_dir": "./output"
+        "official_eval_dir": "gdrive/My Drive/BioBERT/question-answering/scripts/bioasq_eval",
+        "output_dir": "gdrive/My Drive/BioBERT/question-answering/output"
     }
 
     for key, value in custom_eval_settings.items():
@@ -530,8 +514,46 @@ def apply_custom_eval_settings(current_settings):
 
     return current_settings
 
+# LOCAL TRAINING SETTINGS:
+# def apply_custom_train_settings(current_settings):
+#     custom_train_settings = {
+#         "model_type": "bert",
+#         "model_name_or_path": "dmis-lab/biobert-base-cased-v1.1",
+#         "train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+#         "per_gpu_train_batch_size": 12,
+#         "learning_rate": 8e-6,
+#         "num_train_epochs": 3,
+#         "max_seq_length": 384,
+#         "seed": 0,
+#         "output_dir": "./output"
+#     }
+#
+#     for key, value in custom_train_settings.items():
+#         print(key, value)
+#         current_settings[key] = value
+#
+#     return current_settings
+#
+#
+# def apply_custom_eval_settings(current_settings):
+#     custom_eval_settings = {
+#         "model_type": "bert",
+#         "model_name_or_path": "./output",
+#         "predict_file": "../datasets/QA/BioASQ/BioASQ-test-factoid-7b.json",
+#         "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
+#         "per_gpu_eval_batch_size": 12,
+#         "max_seq_length": 384,
+#         "official_eval_dir": "./scripts/bioasq_eval",
+#         "output_dir": "./output"
+#     }
+#
+#     for key, value in custom_eval_settings.items():
+#         current_settings[key] = value
+#
+#     return current_settings
 
-def main():
+
+def main(train_model=True, evaluate_model=True):
     # Set up training arguments
     args = get_default_settings()
     args = apply_custom_train_settings(args)
@@ -548,7 +570,7 @@ def main():
         if (
             os.path.exists(args["output_dir"])
             and os.listdir(args["output_dir"])
-            and args["do_train"]
+            and train_model
             and not args["overwrite_output_dir"]
         ):
             raise ValueError(
@@ -560,6 +582,7 @@ def main():
         # Setup CUDA, GPU & distributed training
         device = torch.device("cuda" if torch.cuda.is_available() and not args["no_cuda"] else "cpu")
         args["n_gpu"] = 0 if args["no_cuda"] else torch.cuda.device_count()
+        args["device"] = device
 
         # Setup logging
         logging.basicConfig(
@@ -568,10 +591,9 @@ def main():
             level=logging.INFO,
         )
         logger.warning(
-            "Device: %s, n_gpu: %s, 16-bits training: %s",
+            "Device: %s, n_gpu: %s",
             device,
             args["n_gpu"],
-            args["fp16"],
         )
 
         # Set seed
@@ -599,29 +621,18 @@ def main():
 
         logger.info("Training/evaluation parameters %s", args)
 
-        # Before we do anything with models, we want to ensure that we get fp16 execution of torch.einsum if args["fp16"] is set.
-        # Otherwise it'll default to "promote" mode, and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
-        # remove the need for this code, but it is still valid.
-        if args["fp16"]:
-            try:
-                import apex
-
-                apex.amp.register_half_function(torch, "einsum")
-            except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
-
         return model, tokenizer
 
     model, tokenizer = setup()
 
     # Training
-    if args["do_train"]:
+    if train_model:
         train_dataset = load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=False)
         global_step, tr_loss = train(args, train_dataset, model, tokenizer)
         logger.info(" global_step = %s, average loss = %s", global_step, tr_loss)
 
     # Save the trained model and the tokenizer
-    if args["do_train"]:
+    if train_model:
         logger.info("Saving model checkpoint to %s", args["output_dir"])
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
@@ -646,8 +657,8 @@ def main():
     apply_custom_eval_settings(args)
     model, tokenizer = setup()
 
-    if args["do_eval"]:
-        if args["do_train"]:
+    if evaluate_model:
+        if train_model:
             logger.info("Loading checkpoints saved during training for evaluation")
             checkpoints = [args["output_dir"]]
             if args["eval_all_checkpoints"]:
