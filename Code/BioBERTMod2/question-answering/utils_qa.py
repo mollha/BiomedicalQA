@@ -83,6 +83,7 @@ def textrip(text):
         return ""
     return text
 
+
 def transform_n2b_factoid(nbest_path, output_path):
     
     #### Checking nbest_BioASQ-test prediction.json

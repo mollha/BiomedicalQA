@@ -61,8 +61,6 @@ MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-
-
 def set_seed(args):
     random.seed(args["seed"])
     np.random.seed(args["seed"])
@@ -464,6 +462,7 @@ def load_and_cache_examples(args, tokenizer, evaluate=False, output_examples=Fal
 
 
 def get_default_settings():
+
     return {
         # Required parameters
         "model_type": None,  # "Model type selected in the list: " + ", ".join(MODEL_TYPES)
@@ -473,59 +472,57 @@ def get_default_settings():
         "official_eval_dir": './scripts/bioasq_eval',  # BioASQ official golden answer file
 
         # Other parameters
-        "data_dir": None, # The input data dir. Should contain the .json files for the task." "If no data dir or train/predict files are specified, will run with tensorflow_datasets."
-        "train_file": None, # "The input training file. If a data dir is specified, will look for the file there" "If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
+        "adam_epsilon": 1e-8,  # Epsilon for Adam optimizer.
+        "train_file": None, # "The input training file. If a data dir is specified, will look for the file there. If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
         "predict_file": None, # The input evaluation file. If a data dir is specified, will look for the file there" If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
-        "config_name": "",  # Pretrained config name or path if not the same as model_name
-        "tokenizer_name": "",  # Pretrained tokenizer name or path if not the same as model_name
         "cache_dir": "",  # Where do you want to store the pre-trained models downloaded from s3
-        "version_2_with_negative": True,  # If true, the SQuAD examples contain some that do not have an answer.
-        "null_score_diff_threshold": 0.0,  # If null_score - best_non_null is greater than the threshold predict null.
+        "config_name": "",  # Pretrained config name or path if not the same as model_name
+        "data_dir": None, # The input data dir. Should contain the .json files for the task. If no data dir or train/predict files are specified, will run with tensorflow_datasets."
+        "do_train": False,  # Whether to run training.
+        "do_eval": False,  # Whether to run eval on the dev set.
+        "do_lower_case": False,  # Set this flag if you are using an uncased model.
+        "fp16": False,  # Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit
+        "fp16_opt_level": "O1", # "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']." See details at https://nvidia.github.io/apex/amp.html
+        "max_grad_norm": 1.0,  # Max gradient norm.
         "max_seq_length": 384,  # The maximum total input sequence length after WordPiece tokenization. Sequences " "longer than this will be truncated, and sequences shorter than this will be padded."
+        "max_steps": -1,  # If > 0: set total number of training steps to perform. Override num_train_epochs.
         "doc_stride": 128,  # When splitting up a long document into chunks, how much stride to take between chunks
         "max_query_length": 64,  # The maximum number of tokens for the question. Questions longer than this will " "be truncated to this length.
-        "do_train": True, # Whether to run training.
-        "do_eval": True,  # Whether to run eval on the dev set.
-        "evaluate_during_training": True,  # Run evaluation during training at each logging step.
-        "do_lower_case": True,  # Set this flag if you are using an uncased model.
         "per_gpu_train_batch_size": 8,  # Batch size per GPU/CPU for training.
         "per_gpu_eval_batch_size": 8, # Batch size per GPU/CPU for evaluation.
+        "lang_id": 0, # language id of input for language-specific xlm models (see tokenization_xlm.PRETRAINED_INIT_CONFIGURATION)"
         "learning_rate": 5e-5, # The initial learning rate for Adam.
+        "local_rank": -1,  # local_rank for distributed training on gpus
+        "logging_steps": 500,  # Log every X updates steps.
         "gradient_accumulation_steps": 1,  # Number of updates steps to accumulate before performing a backward/update pass.
-        "weight_decay": 0.0, #  Weight decay if we apply some.
-        "adam_epsilon": 1e-8, #  Epsilon for Adam optimizer.
-        "max_grad_norm": 1.0, #  Max gradient norm.
+        "null_score_diff_threshold": 0.0,  # If null_score - best_non_null is greater than the threshold predict null.
         "num_train_epochs": 3.0, # Total number of training epochs to perform.
-        "max_steps": -1, # If > 0: set total number of training steps to perform. Override num_train_epochs.
-        "warmup_steps": 0, # Linear warmup over warmup_steps.
         "n_best_size": 20,  # The total number of n-best predictions to generate in the nbest_predictions.json output file.
         "max_answer_length": 30, # The maximum length of an answer that can be generated. This is needed because the start " and end predictions are not conditioned on one another.
-        "verbose_logging": True, # If true, all of the warnings related to data processing will be printed. " "A number of warnings are expected for a normal SQuAD evaluation.",
-        "lang_id": 0,  # language id of input for language-specific xlm models (see tokenization_xlm.PRETRAINED_INIT_CONFIGURATION)"
-        "logging_steps": 500,  # Log every X updates steps.
+        "verbose_logging": False, # If true, all of the warnings related to data processing will be printed. " "A number of warnings are expected for a normal SQuAD evaluation.",
+        "eval_all_checkpoints": False,  # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
+        "evaluate_during_training": False,  # Run evaluation during training at each logging step.
+        "no_cuda": False,  # Whether not to use CUDA when available
+        "overwrite_output_dir": False,  # Overwrite the content of the output directory
+        "overwrite_cache": False,  # Overwrite the cached training and evaluation sets
         "save_steps": 500,  # Save checkpoint every X updates steps.
-        "eval_all_checkpoints": True,  # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
-        "no_cuda": True,  # Whether not to use CUDA when available
-        "overwrite_output_dir": True,  # Overwrite the content of the output directory
-        "overwrite_cache": True,  # Overwrite the cached training and evaluation sets
         "seed": 42,  # random seed for initialization
-        "local_rank": -1,  # local_rank for distributed training on gpus
-        "fp16": True,  # Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit
-        "fp16_opt_level": "O1",  # "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']." See details at https://nvidia.github.io/apex/amp.html
         "server_ip": "",  # "Can be used for distant debugging.
         "server_port": "",  # "Can be used for distant debugging.
-        "threads": 1  # "multiple threads for converting example to features
+        "threads": 1,  # "multiple threads for converting example to features
+        "tokenizer_name": "",  # Pretrained tokenizer name or path if not the same as model_name
+        "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
+        "warmup_steps": 0,  # Linear warmup over warmup_steps.
+        "weight_decay": 0.0  # Weight decay if we apply some.
     }
 
 
-def apply_custom_settings():
-    default_settings = get_default_settings()
-
+def apply_custom_train_settings(current_settings):
     custom_train_settings = {
         "model_type": "bert",
         "model_name_or_path": "dmis-lab/biobert-base-cased-v1.1",
         "do_train": True,
-        "train_file": "../datasets/QA/BioASQ/BioASQ-train-yesno-7b.json",
+        "train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
         "per_gpu_train_batch_size": 12,
         "learning_rate": 8e-6,
         "num_train_epochs": 3,
@@ -534,6 +531,14 @@ def apply_custom_settings():
         "output_dir": "./output"
     }
 
+    for key, value in custom_train_settings.items():
+        print(key, value)
+        current_settings[key] = value
+
+    return current_settings
+
+
+def apply_custom_eval_settings(current_settings):
     custom_eval_settings = {
         "model_type": "bert",
         "model_name_or_path": "./output",
@@ -542,121 +547,124 @@ def apply_custom_settings():
         "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
         "per_gpu_eval_batch_size": 12,
         "max_seq_length": 384,
-        "seed": 0,
         "official_eval_dir": "./scripts/bioasq_eval",
         "output_dir": "./output"
     }
 
-    def override_settings(settings):
-        for key, value in settings.items():
-            default_settings[key] = value
+    for key, value in custom_eval_settings.items():
+        current_settings[key] = value
 
-    override_settings(custom_train_settings)
-    override_settings(custom_eval_settings)
-
-    return default_settings
+    return current_settings
 
 
 def main():
-    args = apply_custom_settings()
+    # Set up training arguments
+    args = get_default_settings()
+    args = apply_custom_train_settings(args)
 
-    if args["doc_stride"] >= args["max_seq_length"] - args["max_query_length"]:
-        logger.warning(
-            "WARNING - You've set a doc stride which may be superior to the document length in some "
-            "examples. This could result in errors when building features from the examples. Please reduce the doc "
-            "stride or increase the maximum length to ensure the features are correctly built."
-        )
+    def setup():
 
-    if (
-        os.path.exists(args["output_dir"])
-        and os.listdir(args["output_dir"])
-        and args["do_train"]
-        and not args["overwrite_output_dir"]
-    ):
-        raise ValueError(
-            "Output directory ({}) already exists and is not empty. Use --overwrite_output_dir to overcome.".format(
-                args["output_dir"]
+        if args["doc_stride"] >= args["max_seq_length"] - args["max_query_length"]:
+            logger.warning(
+                "WARNING - You've set a doc stride which may be superior to the document length in some "
+                "examples. This could result in errors when building features from the examples. Please reduce the doc "
+                "stride or increase the maximum length to ensure the features are correctly built."
             )
+
+        if (
+            os.path.exists(args["output_dir"])
+            and os.listdir(args["output_dir"])
+            and args["do_train"]
+            and not args["overwrite_output_dir"]
+        ):
+            raise ValueError(
+                "Output directory ({}) already exists and is not empty. Use --overwrite_output_dir to overcome.".format(
+                    args["output_dir"]
+                )
+            )
+
+        # Setup distant debugging if needed
+        if args["server_ip"] and args["server_port"]:
+            # Distant debugging - see https://code.visualstudio.com/docs/python/debugging#_attach-to-a-local-script
+            import ptvsd
+
+            print("Waiting for debugger attach")
+            ptvsd.enable_attach(address=(args["server_ip"], args["server_port"]), redirect_output=True)
+            ptvsd.wait_for_attach()
+
+        # Setup CUDA, GPU & distributed training
+        if args["local_rank"] == -1 or args["no_cuda"]:
+            device = torch.device("cuda" if torch.cuda.is_available() and not args["no_cuda"] else "cpu")
+            args["n_gpu"] = 0 if args["no_cuda"] else torch.cuda.device_count()
+        else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+            torch.cuda.set_device(args["local_rank"])
+            device = torch.device("cuda", args["local_rank"])
+            torch.distributed.init_process_group(backend="nccl")
+            args["n_gpu"] = 1
+        args["device"] = device
+
+        # Setup logging
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+            datefmt="%m/%d/%Y %H:%M:%S",
+            level=logging.INFO if args["local_rank"] in [-1, 0] else logging.WARN,
+        )
+        logger.warning(
+            "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
+            args["local_rank"],
+            device,
+            args["n_gpu"],
+            bool(args["local_rank"] != -1),
+            args["fp16"],
         )
 
-    # Setup distant debugging if needed
-    if args["server_ip"] and args["server_port"]:
-        # Distant debugging - see https://code.visualstudio.com/docs/python/debugging#_attach-to-a-local-script
-        import ptvsd
+        # Set seed
+        set_seed(args)
 
-        print("Waiting for debugger attach")
-        ptvsd.enable_attach(address=(args["server_ip"], args["server_port"]), redirect_output=True)
-        ptvsd.wait_for_attach()
+        # Load pretrained model and tokenizer
+        if args["local_rank"] not in [-1, 0]:
+            # Make sure only the first process in distributed training will download model & vocab
+            torch.distributed.barrier()
 
-    # Setup CUDA, GPU & distributed training
-    if args["local_rank"] == -1 or args["no_cuda"]:
-        device = torch.device("cuda" if torch.cuda.is_available() and not args["no_cuda"] else "cpu")
-        args["n_gpu"] = 0 if args["no_cuda"] else torch.cuda.device_count()
-    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.cuda.set_device(args["local_rank"])
-        device = torch.device("cuda", args["local_rank"])
-        torch.distributed.init_process_group(backend="nccl")
-        args["n_gpu"] = 1
-    args["device"] = device
+        args["model_type"] = args["model_type"].lower()
+        config = AutoConfig.from_pretrained(
+            args["config_name"] if args["config_name"] else args["model_name_or_path"],
+            cache_dir=args["cache_dir"] if args["cache_dir"] else None,
+        )
+        tokenizer = AutoTokenizer.from_pretrained(
+            args["tokenizer_name"] if args["tokenizer_name"] else args["model_name_or_path"],
+            do_lower_case=args["do_lower_case"],
+            cache_dir=args["cache_dir"] if args["cache_dir"] else None,
+        )
+        model = AutoModelForQuestionAnswering.from_pretrained(
+            args["model_name_or_path"],
+            from_tf=bool(".ckpt" in args["model_name_or_path"]),
+            config=config,
+            cache_dir=args["cache_dir"] if args["cache_dir"] else None,
+        )
 
-    # Setup logging
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO if args["local_rank"] in [-1, 0] else logging.WARN,
-    )
-    logger.warning(
-        "Process rank: %s, device: %s, n_gpu: %s, distributed training: %s, 16-bits training: %s",
-        args["local_rank"],
-        device,
-        args["n_gpu"],
-        bool(args["local_rank"] != -1),
-        args["fp16"],
-    )
+        if args["local_rank"] == 0:
+            # Make sure only the first process in distributed training will download model & vocab
+            torch.distributed.barrier()
 
-    # Set seed
-    set_seed(args)
+        model.to(args["device"])
 
-    # Load pretrained model and tokenizer
-    if args["local_rank"] not in [-1, 0]:
-        # Make sure only the first process in distributed training will download model & vocab
-        torch.distributed.barrier()
+        logger.info("Training/evaluation parameters %s", args)
 
-    args["model_type"] = args["model_type"].lower()
-    config = AutoConfig.from_pretrained(
-        args["config_name"] if args["config_name"] else args["model_name_or_path"],
-        cache_dir=args["cache_dir"] if args["cache_dir"] else None,
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        args["tokenizer_name"] if args["tokenizer_name"] else args["model_name_or_path"],
-        do_lower_case=args["do_lower_case"],
-        cache_dir=args["cache_dir"] if args["cache_dir"] else None,
-    )
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        args["model_name_or_path"],
-        from_tf=bool(".ckpt" in args["model_name_or_path"]),
-        config=config,
-        cache_dir=args["cache_dir"] if args["cache_dir"] else None,
-    )
+        # Before we do anything with models, we want to ensure that we get fp16 execution of torch.einsum if args["fp16"] is set.
+        # Otherwise it'll default to "promote" mode, and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
+        # remove the need for this code, but it is still valid.
+        if args["fp16"]:
+            try:
+                import apex
 
-    if args["local_rank"] == 0:
-        # Make sure only the first process in distributed training will download model & vocab
-        torch.distributed.barrier()
+                apex.amp.register_half_function(torch, "einsum")
+            except ImportError:
+                raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
 
-    model.to(args["device"])
+        return model, tokenizer
 
-    logger.info("Training/evaluation parameters %s", args)
-
-    # Before we do anything with models, we want to ensure that we get fp16 execution of torch.einsum if args["fp16"] is set.
-    # Otherwise it'll default to "promote" mode, and we'll get fp32 operations. Note that running `--fp16_opt_level="O2"` will
-    # remove the need for this code, but it is still valid.
-    if args["fp16"]:
-        try:
-            import apex
-
-            apex.amp.register_half_function(torch, "einsum")
-        except ImportError:
-            raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
+    model, tokenizer = setup()
 
     # Training
     if args["do_train"]:
@@ -684,6 +692,12 @@ def main():
 
     # Evaluation - we can ask to evaluate all the checkpoints (sub-directories) in a directory
     results = {}
+
+    # Set up evaluation arguments
+    args = get_default_settings()
+    apply_custom_eval_settings(args)
+    model, tokenizer = setup()
+
     if args["do_eval"] and args["local_rank"] in [-1, 0]:
         if args["do_train"]:
             logger.info("Loading checkpoints saved during training for evaluation")
