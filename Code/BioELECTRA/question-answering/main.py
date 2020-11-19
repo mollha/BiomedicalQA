@@ -3,6 +3,8 @@ from os import path
 from random import seed
 from numpy import random
 from glob import glob
+from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
+from run_factoid import train, evaluate
 
 from transformers import (
     WEIGHTS_NAME,
@@ -12,13 +14,44 @@ from transformers import (
     squad_convert_examples_to_features,
 )
 
-from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
-from run_factoid import train, evaluate
 
+# ------------- SPECIFY MODELS AND THEIR RELEVANT PATHS -------------
 # Ensure that lowercase model is used for model_type
 models = {
     "biobert": {"model_type": "bert", "model_path": "dmis-lab/biobert-base-cased-v1.1", "uncased": False},
     "electra": {"model_type": "electra", "model_path": "google/electra-base-discriminator", "uncased": False}
+}
+
+# ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
+train_settings = {
+    "batch_size": 8,
+    "epochs": 1,
+    "learning_rate": 8e-6,  # The initial learning rate for Adam.
+    "decay": 0.0,  # Weight decay if we apply some.
+    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
+    "max_grad_norm": 1.0,  # Max gradient norm.
+    "evaluate_all_checkpoints": False,
+    "update_steps": 500
+}
+
+eval_settings = {
+    "eval_batch_size": 12,
+    "n_best_size": 20,  # The total number of n-best predictions to generate in the nbest_predictions.json output file.
+    "max_answer_length": 30,  # maximum length of a generated answer
+    "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
+}
+
+# ----------------------- SPECIFY DATASET PATHS -----------------------
+colab_datasets = {
+    "bioasq": {"train_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+               "golden_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/7B_golden.json",
+               "official_eval_dir": "gdrive/My Drive/BioBERT/question-answering/scripts/bioasq_eval"},
+}
+
+local_datasets = {
+    "bioasq": {"train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+               "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
+               "official_eval_dir": "./scripts/bioasq_eval"},
 }
 
 
@@ -117,40 +150,12 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
     return dataset
 
 
-train_settings = {
-    "batch_size": 8,
-    "epochs": 1,  # Total number of training epochs to perform.
-    "learning_rate": 8e-6,  # The initial learning rate for Adam.
-    "decay": 0.0,  # Weight decay if we apply some.
-    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
-    "max_grad_norm": 1.0,  # Max gradient norm.
-    "evaluate_all_checkpoints": False
-}
-
-eval_settings = {
-    "eval_batch_size": 12,
-    "n_best_size": 20,  # The total number of n-best predictions to generate in the nbest_predictions.json output file.
-    "max_answer_length": 30,  # The maximum length of an answer that can be generated. This is needed because the start " and end predictions are not conditioned on one another.
-    "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
-}
-
-datasets = {
-    "bioasq": {"train_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-               "golden_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/7B_golden.json",
-               "official_eval_dir": "gdrive/My Drive/BioBERT/question-answering/scripts/bioasq_eval",
-               },
-}
-
-datasets2 = {
-    "bioasq": {"train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-               "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
-               "official_eval_dir": "./scripts/bioasq_eval",
-               },
-}
-
 if __name__ == "__main__":
-    # The output directory where the model checkpoints and predictions will be written.
-    save_dir = "gdrive/My Drive/BioBERT/question-answering/output"  # "./output"
+    run_on_colab = False
+
+    # output folder for model checkpoints and predictions
+    save_dir = "gdrive/My Drive/BioBERT/question-answering/output" if run_on_colab else "./output"
+    datasets = colab_datasets if run_on_colab else local_datasets
 
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
     train_model, evaluate_model = True, True
@@ -159,29 +164,17 @@ if __name__ == "__main__":
     # Setup CUDA, GPU & distributed training
     device = device("cuda" if cuda.is_available() else "cpu")
     gpu_available = bool(cuda.device_count() > 0)
-    print("Device: {}, GPU available: {}".format(device, gpu_available))
+    print("Device: {}, GPU available: {}".format(str(device).upper(), gpu_available))
 
     set_seed(0, gpu_available)  # fix seed for reproducibility
-    model, tokenizer = load_pretrained_model_tokenizer(model_info["model_path"],
-                                                       model_info["uncased"], device)
+    model, tokenizer = load_pretrained_model_tokenizer(model_info["model_path"], model_info["uncased"], device)
 
     # Training
     if train_model:
         training_set = load_and_cache_examples(tokenizer, model_info["model_path"], dataset_info["train_file"],
                                                evaluate=False, output_examples=False)
 
-        global_step, tr_loss = train(training_set, model, tokenizer, model_info,
-                                     device, save_dir, train_settings, dataset_info)
-        print("global_step = {}, average loss = {}".format(global_step, tr_loss))
-
-        # ------------- SAVE FINE-TUNED TOKENIZER AND MODEL -------------
-        save_model = model.module if hasattr(model, "module") else model
-        save_model.save_pretrained(save_dir)
-        tokenizer.save_pretrained(save_dir)
-
-        # save training settings with trained model
-        save(train_settings, path.join(save_dir, "train_settings.bin"))
-        print("Saved model checkpoint to {}".format(save_dir))
+        train(training_set, model, tokenizer, model_info, device, save_dir, train_settings, dataset_info)
 
     # --------------- LOAD FINE-TUNED MODEL AND VOCAB ---------------
     model = AutoModelForQuestionAnswering.from_pretrained(save_dir)
