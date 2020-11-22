@@ -23,6 +23,146 @@ from _utils.would_like_to_pr import *
 """
 
 
+class ELECTRADataProcessor(object):
+    """Given a stream of input text, creates pretraining examples."""
+
+    def __init__(self, hf_dset, tokenizer, max_length, text_col='text', lines_delimiter='\n',
+                 minimize_data_size=True, apply_cleaning=True):
+        self.tokenizer = tokenizer
+        self._current_sentences = []
+        self._current_length = 0
+        self._max_length = max_length
+        self._target_length = max_length
+
+        self.hf_dset = hf_dset
+        self.text_col = text_col
+        self.lines_delimiter = lines_delimiter
+        self.minimize_data_size = minimize_data_size
+        self.apply_cleaning = apply_cleaning
+
+    def map(self, **kwargs):
+        "Some settings of datasets.Dataset.map for ELECTRA data processing"
+        num_proc = kwargs.pop('num_proc', os.cpu_count())
+        return self.hf_dset.my_map(
+            function=self,
+            batched=True,
+            remove_columns=self.hf_dset.column_names,  # this is must b/c we will return different number of rows
+            disable_nullable=True,
+            input_columns=[self.text_col],
+            writer_batch_size=10 ** 4,
+            num_proc=num_proc,
+            **kwargs
+        )
+
+    def __call__(self, texts):
+        if self.minimize_data_size:
+            new_example = {'input_ids': [], 'sentA_length': []}
+        else:
+            new_example = {'input_ids': [], 'input_mask': [], 'segment_ids': []}
+
+        for text in texts:  # for every doc
+
+            for line in re.split(self.lines_delimiter, text):  # for every paragraph
+
+                if re.fullmatch(r'\s*', line): continue  # empty string or string with all space characters
+                if self.apply_cleaning and self.filter_out(line): continue
+
+                example = self.add_line(line)
+                if example:
+                    for k, v in example.items(): new_example[k].append(v)
+
+            if self._current_length != 0:
+                example = self._create_example()
+                for k, v in example.items(): new_example[k].append(v)
+
+        return new_example
+
+    def filter_out(self, line):
+        if len(line) < 80: return True
+        return False
+
+    def clean(self, line):
+        # () is remainder after link in it filtered out
+        return line.strip().replace("\n", " ").replace("()", "")
+
+    def add_line(self, line):
+        """Adds a line of text to the current example being built."""
+        line = self.clean(line)
+        tokens = self.tokenizer.tokenize(line)
+        tokids = self.tokenizer.convert_tokens_to_ids(tokens)
+        self._current_sentences.append(tokids)
+        self._current_length += len(tokids)
+        if self._current_length >= self._target_length:
+            return self._create_example()
+        return None
+
+    def _create_example(self):
+        """Creates a pre-training example from the current list of sentences."""
+        # small chance to only have one segment as in classification tasks
+        if random.random() < 0.1:
+            first_segment_target_length = 100000
+        else:
+            # -3 due to not yet having [CLS]/[SEP] tokens in the input text
+            first_segment_target_length = (self._target_length - 3) // 2
+
+        first_segment = []
+        second_segment = []
+        for sentence in self._current_sentences:
+            # the sentence goes to the first segment if (1) the first segment is
+            # empty, (2) the sentence doesn't put the first segment over length or
+            # (3) 50% of the time when it does put the first segment over length
+            if (len(first_segment) == 0 or
+                    len(first_segment) + len(sentence) < first_segment_target_length or
+                    (len(second_segment) == 0 and
+                     len(first_segment) < first_segment_target_length and
+                     random.random() < 0.5)):
+                first_segment += sentence
+            else:
+                second_segment += sentence
+
+        # trim to max_length while accounting for not-yet-added [CLS]/[SEP] tokens
+        first_segment = first_segment[:self._max_length - 2]
+        second_segment = second_segment[:max(0, self._max_length -
+                                             len(first_segment) - 3)]
+
+        # prepare to start building the next example
+        self._current_sentences = []
+        self._current_length = 0
+        # small chance for random-length instead of max_length-length example
+        if random.random() < 0.05:
+            self._target_length = random.randint(5, self._max_length)
+        else:
+            self._target_length = self._max_length
+
+        return self._make_example(first_segment, second_segment)
+
+    def _make_example(self, first_segment, second_segment):
+        """Converts two "segments" of text into a tf.train.Example."""
+        input_ids = [self.tokenizer.cls_token_id] + first_segment + [self.tokenizer.sep_token_id]
+        sentA_length = len(input_ids)
+        segment_ids = [0] * sentA_length
+        if second_segment:
+            input_ids += second_segment + [self.tokenizer.sep_token_id]
+            segment_ids += [1] * (len(second_segment) + 1)
+
+        if self.minimize_data_size:
+            return {
+                'input_ids': input_ids,
+                'sentA_length': sentA_length,
+            }
+        else:
+            input_mask = [1] * len(input_ids)
+            input_ids += [0] * (self._max_length - len(input_ids))
+            input_mask += [0] * (self._max_length - len(input_mask))
+            segment_ids += [0] * (self._max_length - len(segment_ids))
+            return {
+                'input_ids': input_ids,
+                'input_mask': input_mask,
+                'segment_ids': segment_ids,
+            }
+
+
+
 # define config here
 config = {
     'device': 'cuda:0',
@@ -30,18 +170,17 @@ config = {
     'seed': 0,
     'adam_bias_correction': False,
     'schedule': 'original_linear',
-    # choose from 'original_linear', 'separate_linear', 'one_cycle', 'adjusted_one_cycle'
     'sampling': 'fp32_gumbel',  # choose from 'fp32_gumbel', 'fp16_gumbel', 'multinomial'
     'electra_mask_style': True,
     'gen_smooth_label': False,
     'disc_smooth_label': False,
     'size': 'small',
-    'datas': ['openwebtext'],  # choose from ['wikipedia', 'bookcorpus', 'openwebtext']
     'num_workers': 3,
 }
 
+dataset_names = ['openwebtext']  # choose from ['wikipedia', 'bookcorpus', 'openwebtext'] openwebtext was used before
 
-# %%
+
 # Check and Default
 config["run_name"] = f'{config["base_run_name"]}_{config["seed"]}'
 if config["gen_smooth_label"] is True: config["gen_smooth_label"] = 0.1
@@ -49,19 +188,21 @@ if config["disc_smooth_label"] is True: config["disc_smooth_label"] = 0.1
 
 # Setting of different sizes
 i = ['small', 'base', 'large'].index(config['size'])
+
 config["mask_prob"] = [0.15, 0.15, 0.25][i]
 config["lr"] = [5e-4, 2e-4, 2e-4][i]
-config.bs = [128, 256, 2048][i]
+config["bs"] = [128, 256, 2048][i]
 config["steps"] = [10**6, 766*1000, 400*1000][i]
-config.max_length = [128, 512, 512][i]
+config["max_length"] = [128, 512, 512][i]
 generator_size_divisor = [4, 3, 4][i]
-disc_config = ElectraConfig.from_pretrained(f'google/electra-{config['size']}-discriminator')
-gen_config = ElectraConfig.from_pretrained(f'google/electra-{config['size']}-generator')
+
+disc_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-discriminator')
+gen_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-generator')
 # note that public electra-small model is actually small++ and don't scale down generator size 
 gen_config.hidden_size = int(disc_config.hidden_size/generator_size_divisor)
 gen_config.num_attention_heads = disc_config.num_attention_heads//generator_size_divisor
 gen_config.intermediate_size = disc_config.intermediate_size//generator_size_divisor
-hf_tokenizer = ElectraTokenizerFast.from_pretrained(f"google/electra-{config['size']}-generator")
+electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
 # logger was removed entirely
 
@@ -73,38 +214,41 @@ edl_cache_dir.mkdir(exist_ok=True)
 
 # Print info
 print(f"process id: {os.getpid()}")
-print(c)
-
-
-
-# %% [markdown]
-# # 1. Load Data
 
 # %%
 dsets = []
-ELECTRAProcessor = partial(ELECTRADataProcessor, hf_tokenizer=hf_tokenizer, max_length=config["max_length"])
 
-# Wikipedia
-if 'wikipedia' in config.datas:
-  print('load/download wiki dataset')
-  wiki = datasets.load_dataset('wikipedia', '20200501.en', cache_dir='./datasets')['train']
-  print('load/create data from wiki dataset for ELECTRA')
-  e_wiki = ELECTRAProcessor(wiki).map(cache_file_name=f"electra_wiki_{config["max_length"]}.arrow", num_proc=1)
-  dsets.append(e_wiki)
+# creating this partial function is the first place that electra_tokenizer is used.
+ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
+# todo check the type of the object that is returned by line 227
 
-# OpenWebText
-if 'openwebtext' in config["datas"]:
-  print('load/download OpenWebText Corpus')
-  owt = datasets.load_dataset('openwebtext', cache_dir='./datasets')['train']
-  print('load/create data from OpenWebText Corpus for ELECTRA')
-  e_owt = ELECTRAProcessor(owt, apply_cleaning=False).map(cache_file_name=f"electra_owt_{config['max_length']}.arrow", num_proc=1)
-  dsets.append(e_owt)
 
-assert len(dsets) == len(config["datas"])
+
+dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files={'train': ['my_train_file_1.csv', 'my_train_file_2.csv']})['train']
+
+
+# # Wikipedia
+# if 'wikipedia' in dataset_names:
+#   print('load/download wiki dataset')
+#   wiki = datasets.load_dataset('wikipedia', name='20200501.en', cache_dir='./datasets')['train']
+#   print('load/create data from wiki dataset for ELECTRA')
+#   e_wiki = ELECTRAProcessor(wiki).map(cache_file_name=f'electra_wiki_{config["max_length"]}.arrow', num_proc=1)
+#   dsets.append(e_wiki)
+
+
+# # OpenWebText
+# if 'openwebtext' in dataset_names:
+#   print('Load / Download OpenWebText Corpus')
+#   owt = datasets.load_dataset('openwebtext', cache_dir='./datasets')['train']
+#   print('load/create data from OpenWebText Corpus for ELECTRA')
+#   e_owt = ELECTRAProcessor(owt, apply_cleaning=False).map(cache_file_name=f"electra_owt_{config['max_length']}.arrow", num_proc=1)
+#   dsets.append(e_owt)
+
+assert len(dsets) == len(dataset_names)
 
 merged_dsets = {'train': datasets.concatenate_datasets(dsets)}
-hf_dsets = HF_Datasets(merged_dsets, cols={'input_ids':TensorText,'sentA_length':noop},
-                       hf_toker=hf_tokenizer, n_inp=2)
+hf_dsets = HF_Datasets(merged_dsets, cols={'input_ids':TensorText,'sentA_length': noop},
+                       hf_toker=electra_tokenizer, n_inp=2)
 dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], pin_memory=False,
                            shuffle_train=True,
                            srtkey_fc=False, 
@@ -160,11 +304,15 @@ def mask_tokens(inputs, mask_token_index, vocab_size, special_token_indices, mlm
 
   return inputs, labels, mlm_mask
 
+
 class MaskedLMCallback(Callback):
+  "MaskedLM Callback class handling tweaks of the training loop by changing a `Learner` in various events"
+
   @delegates(mask_tokens)
-  def __init__(self, mask_tok_id, special_tok_ids, vocab_size, ignore_index=-100, for_electra=False, **kwargs):
+  def __init__(self, mask_tok_id, special_tok_ids, vocab_size, ignore_index=-100, **kwargs):
     self.ignore_index = ignore_index
-    self.for_electra = for_electra
+
+    # assumes for_electra is true
     self.mask_tokens = partial(mask_tokens,
                                mask_token_index=mask_tok_id,
                                special_token_indices=special_tok_ids,
@@ -172,24 +320,33 @@ class MaskedLMCallback(Callback):
                                ignore_index=-100,
                                **kwargs)
 
-  def before_batch(self):
-    input_ids, sentA_lenths  = self.xb
+  def before_batch(self) -> None:
+    """
+    Compute the masked inputs - in ELECTRA, MLM is used, therefore the raw batches should
+    not be passed to the model.
+
+    ---- Attributes of Learner: ----
+    xb: last input drawn from self.dl (current DataLoader used for iteration), potentially modified by callbacks
+    yb: last target drawn from self.dl (potentially modified by callbacks).
+    --------------------------------
+
+    :return: None
+    """
+
+    input_ids, sent_lengths = self.xb
     masked_inputs, labels, is_mlm_applied = self.mask_tokens(input_ids)
-    if self.for_electra:
-      self.learn.xb, self.learn.yb = (masked_inputs, sentA_lenths, is_mlm_applied, labels), (labels,)
-    else:
-      self.learn.xb, self.learn.yb = (masked_inputs, sentA_lenths), (labels,)
+    self.learn.xb, self.learn.yb = (masked_inputs, sent_lengths, is_mlm_applied, labels), (labels,)
+
 
   @delegates(TfmdDL.show_batch)
   def show_batch(self, dl, idx_show_ignored, verbose=True, **kwargs):
-    b = dl.one_batch()
-    input_ids, sentA_lenths  = b
+    input_ids, sent_lengths = dl.one_batch()
     masked_inputs, labels, is_mlm_applied = self.mask_tokens(input_ids.clone())
     # check
-    assert torch.equal(is_mlm_applied, labels!=self.ignore_index)
+    assert torch.equal(is_mlm_applied, labels != self.ignore_index)
     assert torch.equal((~is_mlm_applied *masked_inputs + is_mlm_applied * labels), input_ids)
     # change symbol to show the ignored position
-    labels[labels==self.ignore_index] = idx_show_ignored
+    labels[labels == self.ignore_index] = idx_show_ignored
     # some notice to help understand the masking mechanism
     if verbose: 
       print("We won't count loss from position where y is ignore index")
@@ -197,39 +354,37 @@ class MaskedLMCallback(Callback):
       print("Notice 2. Special tokens (CLS, SEP) won't be masked.")
       print("Notice 3. Dynamic masking: every time you run gives you different results.")
     # show
-    tfm_b =(masked_inputs, sentA_lenths, is_mlm_applied, labels) if self.for_electra else (masked_inputs, sentA_lenths, labels)   
+    tfm_b = (masked_inputs, sent_lengths, is_mlm_applied, labels)
     dl.show_batch(b=tfm_b, **kwargs)
 
 
 # %%
-mlm_cb = MaskedLMCallback(mask_tok_id=hf_tokenizer.mask_token_id, 
-                          special_tok_ids=hf_tokenizer.all_special_ids, 
-                          vocab_size=hf_tokenizer.vocab_size,
+mlm_cb = MaskedLMCallback(mask_tok_id=electra_tokenizer.mask_token_id,
+                          special_tok_ids=electra_tokenizer.all_special_ids,
+                          vocab_size=electra_tokenizer.vocab_size,
                           mlm_probability=config["mask_prob"],
                           replace_prob=0.0 if config["electra_mask_style"] else 0.1,
-                          orginal_prob=0.15 if config["electra_mask_style"] else 0.1,
-                          for_electra=True)
-#mlm_cb.show_batch(dls[0], idx_show_ignored=hf_tokenizer.convert_tokens_to_ids(['#'])[0])
+                          orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
+#mlm_cb.show_batch(dls[0], idx_show_ignored=electra_tokenizer.convert_tokens_to_ids(['#'])[0])
 
-# %% [markdown]
-# # 3. ELECTRA (replaced token detection objective)
+# 3. ELECTRA (replaced token detection objective)
 # see details in paper [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555)
 
 # %%
 class ELECTRAModel(nn.Module):
   
-  def __init__(self, generator, discriminator, hf_tokenizer):
+  def __init__(self, generator, discriminator, electra_tokenizer):
     super().__init__()
-    self.generator, self.discriminator = generator,discriminator
+    self.generator, self.discriminator = generator, discriminator
     self.gumbel_dist = torch.distributions.gumbel.Gumbel(0.,1.)
-    self.hf_tokenizer = hf_tokenizer
+    self.electra_tokenizer = electra_tokenizer
 
   def to(self, *args, **kwargs):
     "Also set dtype and device of contained gumbel distribution if needed"
     super().to(*args, **kwargs)
     a_tensor = next(self.parameters())
     device, dtype = a_tensor.device, a_tensor.dtype
-    if config["sampling"]=='fp32_gumbel': dtype = torch.float32
+    if config["sampling"] == 'fp32_gumbel': dtype = torch.float32
     self.gumbel_dist = torch.distributions.gumbel.Gumbel(torch.tensor(0., device=device, dtype=dtype), torch.tensor(1., device=device, dtype=dtype))
 
   def forward(self, masked_inputs, sentA_lenths, is_mlm_applied, labels):
@@ -263,7 +418,7 @@ class ELECTRAModel(nn.Module):
     """
     Only cost you about 500 µs for (128, 128) on GPU, but so that your dataset won't need to save attention_mask and token_type_ids and won't be unnecessarily large, thus, prevent cpu processes loading batches from consuming lots of cpu memory and slow down the machine. 
     """
-    attention_mask = input_ids != self.hf_tokenizer.pad_token_id
+    attention_mask = input_ids != self.electra_tokenizer.pad_token_id
     seq_len = input_ids.shape[1]
     token_type_ids = torch.tensor([ ([0]*len + [1]*(seq_len-len)) for len in sentA_lenths.tolist()],  
                                   device=input_ids.device)
@@ -277,6 +432,7 @@ class ELECTRAModel(nn.Module):
       return (logits + self.gumbel_dist.sample(logits.shape)).argmax(dim=-1)
     elif config["sampling"] == 'multinomial': # 2.X ms
       return torch.multinomial(F.softmax(logits, dim=-1), 1).squeeze()
+
 
 class ELECTRALoss():
   def __init__(self, loss_weights=(1.0, 50.0), gen_label_smooth=False, disc_label_smooth=False):
@@ -300,11 +456,16 @@ class ELECTRALoss():
 
 # %%
 # Seed & PyTorch benchmark
+
 torch.backends.cudnn.benchmark = True
-dls[0].rng = random.Random(c["seed"]) # for fastai dataloader
-random.seed(c["seed"])
-np.random.seed(c["seed"])
-torch.manual_seed(c["seed"])
+
+def set_seed(seed_value):
+    dls[0].rng = random.Random(seed_value)  # for fastai dataloader
+    random.seed(seed_value)
+    np.random.seed(seed_value)
+    torch.manual_seed(seed_value)
+
+set_seed(config["seed"])
 
 # Generator and Discriminator
 generator = ElectraForMaskedLM(gen_config)
@@ -313,20 +474,12 @@ discriminator.electra.embeddings = generator.electra.embeddings
 generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
 
 # ELECTRA training loop
-electra_model = ELECTRAModel(generator, discriminator, hf_tokenizer)
+electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 electra_loss_func = ELECTRALoss(gen_label_smooth=config["gen_smooth_label"], disc_label_smooth=config["disc_smooth_label"])
 
 # Optimizer
 if config["adam_bias_correction"]: opt_func = partial(Adam, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
 else: opt_func = partial(Adam_no_bias_correction, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
-
-# Learning rate shedule
-if config["schedule"].endswith('linear'):
-  lr_shed_func = linear_warmup_and_then_decay if config["schedule"]=='separate_linear' else linear_warmup_and_decay
-  lr_shedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
-                                             lr_max=config["lr"],
-                                             warmup_steps=10000,
-                                             total_steps=config["steps"],)})
 
 
 # Learner
@@ -349,9 +502,13 @@ learn.add_cb(GradientClipping(1.))
 # Print time and run name
 print(f"{config['run_name']} , starts at {datetime.now()}")
 
+# Learning rate schedule
+lr_schedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
+                                         lr_max=config["lr"],
+                                         warmup_steps=10000,
+                                         total_steps=config["steps"],)})
+
 # Run
-if config["schedule"] == 'one_cycle': learn.fit_one_cycle(9999, lr_max=config["lr"])
-elif config["schedule"] == 'adjusted_one_cycle': learn.fit_one_cycle(9999, lr_max=config["lr"], div=1e5, pct_start=10000/config["steps"])
-else: learn.fit(9999, cbs=[lr_shedule])
+learn.fit(9999, cbs=[lr_schedule])
 
 
