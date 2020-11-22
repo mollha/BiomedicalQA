@@ -22,50 +22,46 @@ from _utils.would_like_to_pr import *
 """ Vanilla ELECTRA settings
 """
 
-c = MyConfig({
+
+# define config here
+config = {
     'device': 'cuda:0',
-    'base_run_name': 'vanilla', # run_name = {base_run_name}_{seed}
+    'base_run_name': 'vanilla',  # run_name = {base_run_name}_{seed}
     'seed': 0,
     'adam_bias_correction': False,
     'schedule': 'original_linear',
-    'sampling': 'fp32_gumbel',
+    # choose from 'original_linear', 'separate_linear', 'one_cycle', 'adjusted_one_cycle'
+    'sampling': 'fp32_gumbel',  # choose from 'fp32_gumbel', 'fp16_gumbel', 'multinomial'
     'electra_mask_style': True,
     'gen_smooth_label': False,
     'disc_smooth_label': False,
-
     'size': 'small',
-    'datas': ['openwebtext'],
-    
+    'datas': ['openwebtext'],  # choose from ['wikipedia', 'bookcorpus', 'openwebtext']
     'num_workers': 3,
-})
+}
 
 
 # %%
 # Check and Default
-assert c.sampling in ['fp32_gumbel', 'fp16_gumbel', 'multinomial']
-assert c.schedule in ['original_linear', 'separate_linear', 'one_cycle', 'adjusted_one_cycle']
-for data in c.datas: assert data in ['wikipedia', 'bookcorpus', 'openwebtext']
-if not c.base_run_name: c.base_run_name = str(datetime.now(timezone(timedelta(hours=+8))))[6:-13].replace(' ','').replace(':','').replace('-','')
-if not c.seed: c.seed = random.randint(0, 999999)
-c.run_name = f'{c.base_run_name}_{c.seed}'
-if c.gen_smooth_label is True: c.gen_smooth_label = 0.1
-if c.disc_smooth_label is True: c.disc_smooth_label = 0.1
+config["run_name"] = f'{config["base_run_name"]}_{config["seed"]}'
+if config["gen_smooth_label"] is True: config["gen_smooth_label"] = 0.1
+if config["disc_smooth_label"] is True: config["disc_smooth_label"] = 0.1
 
 # Setting of different sizes
-i = ['small', 'base', 'large'].index(c.size)
-c.mask_prob = [0.15, 0.15, 0.25][i]
-c.lr = [5e-4, 2e-4, 2e-4][i]
-c.bs = [128, 256, 2048][i]
-c.steps = [10**6, 766*1000, 400*1000][i]
-c.max_length = [128, 512, 512][i]
+i = ['small', 'base', 'large'].index(config['size'])
+config["mask_prob"] = [0.15, 0.15, 0.25][i]
+config["lr"] = [5e-4, 2e-4, 2e-4][i]
+config.bs = [128, 256, 2048][i]
+config["steps"] = [10**6, 766*1000, 400*1000][i]
+config.max_length = [128, 512, 512][i]
 generator_size_divisor = [4, 3, 4][i]
-disc_config = ElectraConfig.from_pretrained(f'google/electra-{c.size}-discriminator')
-gen_config = ElectraConfig.from_pretrained(f'google/electra-{c.size}-generator')
+disc_config = ElectraConfig.from_pretrained(f'google/electra-{config['size']}-discriminator')
+gen_config = ElectraConfig.from_pretrained(f'google/electra-{config['size']}-generator')
 # note that public electra-small model is actually small++ and don't scale down generator size 
 gen_config.hidden_size = int(disc_config.hidden_size/generator_size_divisor)
 gen_config.num_attention_heads = disc_config.num_attention_heads//generator_size_divisor
 gen_config.intermediate_size = disc_config.intermediate_size//generator_size_divisor
-hf_tokenizer = ElectraTokenizerFast.from_pretrained(f"google/electra-{c.size}-generator")
+hf_tokenizer = ElectraTokenizerFast.from_pretrained(f"google/electra-{config['size']}-generator")
 
 # logger was removed entirely
 
@@ -86,30 +82,30 @@ print(c)
 
 # %%
 dsets = []
-ELECTRAProcessor = partial(ELECTRADataProcessor, hf_tokenizer=hf_tokenizer, max_length=c.max_length)
+ELECTRAProcessor = partial(ELECTRADataProcessor, hf_tokenizer=hf_tokenizer, max_length=config["max_length"])
 
 # Wikipedia
-if 'wikipedia' in c.datas:
+if 'wikipedia' in config.datas:
   print('load/download wiki dataset')
   wiki = datasets.load_dataset('wikipedia', '20200501.en', cache_dir='./datasets')['train']
   print('load/create data from wiki dataset for ELECTRA')
-  e_wiki = ELECTRAProcessor(wiki).map(cache_file_name=f"electra_wiki_{c.max_length}.arrow", num_proc=1)
+  e_wiki = ELECTRAProcessor(wiki).map(cache_file_name=f"electra_wiki_{config["max_length"]}.arrow", num_proc=1)
   dsets.append(e_wiki)
 
 # OpenWebText
-if 'openwebtext' in c.datas:
+if 'openwebtext' in config["datas"]:
   print('load/download OpenWebText Corpus')
   owt = datasets.load_dataset('openwebtext', cache_dir='./datasets')['train']
   print('load/create data from OpenWebText Corpus for ELECTRA')
-  e_owt = ELECTRAProcessor(owt, apply_cleaning=False).map(cache_file_name=f"electra_owt_{c.max_length}.arrow", num_proc=1)
+  e_owt = ELECTRAProcessor(owt, apply_cleaning=False).map(cache_file_name=f"electra_owt_{config['max_length']}.arrow", num_proc=1)
   dsets.append(e_owt)
 
-assert len(dsets) == len(c.datas)
+assert len(dsets) == len(config["datas"])
 
 merged_dsets = {'train': datasets.concatenate_datasets(dsets)}
 hf_dsets = HF_Datasets(merged_dsets, cols={'input_ids':TensorText,'sentA_length':noop},
                        hf_toker=hf_tokenizer, n_inp=2)
-dls = hf_dsets.dataloaders(bs=c.bs, num_workers=c.num_workers, pin_memory=False,
+dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], pin_memory=False,
                            shuffle_train=True,
                            srtkey_fc=False, 
                            cache_dir='./datasets/electra_dataloader', cache_name='dl_{split}.json')
@@ -209,9 +205,9 @@ class MaskedLMCallback(Callback):
 mlm_cb = MaskedLMCallback(mask_tok_id=hf_tokenizer.mask_token_id, 
                           special_tok_ids=hf_tokenizer.all_special_ids, 
                           vocab_size=hf_tokenizer.vocab_size,
-                          mlm_probability=c.mask_prob,
-                          replace_prob=0.0 if c.electra_mask_style else 0.1, 
-                          orginal_prob=0.15 if c.electra_mask_style else 0.1,
+                          mlm_probability=config["mask_prob"],
+                          replace_prob=0.0 if config["electra_mask_style"] else 0.1,
+                          orginal_prob=0.15 if config["electra_mask_style"] else 0.1,
                           for_electra=True)
 #mlm_cb.show_batch(dls[0], idx_show_ignored=hf_tokenizer.convert_tokens_to_ids(['#'])[0])
 
@@ -233,7 +229,7 @@ class ELECTRAModel(nn.Module):
     super().to(*args, **kwargs)
     a_tensor = next(self.parameters())
     device, dtype = a_tensor.device, a_tensor.dtype
-    if c.sampling=='fp32_gumbel': dtype = torch.float32
+    if config["sampling"]=='fp32_gumbel': dtype = torch.float32
     self.gumbel_dist = torch.distributions.gumbel.Gumbel(torch.tensor(0., device=device, dtype=dtype), torch.tensor(1., device=device, dtype=dtype))
 
   def forward(self, masked_inputs, sentA_lenths, is_mlm_applied, labels):
@@ -275,11 +271,11 @@ class ELECTRAModel(nn.Module):
 
   def sample(self, logits):
     "Reimplement gumbel softmax cuz there is a bug in torch.nn.functional.gumbel_softmax when fp16 (https://github.com/pytorch/pytorch/issues/41663). Gumbel softmax is equal to what official ELECTRA code do, standard gumbel dist. = -ln(-ln(standard uniform dist.))"
-    if c.sampling == 'fp32_gumbel':
+    if config["sampling"] == 'fp32_gumbel':
       return (logits.float() + self.gumbel_dist.sample(logits.shape)).argmax(dim=-1)
-    elif c.sampling == 'fp16_gumbel': # 5.06 ms
+    elif config["sampling"] == 'fp16_gumbel': # 5.06 ms
       return (logits + self.gumbel_dist.sample(logits.shape)).argmax(dim=-1)
-    elif c.sampling == 'multinomial': # 2.X ms
+    elif config["sampling"] == 'multinomial': # 2.X ms
       return torch.multinomial(F.softmax(logits, dim=-1), 1).squeeze()
 
 class ELECTRALoss():
@@ -305,10 +301,10 @@ class ELECTRALoss():
 # %%
 # Seed & PyTorch benchmark
 torch.backends.cudnn.benchmark = True
-dls[0].rng = random.Random(c.seed) # for fastai dataloader
-random.seed(c.seed)
-np.random.seed(c.seed)
-torch.manual_seed(c.seed)
+dls[0].rng = random.Random(c["seed"]) # for fastai dataloader
+random.seed(c["seed"])
+np.random.seed(c["seed"])
+torch.manual_seed(c["seed"])
 
 # Generator and Discriminator
 generator = ElectraForMaskedLM(gen_config)
@@ -318,30 +314,30 @@ generator.generator_lm_head.weight = generator.electra.embeddings.word_embedding
 
 # ELECTRA training loop
 electra_model = ELECTRAModel(generator, discriminator, hf_tokenizer)
-electra_loss_func = ELECTRALoss(gen_label_smooth=c.gen_smooth_label, disc_label_smooth=c.disc_smooth_label)
+electra_loss_func = ELECTRALoss(gen_label_smooth=config["gen_smooth_label"], disc_label_smooth=config["disc_smooth_label"])
 
 # Optimizer
-if c.adam_bias_correction: opt_func = partial(Adam, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
+if config["adam_bias_correction"]: opt_func = partial(Adam, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
 else: opt_func = partial(Adam_no_bias_correction, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
 
 # Learning rate shedule
-if c.schedule.endswith('linear'):
-  lr_shed_func = linear_warmup_and_then_decay if c.schedule=='separate_linear' else linear_warmup_and_decay
+if config["schedule"].endswith('linear'):
+  lr_shed_func = linear_warmup_and_then_decay if config["schedule"]=='separate_linear' else linear_warmup_and_decay
   lr_shedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
-                                             lr_max=c.lr,
+                                             lr_max=config["lr"],
                                              warmup_steps=10000,
-                                             total_steps=c.steps,)})
+                                             total_steps=config["steps"],)})
 
 
 # Learner
-dls.to(torch.device(c.device))
+dls.to(torch.device(config["device"]))
 learn = Learner(dls, electra_model,
                 loss_func=electra_loss_func,
                 opt_func=opt_func ,
                 path='./checkpoints',
                 model_dir='pretrain',
                 cbs=[mlm_cb,
-                    RunSteps(c.steps, [0.0625, 0.125, 0.25, 0.5, 1.0], c.run_name+"_{percent}"),
+                    RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], config["run_name"]+"_{percent}"),
                      ],
                 )
 
@@ -351,11 +347,11 @@ learn.to_native_fp16(init_scale=2.**11)
 learn.add_cb(GradientClipping(1.))
 
 # Print time and run name
-print(f"{c.run_name} , starts at {datetime.now()}")
+print(f"{config['run_name']} , starts at {datetime.now()}")
 
 # Run
-if c.schedule == 'one_cycle': learn.fit_one_cycle(9999, lr_max=c.lr)
-elif c.schedule == 'adjusted_one_cycle': learn.fit_one_cycle(9999, lr_max=c.lr, div=1e5, pct_start=10000/c.steps)
+if config["schedule"] == 'one_cycle': learn.fit_one_cycle(9999, lr_max=config["lr"])
+elif config["schedule"] == 'adjusted_one_cycle': learn.fit_one_cycle(9999, lr_max=config["lr"], div=1e5, pct_start=10000/config["steps"])
 else: learn.fit(9999, cbs=[lr_shedule])
 
 
