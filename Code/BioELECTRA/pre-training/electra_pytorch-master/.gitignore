@@ -1,0 +1,9 @@
+.vscode/*
+/wandb/*
+**/__pycache__/
+.ipynb_checkpoints/*
+*.log
+nohup.out
+datasets/*
+checkpoints/*
+test_outputs/*

@@ -112,6 +112,7 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
                 steps_trained_in_current_epoch -= 1
                 continue
 
+            # train model one step
             model.train()
             batch = tuple(t.to(device) for t in batch)
 
@@ -142,6 +143,7 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
             loss.backward()
 
             tr_loss += loss.item()
+
             if (step + 1) % 1 == 0:
                 nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
                 global_step += 1
