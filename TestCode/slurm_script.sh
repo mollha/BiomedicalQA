@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# X number of nodes with Y number of
+# cores in each node.
+#SBATCH -N 1
+#SBATCH -c 1
+#SBATCH --mem=14g
+
+# Partition: cpu | gpu-small | gpu-large
+#SBATCH -p cpu
+
+# QOS: debug | short | long-high-prio | long-low-prio | long-cpu
+#SBATCH --qos=long-cpu
+
+# TIME
+#SBATCH -t 48:00:00
+
+# Source the bash profile (required to use the module command)
+source /etc/profile
+
+# Run your program (replace this with your program)
+python TestScript.py
