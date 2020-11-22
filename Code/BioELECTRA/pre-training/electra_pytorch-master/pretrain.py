@@ -1,6 +1,3 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %%
 import os, sys, random
 from pathlib import Path
 from functools import partial
@@ -162,29 +159,20 @@ class ELECTRADataProcessor(object):
             }
 
 
-
 # define config here
 config = {
-    'device': 'cuda:0',
-    'base_run_name': 'vanilla',  # run_name = {base_run_name}_{seed}
+    'device': "cuda:0" if torch.cuda.is_available() else "cpu:0",
     'seed': 0,
     'adam_bias_correction': False,
     'schedule': 'original_linear',
     'sampling': 'fp32_gumbel',  # choose from 'fp32_gumbel', 'fp16_gumbel', 'multinomial'
     'electra_mask_style': True,
-    'gen_smooth_label': False,
-    'disc_smooth_label': False,
     'size': 'small',
     'num_workers': 3,
 }
 
-dataset_names = ['openwebtext']  # choose from ['wikipedia', 'bookcorpus', 'openwebtext'] openwebtext was used before
-
-
 # Check and Default
-config["run_name"] = f'{config["base_run_name"]}_{config["seed"]}'
-if config["gen_smooth_label"] is True: config["gen_smooth_label"] = 0.1
-if config["disc_smooth_label"] is True: config["disc_smooth_label"] = 0.1
+name_of_run = 'Electra_Seed_{}'.format(config["seed"])
 
 # Setting of different sizes
 i = ['small', 'base', 'large'].index(config['size'])
@@ -216,48 +204,33 @@ edl_cache_dir.mkdir(exist_ok=True)
 print(f"process id: {os.getpid()}")
 
 # %%
-dsets = []
 
 # creating this partial function is the first place that electra_tokenizer is used.
 ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
 # todo check the type of the object that is returned by line 227
 
 
-
-dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files={'train': ['my_train_file_1.csv', 'my_train_file_2.csv']})['train']
-
-
-# # Wikipedia
-# if 'wikipedia' in dataset_names:
-#   print('load/download wiki dataset')
-#   wiki = datasets.load_dataset('wikipedia', name='20200501.en', cache_dir='./datasets')['train']
-#   print('load/create data from wiki dataset for ELECTRA')
-#   e_wiki = ELECTRAProcessor(wiki).map(cache_file_name=f'electra_wiki_{config["max_length"]}.arrow', num_proc=1)
-#   dsets.append(e_wiki)
+print('Load in dataset')
+# dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files={'train': ['my_train_file_1.csv', 'my_train_file_2.csv']})['train']
+dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files='./datasets/fibro_abstracts.csv')['train']
 
 
-# # OpenWebText
-# if 'openwebtext' in dataset_names:
-#   print('Load / Download OpenWebText Corpus')
-#   owt = datasets.load_dataset('openwebtext', cache_dir='./datasets')['train']
-#   print('load/create data from OpenWebText Corpus for ELECTRA')
-#   e_owt = ELECTRAProcessor(owt, apply_cleaning=False).map(cache_file_name=f"electra_owt_{config['max_length']}.arrow", num_proc=1)
-#   dsets.append(e_owt)
 
-assert len(dsets) == len(dataset_names)
+print('Load/create data from dataset for ELECTRA')
+# apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
+e_dataset = ELECTRAProcessor(dataset).map(cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
 
-merged_dsets = {'train': datasets.concatenate_datasets(dsets)}
+
+merged_dsets = {'train': e_dataset}
 hf_dsets = HF_Datasets(merged_dsets, cols={'input_ids':TensorText,'sentA_length': noop},
                        hf_toker=electra_tokenizer, n_inp=2)
 dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], pin_memory=False,
                            shuffle_train=True,
-                           srtkey_fc=False, 
+                           srtkey_fc=False,
                            cache_dir='./datasets/electra_dataloader', cache_name='dl_{split}.json')
 
-# %% [markdown]
 # # 2. Masked language model objective
-# %% [markdown]
-# ## 2.1 MLM objective callback
+# 2.1 MLM objective callback
 
 # %%
 """
@@ -270,17 +243,18 @@ And
 - cost you only 550 µs for a (128,128) tensor on gpu, so dynamic masking is cheap   
 """
 def mask_tokens(inputs, mask_token_index, vocab_size, special_token_indices, mlm_probability=0.15, replace_prob=0.1, orginal_prob=0.1, ignore_index=-100):
-  """ 
+  """
   Prepare masked tokens inputs/labels for masked language modeling: (1-replace_prob-orginal_prob)% MASK, replace_prob% random, orginal_prob% original within mlm_probability% of tokens in the sentence. 
   * ignore_index in nn.CrossEntropy is default to -100, so you don't need to specify ignore_index in loss
   """
-  
+
   device = inputs.device
   labels = inputs.clone()
-  
+
   # Get positions to apply mlm (mask/replace/not changed). (mlm_probability)
   probability_matrix = torch.full(labels.shape, mlm_probability, device=device)
   special_tokens_mask = torch.full(inputs.shape, False, dtype=torch.bool, device=device)
+
   for sp_id in special_token_indices:
     special_tokens_mask = special_tokens_mask | (inputs==sp_id)
   probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
@@ -293,7 +267,7 @@ def mask_tokens(inputs, mask_token_index, vocab_size, special_token_indices, mlm
   inputs[mask_token_mask] = mask_token_index
 
   # replace with a random token (mlm_probability * replace_prob)
-  if int(replace_prob)!=0:
+  if int(replace_prob) != 0:
     rep_prob = replace_prob/(replace_prob + orginal_prob)
     replace_token_mask = torch.bernoulli(torch.full(labels.shape, rep_prob, device=device)).bool() & mlm_mask & ~mask_token_mask
     random_words = torch.randint(vocab_size, labels.shape, dtype=torch.long, device=device)
@@ -324,13 +298,12 @@ class MaskedLMCallback(Callback):
     """
     Compute the masked inputs - in ELECTRA, MLM is used, therefore the raw batches should
     not be passed to the model.
+    :return: None
 
     ---- Attributes of Learner: ----
     xb: last input drawn from self.dl (current DataLoader used for iteration), potentially modified by callbacks
     yb: last target drawn from self.dl (potentially modified by callbacks).
     --------------------------------
-
-    :return: None
     """
 
     input_ids, sent_lengths = self.xb
@@ -348,7 +321,7 @@ class MaskedLMCallback(Callback):
     # change symbol to show the ignored position
     labels[labels == self.ignore_index] = idx_show_ignored
     # some notice to help understand the masking mechanism
-    if verbose: 
+    if verbose:
       print("We won't count loss from position where y is ignore index")
       print("Notice 1. Positions have label token in y will be either [Mask]/other token/orginal token in x")
       print("Notice 2. Special tokens (CLS, SEP) won't be masked.")
@@ -370,9 +343,8 @@ mlm_cb = MaskedLMCallback(mask_tok_id=electra_tokenizer.mask_token_id,
 # 3. ELECTRA (replaced token detection objective)
 # see details in paper [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555)
 
-# %%
 class ELECTRAModel(nn.Module):
-  
+
   def __init__(self, generator, discriminator, electra_tokenizer):
     super().__init__()
     self.generator, self.discriminator = generator, discriminator
@@ -399,13 +371,15 @@ class ELECTRAModel(nn.Module):
     gen_logits = self.generator(masked_inputs, attention_mask, token_type_ids)[0] # (B, L, vocab size)
     # reduce size to save space and speed
     mlm_gen_logits = gen_logits[is_mlm_applied, :] # ( #mlm_positions, vocab_size)
-    
+
     with torch.no_grad():
       # sampling
-      pred_toks = self.sample(mlm_gen_logits) # ( #mlm_positions, )
+      pred_toks = self.sample(mlm_gen_logits)  # ( #mlm_positions, )
+
       # produce inputs for discriminator
-      generated = masked_inputs.clone() # (B,L)
-      generated[is_mlm_applied] = pred_toks # (B,L)
+      generated = masked_inputs.clone()  # (B,L)
+      generated[is_mlm_applied] = pred_toks  # (B,L)
+
       # produce labels for discriminator
       is_replaced = is_mlm_applied.clone() # (B,L)
       is_replaced[is_mlm_applied] = (pred_toks != labels[is_mlm_applied]) # (B,L)
@@ -420,7 +394,7 @@ class ELECTRAModel(nn.Module):
     """
     attention_mask = input_ids != self.electra_tokenizer.pad_token_id
     seq_len = input_ids.shape[1]
-    token_type_ids = torch.tensor([ ([0]*len + [1]*(seq_len-len)) for len in sentA_lenths.tolist()],  
+    token_type_ids = torch.tensor([ ([0]*len + [1]*(seq_len-len)) for len in sentA_lenths.tolist()],
                                   device=input_ids.device)
     return attention_mask, token_type_ids
 
@@ -435,29 +409,31 @@ class ELECTRAModel(nn.Module):
 
 
 class ELECTRALoss():
-  def __init__(self, loss_weights=(1.0, 50.0), gen_label_smooth=False, disc_label_smooth=False):
+  """
+  Generator loss function: Cross-Entropy loss flat
+  Discriminator loss function: BCE with Logits
+  """
+
+  def __init__(self, loss_weights=(1.0, 50.0)):
     self.loss_weights = loss_weights
-    self.gen_loss_fc = LabelSmoothingCrossEntropyFlat(eps=gen_label_smooth) if gen_label_smooth else CrossEntropyLossFlat()
-    self.disc_loss_fc = nn.BCEWithLogitsLoss()
-    self.disc_label_smooth = disc_label_smooth
-    
+    self.generator_loss_function = CrossEntropyLossFlat()
+    self.discriminator_loss_function = nn.BCEWithLogitsLoss()
+
   def __call__(self, pred, targ_ids):
     mlm_gen_logits, generated, disc_logits, is_replaced, non_pad, is_mlm_applied = pred
-    gen_loss = self.gen_loss_fc(mlm_gen_logits.float(), targ_ids[is_mlm_applied])
-    disc_logits = disc_logits.masked_select(non_pad) # -> 1d tensor
-    is_replaced = is_replaced.masked_select(non_pad) # -> 1d tensor
-    if self.disc_label_smooth:
-      is_replaced = is_replaced.float().masked_fill(~is_replaced, self.disc_label_smooth)
-    disc_loss = self.disc_loss_fc(disc_logits.float(), is_replaced.float())
+    disc_logits = disc_logits.masked_select(non_pad)  # -> 1d tensor
+    is_replaced = is_replaced.masked_select(non_pad)  # -> 1d tensor
+
+    gen_loss = self.generator_loss_function(mlm_gen_logits.float(), targ_ids[is_mlm_applied])
+    disc_loss = self.discriminator_loss_function(disc_logits.float(), is_replaced.float())
+
     return gen_loss * self.loss_weights[0] + disc_loss * self.loss_weights[1]
 
-# %% [markdown]
+
 # # 5. Train
-
-# %%
 # Seed & PyTorch benchmark
-
-torch.backends.cudnn.benchmark = True
+# TODO SET TO TRUE IF USING CUDA
+torch.backends.cudnn.benchmark = False
 
 def set_seed(seed_value):
     dls[0].rng = random.Random(seed_value)  # for fastai dataloader
@@ -475,23 +451,24 @@ generator.generator_lm_head.weight = generator.electra.embeddings.word_embedding
 
 # ELECTRA training loop
 electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
-electra_loss_func = ELECTRALoss(gen_label_smooth=config["gen_smooth_label"], disc_label_smooth=config["disc_smooth_label"])
+
 
 # Optimizer
-if config["adam_bias_correction"]: opt_func = partial(Adam, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
-else: opt_func = partial(Adam_no_bias_correction, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
+if config["adam_bias_correction"]:
+    opt_func = partial(Adam, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
+else:
+    opt_func = partial(Adam_no_bias_correction, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
 
 
 # Learner
 dls.to(torch.device(config["device"]))
+
 learn = Learner(dls, electra_model,
-                loss_func=electra_loss_func,
-                opt_func=opt_func ,
+                loss_func=ELECTRALoss(),
+                opt_func=opt_func,
                 path='./checkpoints',
                 model_dir='pretrain',
-                cbs=[mlm_cb,
-                    RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], config["run_name"]+"_{percent}"),
-                     ],
+                cbs=[mlm_cb, RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], name_of_run+"_{percent}")],
                 )
 
 
@@ -500,13 +477,13 @@ learn.to_native_fp16(init_scale=2.**11)
 learn.add_cb(GradientClipping(1.))
 
 # Print time and run name
-print(f"{config['run_name']} , starts at {datetime.now()}")
+print(f"{name_of_run} , starts at {datetime.now()}")
 
 # Learning rate schedule
 lr_schedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
-                                         lr_max=config["lr"],
-                                         warmup_steps=10000,
-                                         total_steps=config["steps"],)})
+                                            lr_max=config["lr"],
+                                            warmup_steps=10000,
+                                            total_steps=config["steps"],)})
 
 # Run
 learn.fit(9999, cbs=[lr_schedule])
