@@ -283,56 +283,10 @@ if __name__ == "__main__":
     # Learner
     dls.to(torch.device(config["device"]))
 
-    # Learner is the basic fast ai class for handling the training loop
-    # dls: data loaders
-    # model: the model to train
-    # loss_func: the loss function to use
-    # opt_func: used to create an optimiser when Learner.fit is called
-    # lr: is the default learning rate
-    # :
-
-    # # Check and Default
-    # name_of_run = 'Electra_Seed_{}'.format(config["seed"])
-
-    # learn = Learner(dls, electra_model,
-    #                 loss_func=ELECTRALoss(),
-    #                 opt_func=opt_func,
-    #                 path='./checkpoints',
-    #                 model_dir='pretrain',
-    #                 cbs=[mlm_cb, RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], name_of_run+"_{percent}")],
-    #                 )
-
-    # Mixed precison and Gradient clip
-    # learn.to_native_fp16(init_scale=2.**11)
-
-    # add callback
-    # learn.add_cb(GradientClipping(1.))
-
-    # # Print time and run name
-    # print(f"{name_of_run} , starts at {datetime.now()}")
-
-    # Learning rate schedule
-    # lr_schedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
-    #                                             lr_max=config["lr"],
-    #                                             warmup_steps=10000,
-    #                                             total_steps=config["steps"],)})
-
-    # Run
-    # learn.fit(9999, cbs=[lr_schedule])
-
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
-    no_decay = ["bias", "LayerNorm.weight"]
-    optimizer_grouped_parameters = [
-        {
-            "params": [p for n, p in electra_model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": 0.01,
-        },
-        {   "params": [p for n, p in electra_model.named_parameters() if any(nd in n for nd in no_decay)],
-            "weight_decay": 0.0},
-    ]
-    optimizer = AdamW(optimizer_grouped_parameters, eps=1e-6, lr=config["lr"])
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
+    optimizer = AdamW(optimizer_grouped_parameters, eps=1e-6, weight_decay=0.01, lr=config["lr"], correct_bias=config["adam_bias_correction"])
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
     pre_train(data_loader, electra_model, electra_tokenizer, lr_schedule, optimizer, config, checkpoint_name=None)
