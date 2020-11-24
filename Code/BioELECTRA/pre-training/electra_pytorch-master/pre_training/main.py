@@ -24,8 +24,7 @@ now = datetime.now()
 today = datetime.today()
 
 
-# Random Sampler used during training.
-data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=settings["batch_size"])
+
 
 def create_training_objects(model):
     """
@@ -53,24 +52,30 @@ def create_training_objects(model):
 
 
 # Save checkpoint and log every X updates steps.
-def save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss, save_dir):
+def save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir):
     # set global_step to global_step of last saved checkpoint from model path
 
+    # NOW THAT WE HAVE LOADED IN STATES FROM PREVIOUS CHECKPOINT - WE NEED TO CREATE A NEW CHECKPOINT NAME
+    current_day = today.strftime("%d_%m_%y")
+    current_time = now.strftime("%H_%M_%S")
+    checkpoint_name = current_day + '.' + current_time
+
     # ------------- SAVE FINE-TUNED TOKENIZER AND MODEL -------------
-    save_dir = os.path.join(save_dir, "checkpoint-{}".format(global_step))
+    save_dir = os.path.join(checkpoint_dir, checkpoint_name)
 
     # Take care of distributed/parallel training
-    saving_model = model.module if hasattr(model, "module") else model
-    saving_model.save_pretrained(save_dir)
-    tokenizer.save_pretrained(save_dir)
+    # saving_model = model.module if hasattr(model, "module") else model
+    # saving_model.save_pretrained(save_dir)
+    # tokenizer.save_pretrained(save_dir)
 
     # save training settings with trained model
     save(settings, os.path.join(save_dir, "train_settings.bin"))
     save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
     save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
-    print("Saving model checkpoint, optimizer and scheduler states to {}".format(save_dir))
-    print("global_step = {}, average loss = {}".format(global_step, tr_loss))
+    save(model.state_dict(), os.path.join(save_dir, "model.pt"))
 
+    print("Saving model checkpoint, optimizer and scheduler states to {}".format(save_dir))
+    print("global_step = {}, avg. training loss = {}".format(settings["global_step"], total_training_loss / settings["global_step"]))
 
 
 def update_settings(settings, update):
@@ -80,19 +85,11 @@ def update_settings(settings, update):
     return settings
 
 
-
-def pre_train(data_loader, model, tokenizer, scheduler, optimizer, model_info, device, settings, dataset_info, checkpoint_name=None):
+def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=None):
     """ Train the model """
     # pass in model, data_loader, optimizer, scheduler and tokenizer
     # pass in model_name
     # pass in checkpoint_name
-    settings = {
-        "trainings_epochs": 10,
-        "batch_size": 30,
-        "epochs_trained": 0,
-        "steps_trained": 0,
-        "global_step": 1
-    }
 
 
     # Specify which directory model checkpoints should be saved to.
@@ -109,13 +106,17 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, model_info, d
         if os.path.isfile(path_to_optimizer):
             optimizer.load_state_dict(torch.load(path_to_optimizer))
 
-        path_to_tokenizer = os.path.join(path_to_checkpoint, "tokenizer.pt")
-        if os.path.isfile(path_to_tokenizer):
-            tokenizer.load_state_dict(torch.load(path_to_tokenizer))
+        # path_to_tokenizer = os.path.join(path_to_checkpoint, "tokenizer.pt")
+        # if os.path.isfile(path_to_tokenizer):
+        #     tokenizer.load_state_dict(torch.load(path_to_tokenizer))
 
         path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
         if os.path.isfile(path_to_scheduler):
             scheduler.load_state_dict(torch.load(path_to_scheduler))
+
+        path_to_model = os.path.join(path_to_checkpoint, "model.pt")
+        if os.path.isfile(path_to_model):
+            model.load_state_dict(torch.load(path_to_model))
 
         new_settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
         settings = update_settings(settings, new_settings)
@@ -127,24 +128,12 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, model_info, d
         if settings["steps_trained"] > 0:
             print("Skip the first {} steps in the first epoch", settings["steps_trained"])
 
-        # Check if continuing training from a checkpoint
-        if os.path.exists(model_info["model_path"]):
-            pass
-
-
-    # NOW THAT WE HAVE LOADED IN STATES FROM PREVIOUS CHECKPOINT - WE NEED TO CREATE A NEW CHECKPOINT NAME
-    current_day = today.strftime("%d_%m_%y")
-    current_time = now.strftime("%H_%M_%S")
-    checkpoint_name = current_day + '.' + current_time
-
-    version_2_with_negative = False
-
     print("\n---------- BEGIN TRAINING ----------")
     print("Dataset Size = {}\nNumber of Epochs = {}\nBatch size = {}\n"
           .format(len(data_loader), settings["training_epochs"], settings["batch_size"]))
     # todo check that replacing len(dataset) with len(data_loader) is a fair / valid exchange
 
-    tr_loss, logging_loss = 0.0, 0.0
+    total_training_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
     train_iterator = trange(settings["epochs_trained"], int(settings["epochs"]), desc="Epoch")
 
@@ -152,6 +141,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, model_info, d
     # TODO SET SEED HERE AGAIN
 
     tb_writer = SummaryWriter()  # Create a SummaryWriter()
+
     for _ in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
         for step, batch in enumerate(epoch_iterator):
@@ -161,66 +151,47 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, model_info, d
                 settings["steps_trained"] -= 1
                 continue
 
+            # MASK INPUTS HERE
+
             # train model one step
             model.train()
-            batch = tuple(t.to(device) for t in batch)
+            batch = tuple(t.to(settings["device"]) for t in batch)
 
-            inputs = {
-                "input_ids": batch[0],
-                "attention_mask": batch[1],
-                "token_type_ids": batch[2],
-                "start_positions": batch[3],
-                "end_positions": batch[4],
-            }
-
-            if model_info["model_type"] in ["xlm", "roberta", "distilbert", "camembert"]:
-                del inputs["token_type_ids"]
-
-            if model_info["model_type"] in ["xlnet", "xlm"]:
-                inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
-                if version_2_with_negative:
-                    inputs.update({"is_impossible": batch[7]})
-                if hasattr(model, "config") and hasattr(model.config, "lang2id"):
-                    inputs.update(
-                        {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
-                    )
-
+            inputs = {"inputs": batch[0]}
             outputs = model(**inputs)
 
             # model outputs are always tuple in transformers (see doc)
             loss = outputs[0]
             loss.backward()
+            total_training_loss += loss.item()
 
-            tr_loss += loss.item()
+            nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
+            settings["global_step"] += 1
 
-            if (step + 1) % 1 == 0:
-                nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
-                settings["global_step"] += 1
+            optimizer.step()
+            scheduler.step()  # Update learning rate schedule
+            model.zero_grad()
 
-                optimizer.step()
-                scheduler.step()  # Update learning rate schedule
-                model.zero_grad()
+            # # Log metrics
+            # if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
+            #     # Only evaluate when single GPU otherwise metrics may not average well
+            #     # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
+            #     if settings["evaluate_all_checkpoints"]:
+            #         results = evaluate(model, tokenizer, model_info["model_type"], save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
+            #         for key, value in results.items():
+            #             tb_writer.add_scalar("eval_{}".format(key), value, settings["global_step"])
+            #     tb_writer.add_scalar("lr", scheduler.get_lr()[0], settings["global_step"])
+            #     tb_writer.add_scalar("loss", (total_training_loss - logging_loss) / settings["update_steps"], settings["global_step"])
+            #     logging_loss = total_training_loss
 
-                # Log metrics
-                if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
-                    # Only evaluate when single GPU otherwise metrics may not average well
-                    # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
-                    if settings["evaluate_all_checkpoints"]:
-                        results = evaluate(model, tokenizer, model_info["model_type"], save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
-                        for key, value in results.items():
-                            tb_writer.add_scalar("eval_{}".format(key), value, settings["global_step"])
-                    tb_writer.add_scalar("lr", scheduler.get_lr()[0], settings["global_step"])
-                    tb_writer.add_scalar("loss", (tr_loss - logging_loss) / settings["update_steps"], settings["global_step"])
-                    logging_loss = tr_loss
-
-                # Save model checkpoint
-                if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
-                    save_model(model, tokenizer, optimizer, scheduler, settings, settings["global_step"], tr_loss / settings["global_step"], save_dir)
+            # Save model checkpoint
+            if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
+                save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir)
 
     tb_writer.close()
 
     # ------------- SAVE FINE-TUNED MODEL -------------
-    save_model(model, tokenizer, optimizer, scheduler, settings, settings["global_step"], tr_loss / settings["global_step"], save_dir)
+    save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir)
 
 
 
@@ -235,6 +206,11 @@ if __name__ == "__main__":
         'electra_mask_style': True,
         'size': 'small',
         'num_workers': 3 if torch.cuda.is_available() else 0,           # this might be wrong - it initially was just 3
+        "trainings_epochs": 10,
+        "batch_size": 30,
+        "epochs_trained": 0,
+        "steps_trained": 0,
+        "global_step": 1
     }
 
     # Check and Default
@@ -245,6 +221,7 @@ if __name__ == "__main__":
     model_specific_config = get_model_config(config['size'])
     config = {**config, **model_specific_config}
 
+    # ------ DEFINE GENERATOR AND DISCRIMINATOR CONFIG ------
     discriminator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-discriminator')
     generator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-generator')
 
@@ -252,6 +229,7 @@ if __name__ == "__main__":
     generator_config.hidden_size = int(discriminator_config.hidden_size/config["generator_size_divisor"])
     generator_config.num_attention_heads = discriminator_config.num_attention_heads//config["generator_size_divisor"]
     generator_config.intermediate_size = discriminator_config.intermediate_size//config["generator_size_divisor"]
+
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
     # Path to data
@@ -281,6 +259,9 @@ if __name__ == "__main__":
                                shuffle_train=True,
                                srtkey_fc=False,
                                cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
+
+    # Random Sampler used during training.
+    data_loader = DataLoader(dataset, sampler=RandomSampler(dataset), batch_size=settings["batch_size"])
 
 
     # # 2. Masked language model objective
@@ -315,7 +296,6 @@ if __name__ == "__main__":
 
     # ELECTRA training loop
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
-
 
     # Optimizer
     if config["adam_bias_correction"]:
@@ -360,3 +340,9 @@ if __name__ == "__main__":
 
     # Run
     learn.fit(9999, cbs=[lr_schedule])
+
+
+
+
+
+    pre_train(data_loader, electra_model, electra_tokenizer, lr_schedule, optimizer, config, checkpoint_name=None)
