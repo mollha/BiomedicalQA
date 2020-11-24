@@ -1,33 +1,10 @@
-from mask_inputs import MaskedLMCallback
+from callback_functions import MaskedLMCallback, GradientClipping, RunSteps
 from data_processing import ELECTRADataProcessor
+from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config
-
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
 from _utils.utils import *
-from _utils.would_like_to_pr import *
-
-
-class ELECTRALoss:
-    """
-    Generator loss function: Cross-Entropy loss flat
-    Discriminator loss function: BCE with Logits
-    """
-
-    def __init__(self, loss_weights=(1.0, 50.0)):
-        self.loss_weights = loss_weights
-        self.generator_loss_function = CrossEntropyLossFlat()
-        self.discriminator_loss_function = nn.BCEWithLogitsLoss()
-
-    def __call__(self, pred, targ_ids):
-        mlm_gen_logits, generated, disc_logits, is_replaced, non_pad, is_mlm_applied = pred
-        disc_logits = disc_logits.masked_select(non_pad)  # -> 1d tensor
-        is_replaced = is_replaced.masked_select(non_pad)  # -> 1d tensor
-
-        gen_loss = self.generator_loss_function(mlm_gen_logits.float(), targ_ids[is_mlm_applied])
-        disc_loss = self.discriminator_loss_function(disc_logits.float(), is_replaced.float())
-
-        return gen_loss * self.loss_weights[0] + disc_loss * self.loss_weights[1]
 
 
 if __name__ == "__main__":
@@ -61,9 +38,9 @@ if __name__ == "__main__":
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
     # Path to data
-    Path('./datasets', exist_ok=True)
+    Path('../datasets', exist_ok=True)
     Path('./checkpoints/pretrain').mkdir(exist_ok=True, parents=True)
-    edl_cache_dir = Path("./datasets/electra_dataloader")
+    edl_cache_dir = Path("../datasets/electra_dataloader")
     edl_cache_dir.mkdir(exist_ok=True)
 
     # Print info
@@ -73,7 +50,7 @@ if __name__ == "__main__":
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
 
     print('Load in the dataset.')
-    dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files='./datasets/fibro_abstracts.csv')['train']
+    dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')['train']
 
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
@@ -86,7 +63,7 @@ if __name__ == "__main__":
     dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], pin_memory=False,
                                shuffle_train=True,
                                srtkey_fc=False,
-                               cache_dir='./datasets/electra_dataloader', cache_name='dl_{split}.json')
+                               cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
 
 
     # # 2. Masked language model objective
@@ -133,6 +110,13 @@ if __name__ == "__main__":
     # Learner
     dls.to(torch.device(config["device"]))
 
+    # Learner is the basic fast ai class for handling the training loop
+    # dls: data loaders
+    # model: the model to train
+    # loss_func: the loss function to use
+    # opt_func: used to create an optimiser when Learner.fit is called
+    # lr: is the default learning rate
+    # :
     learn = Learner(dls, electra_model,
                     loss_func=ELECTRALoss(),
                     opt_func=opt_func,
@@ -141,9 +125,10 @@ if __name__ == "__main__":
                     cbs=[mlm_cb, RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], name_of_run+"_{percent}")],
                     )
 
-
     # Mixed precison and Gradient clip
     learn.to_native_fp16(init_scale=2.**11)
+
+    # add callback
     learn.add_cb(GradientClipping(1.))
 
     # Print time and run name
