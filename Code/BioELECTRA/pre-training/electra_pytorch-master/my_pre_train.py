@@ -71,22 +71,18 @@ if __name__ == "__main__":
 
     # creating this partial function is the first place that electra_tokenizer is used.
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
-    # todo check the type of the object that is returned by line 227
 
-
-    print('Load in dataset')
-    # dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files={'train': ['my_train_file_1.csv', 'my_train_file_2.csv']})['train']
+    print('Load in the dataset.')
     dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files='./datasets/fibro_abstracts.csv')['train']
 
-
-    print('Load/create data from dataset for ELECTRA')
+    print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
     e_dataset = ELECTRAProcessor(dataset).map(cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
 
-
-    merged_dsets = {'train': e_dataset}
-    hf_dsets = HF_Datasets(merged_dsets, cols={'input_ids':TensorText,'sentA_length': noop},
+    hf_dsets = HF_Datasets({'train': e_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
                            hf_toker=electra_tokenizer, n_inp=2)
+
+    # data loader
     dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], pin_memory=False,
                                shuffle_train=True,
                                srtkey_fc=False,
@@ -103,8 +99,6 @@ if __name__ == "__main__":
                               orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
     # mlm_cb.show_batch(dls[0], idx_show_ignored=electra_tokenizer.convert_tokens_to_ids(['#'])[0])
-
-
 
     # # 5. Train
     # Seed & PyTorch benchmark
