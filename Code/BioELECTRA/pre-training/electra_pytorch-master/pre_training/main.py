@@ -131,6 +131,14 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
             # MASK INPUTS HERE
 
+
+
+
+
+
+
+
+
             # train model one step
             model.train()
             batch = tuple(t.to(settings["device"]) for t in batch)
@@ -139,6 +147,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             outputs = model(**inputs)
 
             # model outputs are always tuple in transformers (see doc)
+
             loss = outputs[0]
             loss.backward()
             total_training_loss += loss.item()
@@ -273,13 +282,6 @@ if __name__ == "__main__":
     # ELECTRA training loop
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
-    # Optimizer
-    if config["adam_bias_correction"]:
-        opt_func = partial(Adam, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
-    else:
-        opt_func = partial(Adam_no_bias_correction, eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01)
-
-
     # Learner
     dls.to(torch.device(config["device"]))
 
@@ -289,4 +291,5 @@ if __name__ == "__main__":
     optimizer = AdamW(optimizer_grouped_parameters, eps=1e-6, weight_decay=0.01, lr=config["lr"], correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(data_loader, electra_model, electra_tokenizer, lr_schedule, optimizer, config, checkpoint_name=None)
+
+    pre_train(dls, electra_model, electra_tokenizer, lr_schedule, optimizer, config, checkpoint_name=None)
