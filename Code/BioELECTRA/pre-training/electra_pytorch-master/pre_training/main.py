@@ -26,29 +26,7 @@ today = datetime.today()
 
 
 
-def create_training_objects(model):
-    """
-    Given whatever parameters necessary - return a new optimizer, tokenizer and scheduler to be used in
-    the training loop
-    :param model:
-    :return: tuple
-    """
 
-    # Prepare optimizer and schedule (linear warm up and decay)
-    no_decay = ["bias", "LayerNorm.weight"]
-    optimizer_grouped_parameters = [
-        {
-            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": settings["decay"],
-        },
-        {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
-    ]
-    optimizer = AdamW(optimizer_grouped_parameters, eps=settings["epsilon"], lr=settings["learning_rate"])
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0,
-                                                num_training_steps=len(data_loader) // settings["epochs"])
-
-
-    return optimizer, tokenizer, scheduler
 
 
 # Save checkpoint and log every X updates steps.
@@ -165,8 +143,9 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             loss.backward()
             total_training_loss += loss.item()
 
-            nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
+            nn.utils.clip_grad_norm_(model.parameters(), 1.)
             settings["global_step"] += 1
+
 
             optimizer.step()
             scheduler.step()  # Update learning rate schedule
@@ -206,17 +185,14 @@ if __name__ == "__main__":
         'electra_mask_style': True,
         'size': 'small',
         'num_workers': 3 if torch.cuda.is_available() else 0,           # this might be wrong - it initially was just 3
-        "trainings_epochs": 10,
+        "trainings_epochs": 9999,
         "batch_size": 30,
         "epochs_trained": 0,
         "steps_trained": 0,
         "global_step": 1
     }
 
-    # Check and Default
-    name_of_run = 'Electra_Seed_{}'.format(config["seed"])
-
-    # merge general config with model specific config
+    # Merge general config with model specific config
     # Setting of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**config, **model_specific_config}
@@ -249,9 +225,9 @@ if __name__ == "__main__":
 
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
-    e_dataset = ELECTRAProcessor(dataset).map(cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
+    electra_dataset = ELECTRAProcessor(dataset).map(cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
 
-    hf_dsets = HF_Datasets({'train': e_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
+    hf_dsets = HF_Datasets({'train': electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
                            hf_toker=electra_tokenizer, n_inp=2)
 
     # data loader
@@ -314,35 +290,49 @@ if __name__ == "__main__":
     # opt_func: used to create an optimiser when Learner.fit is called
     # lr: is the default learning rate
     # :
-    learn = Learner(dls, electra_model,
-                    loss_func=ELECTRALoss(),
-                    opt_func=opt_func,
-                    path='./checkpoints',
-                    model_dir='pretrain',
-                    cbs=[mlm_cb, RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], name_of_run+"_{percent}")],
-                    )
+
+    # # Check and Default
+    # name_of_run = 'Electra_Seed_{}'.format(config["seed"])
+
+    # learn = Learner(dls, electra_model,
+    #                 loss_func=ELECTRALoss(),
+    #                 opt_func=opt_func,
+    #                 path='./checkpoints',
+    #                 model_dir='pretrain',
+    #                 cbs=[mlm_cb, RunSteps(config["steps"], [0.0625, 0.125, 0.25, 0.5, 1.0], name_of_run+"_{percent}")],
+    #                 )
 
     # Mixed precison and Gradient clip
-    learn.to_native_fp16(init_scale=2.**11)
+    # learn.to_native_fp16(init_scale=2.**11)
 
     # add callback
-    learn.add_cb(GradientClipping(1.))
+    # learn.add_cb(GradientClipping(1.))
 
-    # Print time and run name
-    print(f"{name_of_run} , starts at {datetime.now()}")
+    # # Print time and run name
+    # print(f"{name_of_run} , starts at {datetime.now()}")
 
     # Learning rate schedule
-    lr_schedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
-                                                lr_max=config["lr"],
-                                                warmup_steps=10000,
-                                                total_steps=config["steps"],)})
-
+    # lr_schedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
+    #                                             lr_max=config["lr"],
+    #                                             warmup_steps=10000,
+    #                                             total_steps=config["steps"],)})
 
     # Run
-    learn.fit(9999, cbs=[lr_schedule])
+    # learn.fit(9999, cbs=[lr_schedule])
 
-
-
+    # Prepare optimizer and schedule (linear warm up and decay)
+    # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
+    no_decay = ["bias", "LayerNorm.weight"]
+    optimizer_grouped_parameters = [
+        {
+            "params": [p for n, p in electra_model.named_parameters() if not any(nd in n for nd in no_decay)],
+            "weight_decay": 0.01,
+        },
+        {   "params": [p for n, p in electra_model.named_parameters() if any(nd in n for nd in no_decay)],
+            "weight_decay": 0.0},
+    ]
+    optimizer = AdamW(optimizer_grouped_parameters, eps=1e-6, lr=config["lr"])
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
 
     pre_train(data_loader, electra_model, electra_tokenizer, lr_schedule, optimizer, config, checkpoint_name=None)
