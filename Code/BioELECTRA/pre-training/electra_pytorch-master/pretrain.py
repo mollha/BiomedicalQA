@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import torch.tensor as T
 import datasets
 from fastai.text.all import *
+
 from mask_inputs import MaskedLMCallback
 from data_processing import ELECTRADataProcessor
 from models import ELECTRAModel
@@ -22,7 +23,6 @@ from _utils.would_like_to_pr import *
 
 """ Vanilla ELECTRA settings
 """
-
 
 # define config here
 config = {
@@ -50,7 +50,8 @@ generator_size_divisor = [4, 3, 4][i]
 
 disc_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-discriminator')
 gen_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-generator')
-# note that public electra-small model is actually small++ and don't scale down generator size 
+
+# note that public electra-small model is actually small++ and don't scale down generator size
 gen_config.hidden_size = int(disc_config.hidden_size/generator_size_divisor)
 gen_config.num_attention_heads = disc_config.num_attention_heads//generator_size_divisor
 gen_config.intermediate_size = disc_config.intermediate_size//generator_size_divisor
@@ -67,8 +68,6 @@ edl_cache_dir.mkdir(exist_ok=True)
 # Print info
 print(f"process id: {os.getpid()}")
 
-# %%
-
 # creating this partial function is the first place that electra_tokenizer is used.
 ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
 # todo check the type of the object that is returned by line 227
@@ -77,7 +76,6 @@ ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, ma
 print('Load in dataset')
 # dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files={'train': ['my_train_file_1.csv', 'my_train_file_2.csv']})['train']
 dataset = datasets.load_dataset('csv', cache_dir='./datasets', data_files='./datasets/fibro_abstracts.csv')['train']
-
 
 
 print('Load/create data from dataset for ELECTRA')
@@ -93,9 +91,9 @@ dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], p
                            srtkey_fc=False,
                            cache_dir='./datasets/electra_dataloader', cache_name='dl_{split}.json')
 
+
 # # 2. Masked language model objective
 # 2.1 MLM objective callback
-
 mlm_cb = MaskedLMCallback(mask_tok_id=electra_tokenizer.mask_token_id,
                           special_tok_ids=electra_tokenizer.all_special_ids,
                           vocab_size=electra_tokenizer.vocab_size,
@@ -104,10 +102,6 @@ mlm_cb = MaskedLMCallback(mask_tok_id=electra_tokenizer.mask_token_id,
                           orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
 # mlm_cb.show_batch(dls[0], idx_show_ignored=electra_tokenizer.convert_tokens_to_ids(['#'])[0])
-
-# 3. ELECTRA (replaced token detection objective)
-# see details in paper [ELECTRA: Pre-training Text Encoders as Discriminators Rather Than Generators](https://arxiv.org/abs/2003.10555)
-
 
 
 class ELECTRALoss():
@@ -134,8 +128,8 @@ class ELECTRALoss():
 
 # # 5. Train
 # Seed & PyTorch benchmark
-# TODO SET TO TRUE IF USING CUDA
-torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.benchmark = torch.cuda.is_available()
+
 
 def set_seed(seed_value):
     dls[0].rng = random.Random(seed_value)  # for fastai dataloader
@@ -186,6 +180,7 @@ lr_schedule = ParamScheduler({'lr': partial(linear_warmup_and_decay,
                                             lr_max=config["lr"],
                                             warmup_steps=10000,
                                             total_steps=config["steps"],)})
+
 
 # Run
 learn.fit(9999, cbs=[lr_schedule])

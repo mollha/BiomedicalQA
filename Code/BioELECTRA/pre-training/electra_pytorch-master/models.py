@@ -8,8 +8,44 @@ import torch
 from torch import nn
 import torch.nn.functional
 import torch.tensor as T
-import datasets
 from fastai.text.all import *
+
+""" Vanilla ELECTRA settings
+    """
+
+small_config = {
+        "mask_prob": 0.15,
+        "lr": 5e-4,
+        "bs": 128,
+        "steps": 10 ** 6,
+        "max_length": 128,
+        "generator_size_divisor": 4
+    }
+
+base_config = {
+        "mask_prob": 0.15,
+        "lr": 2e-4,
+        "bs": 256,
+        "steps": 766 * 1000,
+        "max_length": 512,
+        "generator_size_divisor": 3
+    }
+
+large_config = {
+        "mask_prob": 0.25,
+        "lr": 2e-4,
+        "bs": 2048,
+        "steps": 400 * 1000,
+        "max_length": 512,
+        "generator_size_divisor": 4
+    }
+
+
+def get_model_config(model_size):
+    assert (model_size in ["small", "base", "large"])
+
+    index = ['small', 'base', 'large'].index(model_size)
+    return [small_config, base_config, large_config][index]
 
 
 class ELECTRAModel(nn.Module):
