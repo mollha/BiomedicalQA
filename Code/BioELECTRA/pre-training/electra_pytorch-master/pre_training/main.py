@@ -26,7 +26,6 @@ today = datetime.date.today()
 
 # Save checkpoint and log every X updates steps.
 def save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir):
-    # set global_step to global_step of last saved checkpoint from model path
 
     # NOW THAT WE HAVE LOADED IN STATES FROM PREVIOUS CHECKPOINT - WE NEED TO CREATE A NEW CHECKPOINT NAME
     current_day = today.strftime("%d_%m_%y")
@@ -48,8 +47,7 @@ def save_model(model, tokenizer, optimizer, scheduler, settings, total_training_
     save(model.state_dict(), os.path.join(save_dir, "model.pt"))
 
     print("Saving model checkpoint, optimizer and scheduler states to {}".format(save_dir))
-    print("global_step = {}, avg. training loss = {}".format(settings["global_step"],
-                                                             total_training_loss / settings["global_step"]))
+    # print("Avg. training loss = {}".format(total_training_loss / settings["global_step"]))
 
 
 def update_settings(settings, update):
@@ -97,8 +95,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
         if settings["epochs_trained"] > 0:
             print("Continuing training from checkpoint, will skip to saved global_step")
-            print("Continuing training from epoch {} and global step {}".format(settings["epochs_trained"],
-                                                                                settings["global_step"]))
+            print("Continuing training from epoch {}.".format(settings["epochs_trained"]))
 
         if settings["steps_trained"] > 0:
             print("Skip the first {} steps in the first epoch", settings["steps_trained"])
@@ -130,6 +127,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
 
     for epoch_number in train_iterator:
+        print('Max epochs', len(train_iterator))
         epoch_iterator = tqdm(data_loader, desc="Iteration")
         print(len(epoch_iterator))
 
@@ -164,7 +162,6 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
-            settings["global_step"] += 1
 
             optimizer.step()
             scheduler.step()  # Update learning rate schedule
@@ -207,7 +204,6 @@ if __name__ == "__main__":
         "batch_size": 30,
         "epochs_trained": 0,
         "steps_trained": 0,
-        "global_step": 1,
         "update_steps": 500
     }
 
@@ -259,6 +255,8 @@ if __name__ == "__main__":
 
     print(electra_dataset)
     config["sample_size"] = len(dataset)
+    print('DATASET SIZE: ', len(dataset))
+    print("steps", config["steps"])
 
     # Random Sampler used during training.
     # data_loader = DataLoader(dset, sampler=RandomSampler(dset), batch_size=config["batch_size"])

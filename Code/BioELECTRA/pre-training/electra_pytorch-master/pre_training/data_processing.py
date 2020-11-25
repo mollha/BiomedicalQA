@@ -47,7 +47,6 @@ class ELECTRADataProcessor(object):
             new_example = {'input_ids': [], 'input_mask': [], 'segment_ids': []}
 
         for text in texts:  # for every doc
-
             for line in re.split(self.lines_delimiter, text):  # for every paragraph
 
                 if re.fullmatch(r'\s*', line): continue  # empty string or string with all space characters
@@ -58,11 +57,13 @@ class ELECTRADataProcessor(object):
 
                 example = self.add_line(line)
                 if example:
-                    for k, v in example.items(): new_example[k].append(v)
+                    for k, v in example.items():
+                        new_example[k].append(v)
 
             if self._current_length != 0:
                 example = self._create_example()
-                for k, v in example.items(): new_example[k].append(v)
+                for k, v in example.items():
+                    new_example[k].append(v)
 
         return new_example
 
