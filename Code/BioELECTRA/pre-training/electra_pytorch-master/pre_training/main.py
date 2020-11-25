@@ -1,10 +1,9 @@
-from callback_functions import MaskedLMCallback, GradientClipping, RunSteps, MaskedLM
+from callback_functions import MaskedLM
 from data_processing import ELECTRADataProcessor
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
-from _utils.utils import *
 import pickle
 
 import os
@@ -59,10 +58,6 @@ def update_settings(settings, update):
 
 def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
     """ Train the model """
-    # pass in model, data_loader, optimizer, scheduler and tokenizer
-    # pass in model_name
-    # pass in checkpoint_name
-
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
     checkpoint_dir = "./checkpoints"
@@ -118,6 +113,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
     loss_function = ELECTRALoss()
 
+    # # 2. Masked language model objective
     mlm = MaskedLM(mask_tok_id=electra_tokenizer.mask_token_id,
                    special_tok_ids=electra_tokenizer.all_special_ids,
                    vocab_size=electra_tokenizer.vocab_size,
@@ -132,6 +128,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
         print(len(epoch_iterator))
 
         for step, batch in enumerate(epoch_iterator):
+            print('Max epoch_iterator', len(epoch_iterator))
 
             # Skip past any already trained steps if resuming training
             if settings["steps_trained"] > 0:
@@ -142,7 +139,8 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
             # train model one step
             model.train()
-            batch = tuple(t.to(settings["device"]) for t in batch.one_batch())
+            print(batch)
+            batch = tuple(t.to(settings["device"]) for t in batch)
             # print(len(batch[0]))
             # print("batch size", len(batch))
 
@@ -253,24 +251,11 @@ if __name__ == "__main__":
                                srtkey_fc=False,
                                cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
 
-    print(electra_dataset)
-    config["sample_size"] = len(dataset)
-    print('DATASET SIZE: ', len(dataset))
-    print("steps", config["steps"])
 
     # Random Sampler used during training.
     # data_loader = DataLoader(dset, sampler=RandomSampler(dset), batch_size=config["batch_size"])
 
-    # # 2. Masked language model objective
-    # 2.1 MLM objective callback
-    mlm_cb = MaskedLMCallback(mask_tok_id=electra_tokenizer.mask_token_id,
-                              special_tok_ids=electra_tokenizer.all_special_ids,
-                              vocab_size=electra_tokenizer.vocab_size,
-                              mlm_probability=config["mask_prob"],
-                              replace_prob=0.0 if config["electra_mask_style"] else 0.1,
-                              orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
-    # mlm_cb.show_batch(dls[0], idx_show_ignored=electra_tokenizer.convert_tokens_to_ids(['#'])[0])
 
     # # 5. Train
     # Seed & PyTorch benchmark
@@ -301,8 +286,17 @@ if __name__ == "__main__":
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
 
+    dl = dls[0]
+
+    config["sample_size"] = len(dataset)
+    print('DATASET SIZE: ', len(dataset))
+    print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
+
+    print("steps", config["steps"])
+
+
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(dls, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
+    pre_train(dl, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
