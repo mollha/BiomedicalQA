@@ -16,7 +16,7 @@ from fastai.text.all import *
 small_config = {
         "mask_prob": 0.15,
         "lr": 5e-4,
-        "bs": 128,
+        "batch_size": 128,
         "steps": 10 ** 6,
         "max_length": 128,
         "generator_size_divisor": 4
@@ -25,7 +25,7 @@ small_config = {
 base_config = {
         "mask_prob": 0.15,
         "lr": 2e-4,
-        "bs": 256,
+        "batch_size": 256,
         "steps": 766 * 1000,
         "max_length": 512,
         "generator_size_divisor": 3
@@ -34,7 +34,7 @@ base_config = {
 large_config = {
         "mask_prob": 0.25,
         "lr": 2e-4,
-        "bs": 2048,
+        "batch_size": 2048,
         "steps": 400 * 1000,
         "max_length": 512,
         "generator_size_divisor": 4

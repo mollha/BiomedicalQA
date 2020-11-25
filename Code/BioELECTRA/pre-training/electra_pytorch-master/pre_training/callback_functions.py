@@ -59,6 +59,36 @@ def mask_tokens(inputs, mask_token_index, vocab_size, special_token_indices, mlm
     return inputs, labels, mlm_mask
 
 
+
+class MaskedLM():
+    def __init__(self, mask_tok_id, special_tok_ids, vocab_size, ignore_index=-100, **kwargs):
+        self.ignore_index = ignore_index
+
+        # assumes for_electra is true
+        self.mask_tokens = partial(mask_tokens, mask_token_index=mask_tok_id, special_token_indices=special_tok_ids,
+                                   vocab_size=vocab_size, ignore_index=-100, **kwargs)
+
+
+    def mask_batch(self, inputs) -> tuple:
+        """
+        Compute the masked inputs - in ELECTRA, MLM is used, therefore the raw batches should
+        not be passed to the model.
+        :return: None
+
+        ---- Attributes of Learner: ----
+        xb: last input drawn from self.dl (current DataLoader used for iteration), potentially modified by callbacks
+        yb: last target drawn from self.dl (potentially modified by callbacks).
+        --------------------------------
+        """
+
+        input_ids, sent_lengths = inputs
+        masked_inputs, labels, is_mlm_applied = self.mask_tokens(input_ids)
+
+        # return self.learn.xb, self.learn.yb
+        return (masked_inputs, sent_lengths, is_mlm_applied, labels), (labels,)
+
+
+
 class MaskedLMCallback(Callback):
     " MaskedLM Callback class handling tweaks of the training loop by changing a `Learner` in various events"
 

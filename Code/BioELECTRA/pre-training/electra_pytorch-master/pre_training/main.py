@@ -1,4 +1,4 @@
-from callback_functions import MaskedLMCallback, GradientClipping, RunSteps
+from callback_functions import MaskedLMCallback, GradientClipping, RunSteps, MaskedLM
 from data_processing import ELECTRADataProcessor
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config
@@ -20,13 +20,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 import datetime
 
-now = datetime.now()
-today = datetime.today()
-
-
-
-
-
+now = datetime.datetime.now()
+today = datetime.date.today()
 
 
 # Save checkpoint and log every X updates steps.
@@ -53,7 +48,8 @@ def save_model(model, tokenizer, optimizer, scheduler, settings, total_training_
     save(model.state_dict(), os.path.join(save_dir, "model.pt"))
 
     print("Saving model checkpoint, optimizer and scheduler states to {}".format(save_dir))
-    print("global_step = {}, avg. training loss = {}".format(settings["global_step"], total_training_loss / settings["global_step"]))
+    print("global_step = {}, avg. training loss = {}".format(settings["global_step"],
+                                                             total_training_loss / settings["global_step"]))
 
 
 def update_settings(settings, update):
@@ -63,17 +59,17 @@ def update_settings(settings, update):
     return settings
 
 
-def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=None):
+def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
     """ Train the model """
     # pass in model, data_loader, optimizer, scheduler and tokenizer
     # pass in model_name
     # pass in checkpoint_name
 
-
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
     checkpoint_dir = "./checkpoints"
     Path(checkpoint_dir).mkdir(exist_ok=True, parents=True)
+    model.to(settings["device"])
 
     path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
     if checkpoint_name and os.path.exists(path_to_checkpoint):
@@ -101,28 +97,45 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
         if settings["epochs_trained"] > 0:
             print("Continuing training from checkpoint, will skip to saved global_step")
-            print("Continuing training from epoch {} and global step {}".format(settings["epochs_trained"], settings["global_step"]))
+            print("Continuing training from epoch {} and global step {}".format(settings["epochs_trained"],
+                                                                                settings["global_step"]))
 
         if settings["steps_trained"] > 0:
             print("Skip the first {} steps in the first epoch", settings["steps_trained"])
 
     print("\n---------- BEGIN TRAINING ----------")
     print("Dataset Size = {}\nNumber of Epochs = {}\nBatch size = {}\n"
-          .format(len(data_loader), settings["training_epochs"], settings["batch_size"]))
+          .format(config["sample_size"], settings["training_epochs"], settings["batch_size"]))
     # todo check that replacing len(dataset) with len(data_loader) is a fair / valid exchange
 
     total_training_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
-    train_iterator = trange(settings["epochs_trained"], int(settings["epochs"]), desc="Epoch")
 
     # Added here for reproducibility
     # TODO SET SEED HERE AGAIN
 
     tb_writer = SummaryWriter()  # Create a SummaryWriter()
 
+    # Resume training from the epoch we left off at earlier.
+    train_iterator = trange(settings["epochs_trained"], int(settings["training_epochs"]), desc="Epoch")
+
+    loss_function = ELECTRALoss()
+
+    mlm = MaskedLM(mask_tok_id=electra_tokenizer.mask_token_id,
+                   special_tok_ids=electra_tokenizer.all_special_ids,
+                   vocab_size=electra_tokenizer.vocab_size,
+                   mlm_probability=config["mask_prob"],
+                   replace_prob=0.0 if config["electra_mask_style"] else 0.1,
+                   orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
+
+
     for _ in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
+
         for step, batch in enumerate(epoch_iterator):
+            print(batch.one_batch())
+
+            print("batch size", len(batch))
 
             # Skip past any already trained steps if resuming training
             if settings["steps_trained"] > 0:
@@ -131,30 +144,27 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
             # MASK INPUTS HERE
 
-
-
-
-
-
-
-
-
             # train model one step
             model.train()
-            batch = tuple(t.to(settings["device"]) for t in batch)
+            batch = tuple(t.to(settings["device"]) for t in batch.one_batch())
 
-            inputs = {"inputs": batch[0]}
-            outputs = model(**inputs)
+            # inputs = {'input_ids': batch[0], 'sentA_length': batch[0]}
+            # inputs = (masked_inputs, sent_lengths, is_mlm_applied, labels),  targets = (labels,)
+            inputs, targets = mlm.mask_batch(batch)
+
+            outputs = model(*inputs)
+            print(outputs) # mlm_gen_logits, generated, disc_logits, is_replaced, attention_mask, is_mlm_applied
 
             # model outputs are always tuple in transformers (see doc)
+            # loss = outputs[0]
 
-            loss = outputs[0]
+            loss = loss_function(outputs, *targets)
+
             loss.backward()
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
             settings["global_step"] += 1
-
 
             optimizer.step()
             scheduler.step()  # Update learning rate schedule
@@ -182,23 +192,23 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
     save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir)
 
 
-
 if __name__ == "__main__":
-
     # define config here
     config = {
         'device': "cuda:0" if torch.cuda.is_available() else "cpu:0",
+        # "cuda:0" if torch.cuda.is_available() else "cpu:0",
         'seed': 0,
         'adam_bias_correction': False,
         'schedule': 'original_linear',
         'electra_mask_style': True,
         'size': 'small',
-        'num_workers': 3 if torch.cuda.is_available() else 0,           # this might be wrong - it initially was just 3
-        "trainings_epochs": 9999,
+        'num_workers': 3 if torch.cuda.is_available() else 0,  # this might be wrong - it initially was just 3
+        "training_epochs": 9999,
         "batch_size": 30,
         "epochs_trained": 0,
         "steps_trained": 0,
-        "global_step": 1
+        "global_step": 1,
+        "update_steps": 500
     }
 
     # Merge general config with model specific config
@@ -211,9 +221,9 @@ if __name__ == "__main__":
     generator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-generator')
 
     # note that public electra-small model is actually small++ and don't scale down generator size
-    generator_config.hidden_size = int(discriminator_config.hidden_size/config["generator_size_divisor"])
-    generator_config.num_attention_heads = discriminator_config.num_attention_heads//config["generator_size_divisor"]
-    generator_config.intermediate_size = discriminator_config.intermediate_size//config["generator_size_divisor"]
+    generator_config.hidden_size = int(discriminator_config.hidden_size / config["generator_size_divisor"])
+    generator_config.num_attention_heads = discriminator_config.num_attention_heads // config["generator_size_divisor"]
+    generator_config.intermediate_size = discriminator_config.intermediate_size // config["generator_size_divisor"]
 
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
@@ -230,24 +240,28 @@ if __name__ == "__main__":
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
 
     print('Load in the dataset.')
-    dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')['train']
+    dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
+        'train']
 
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
-    electra_dataset = ELECTRAProcessor(dataset).map(cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
+    electra_dataset = ELECTRAProcessor(dataset).map(
+        cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
 
     hf_dsets = HF_Datasets({'train': electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
                            hf_toker=electra_tokenizer, n_inp=2)
 
     # data loader
-    dls = hf_dsets.dataloaders(bs=config["bs"], num_workers=config["num_workers"], pin_memory=False,
+    dls = hf_dsets.dataloaders(bs=config["batch_size"], num_workers=config["num_workers"], pin_memory=False,
                                shuffle_train=True,
                                srtkey_fc=False,
                                cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
 
-    # Random Sampler used during training.
-    data_loader = DataLoader(dataset, sampler=RandomSampler(dataset), batch_size=settings["batch_size"])
+    print(electra_dataset)
+    config["sample_size"] = len(dataset)
 
+    # Random Sampler used during training.
+    # data_loader = DataLoader(dset, sampler=RandomSampler(dset), batch_size=config["batch_size"])
 
     # # 2. Masked language model objective
     # 2.1 MLM objective callback
@@ -271,6 +285,7 @@ if __name__ == "__main__":
         np.random.seed(seed_value)
         torch.manual_seed(seed_value)
 
+
     set_seed(config["seed"])
 
     # Generator and Discriminator
@@ -288,8 +303,8 @@ if __name__ == "__main__":
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
 
-    optimizer = AdamW(optimizer_grouped_parameters, eps=1e-6, weight_decay=0.01, lr=config["lr"], correct_bias=config["adam_bias_correction"])
+    optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
+                      correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-
-    pre_train(dls, electra_model, electra_tokenizer, lr_schedule, optimizer, config, checkpoint_name=None)
+    pre_train(dls, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
