@@ -129,13 +129,11 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
                    orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
 
-    for _ in train_iterator:
+    for epoch_number in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
+        print(len(epoch_iterator))
 
         for step, batch in enumerate(epoch_iterator):
-            print(batch.one_batch())
-
-            print("batch size", len(batch))
 
             # Skip past any already trained steps if resuming training
             if settings["steps_trained"] > 0:
@@ -147,13 +145,15 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             # train model one step
             model.train()
             batch = tuple(t.to(settings["device"]) for t in batch.one_batch())
+            # print(len(batch[0]))
+            # print("batch size", len(batch))
+
 
             # inputs = {'input_ids': batch[0], 'sentA_length': batch[0]}
             # inputs = (masked_inputs, sent_lengths, is_mlm_applied, labels),  targets = (labels,)
             inputs, targets = mlm.mask_batch(batch)
 
             outputs = model(*inputs)
-            print(outputs) # mlm_gen_logits, generated, disc_logits, is_replaced, attention_mask, is_mlm_applied
 
             # model outputs are always tuple in transformers (see doc)
             # loss = outputs[0]
