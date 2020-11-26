@@ -1,23 +1,22 @@
-from callback_functions import MaskedLM
-from data_processing import ELECTRADataProcessor
-from loss_functions import ELECTRALoss
-from models import ELECTRAModel, get_model_config
-from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
-from hugdatafast import *
-import pickle
-
 import os
 from time import time
 import torch
 from torch import save, ones, int64, nn, no_grad
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from tqdm import tqdm, trange
-from transformers import MODEL_FOR_QUESTION_ANSWERING_MAPPING, AdamW, get_linear_schedule_with_warmup
-from transformers.data.metrics.squad_metrics import compute_predictions_logits
-from transformers.data.processors.squad import SquadResult
+from transformers import AdamW, get_linear_schedule_with_warmup
 from torch.utils.tensorboard import SummaryWriter
 
+
+from data_processing import ELECTRADataProcessor, MaskedLM
+from loss_functions import ELECTRALoss
+from models import ELECTRAModel, get_model_config
+from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
+from hugdatafast import *
+import pickle
 import datetime
+
+
 
 now = datetime.datetime.now()
 today = datetime.date.today()
@@ -127,36 +126,23 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
         epoch_iterator = tqdm(data_loader, desc="Iteration")
         print(len(epoch_iterator))
 
-        for step, batch in enumerate(epoch_iterator):
-            print('Max epoch_iterator', len(epoch_iterator))
+        for step, batch in enumerate(data_loader):
+            print('Max epoch_iterator', len(data_loader))
 
             # Skip past any already trained steps if resuming training
             if settings["steps_trained"] > 0:
                 settings["steps_trained"] -= 1
                 continue
 
-            # MASK INPUTS HERE
-
-            # train model one step
             model.train()
-            print(batch)
             batch = tuple(t.to(settings["device"]) for t in batch)
-            # print(len(batch[0]))
-            # print("batch size", len(batch))
 
-
-            # inputs = {'input_ids': batch[0], 'sentA_length': batch[0]}
-            # inputs = (masked_inputs, sent_lengths, is_mlm_applied, labels),  targets = (labels,)
             inputs, targets = mlm.mask_batch(batch)
-
             outputs = model(*inputs)
 
-            # model outputs are always tuple in transformers (see doc)
-            # loss = outputs[0]
-
             loss = loss_function(outputs, *targets)
-
             loss.backward()
+
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
@@ -187,9 +173,8 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
     save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir)
 
 
-if __name__ == "__main__":
-    # define config here
-    config = {
+# define config here
+config = {
         'device': "cuda:0" if torch.cuda.is_available() else "cpu:0",
         # "cuda:0" if torch.cuda.is_available() else "cpu:0",
         'seed': 0,
@@ -204,6 +189,9 @@ if __name__ == "__main__":
         "steps_trained": 0,
         "update_steps": 500
     }
+
+
+if __name__ == "__main__":
 
     # Merge general config with model specific config
     # Setting of different sizes
@@ -228,7 +216,7 @@ if __name__ == "__main__":
     edl_cache_dir.mkdir(exist_ok=True)
 
     # Print info
-    print(f"process id: {os.getpid()}")
+    print(f"Process ID: {os.getpid()}")
 
     # creating this partial function is the first place that electra_tokenizer is used.
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
@@ -251,14 +239,8 @@ if __name__ == "__main__":
                                srtkey_fc=False,
                                cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
 
-
     # Random Sampler used during training.
-    # data_loader = DataLoader(dset, sampler=RandomSampler(dset), batch_size=config["batch_size"])
-
-
-
-    # # 5. Train
-    # Seed & PyTorch benchmark
+    data_loader = DataLoader(electra_dataset, sampler=RandomSampler(electra_dataset), batch_size=config["batch_size"])
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
 
 
@@ -281,11 +263,10 @@ if __name__ == "__main__":
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
     # Learner
-    dls.to(torch.device(config["device"]))
+    # dls.to(torch.device(config["device"]))
 
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
-
     dl = dls[0]
 
     config["sample_size"] = len(dataset)
@@ -294,9 +275,8 @@ if __name__ == "__main__":
 
     print("steps", config["steps"])
 
-
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(dl, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
+    pre_train(data_loader, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")

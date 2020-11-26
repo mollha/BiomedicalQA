@@ -1,14 +1,6 @@
-import os, sys, random
-from pathlib import Path
-from functools import partial
-from datetime import datetime, timezone, timedelta
-from IPython.core.debugger import set_trace as bk
-import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional
-import torch.tensor as T
-from fastai.text.all import *
 
 """ Vanilla ELECTRA settings
     """
