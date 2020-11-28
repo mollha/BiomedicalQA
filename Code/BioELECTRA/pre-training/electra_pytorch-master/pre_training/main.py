@@ -109,7 +109,6 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["epochs_trained"], int(settings["training_epochs"]), desc="Epoch")
-
     loss_function = ELECTRALoss()
 
     # # 2. Masked language model objective
@@ -120,9 +119,8 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
                    replace_prob=0.0 if config["electra_mask_style"] else 0.1,
                    orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
-
+    # iterate over all epochs e.g. len(train_iterator) = num_epochs
     for epoch_number in train_iterator:
-        print('Max epochs', len(train_iterator))
         epoch_iterator = tqdm(data_loader, desc="Iteration")
         print(len(epoch_iterator))
 
@@ -225,10 +223,23 @@ if __name__ == "__main__":
     dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
         'train']
 
+    transformed_dataset = FaceLandmarksDataset(csv_file='data/faces/face_landmarks.csv',
+                                               root_dir='data/faces/',
+                                               transform=transforms.Compose([
+                                                   Rescale(256),
+                                                   RandomCrop(224),
+                                                   ToTensor()
+                                               ]))
+
+
+
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
     electra_dataset = ELECTRAProcessor(dataset).map(
         cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
+
+
+
 
     hf_dsets = HF_Datasets({'train': electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
                            hf_toker=electra_tokenizer, n_inp=2)
@@ -240,7 +251,11 @@ if __name__ == "__main__":
                                cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
 
     # Random Sampler used during training.
-    data_loader = DataLoader(electra_dataset, sampler=RandomSampler(electra_dataset), batch_size=config["batch_size"])
+    data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
+
+
+
+
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
 
 
@@ -272,7 +287,6 @@ if __name__ == "__main__":
     config["sample_size"] = len(dataset)
     print('DATASET SIZE: ', len(dataset))
     print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
-
     print("steps", config["steps"])
 
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
