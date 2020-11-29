@@ -1,6 +1,7 @@
 import os
 from time import time
 import torch
+
 from torch import save, ones, int64, nn, no_grad
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from tqdm import tqdm, trange
@@ -8,7 +9,7 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 from torch.utils.tensorboard import SummaryWriter
 
 
-from data_processing import ELECTRADataProcessor, MaskedLM
+from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
@@ -55,7 +56,7 @@ def update_settings(settings, update):
     return settings
 
 
-def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
+def pre_train(dataset, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
@@ -121,11 +122,12 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
     # iterate over all epochs e.g. len(train_iterator) = num_epochs
     for epoch_number in train_iterator:
-        epoch_iterator = tqdm(data_loader, desc="Iteration")
-        print(len(epoch_iterator))
+        epoch_iterator = tqdm(dataset, desc="Iteration")
+        print(len(dataset))
 
-        for step, batch in enumerate(data_loader):
-            print('Max epoch_iterator', len(data_loader))
+        for step in range(len(dataset)):
+
+            batch = next(dataset)
 
             # Skip past any already trained steps if resuming training
             if settings["steps_trained"] > 0:
@@ -133,7 +135,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
                 continue
 
             model.train()
-            batch = tuple(t.to(settings["device"]) for t in batch)
+            batch = tuple(t.to(settings["device"]) for t in batch) #
 
             inputs, targets = mlm.mask_batch(batch)
             outputs = model(*inputs)
@@ -223,35 +225,48 @@ if __name__ == "__main__":
     dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
         'train']
 
-    transformed_dataset = FaceLandmarksDataset(csv_file='data/faces/face_landmarks.csv',
-                                               root_dir='data/faces/',
-                                               transform=transforms.Compose([
-                                                   Rescale(256),
-                                                   RandomCrop(224),
-                                                   ToTensor()
-                                               ]))
+    # transformed_dataset = FaceLandmarksDataset(csv_file='data/faces/face_landmarks.csv',
+    #                                            root_dir='data/faces/',
+    #                                            transform=transforms.Compose([
+    #                                                Rescale(256),
+    #                                                RandomCrop(224),
+    #                                                ToTensor()
+    #                                            ]))
+    #
+    dp = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
 
+
+    dataset = CSVDataset('./datasets/fibro_abstracts.csv', chunk_size=config["batch_size"], header=True, transform=dp)
+
+
+    # transformed_dataset = FaceLandmarksDataset(csv_file='data/faces/face_landmarks.csv',
+    #                                            root_dir='data/faces/',
+    #                                            transform=transforms.Compose([
+    #                                                Rescale(256),
+    #                                                RandomCrop(224),
+    #                                                ToTensor()
+    #                                            ]))
+    #
 
 
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
-    electra_dataset = ELECTRAProcessor(dataset).map(
-        cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
+    # electra_dataset = ELECTRAProcessor(dataset).map(
+    #     cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
 
 
 
-
-    hf_dsets = HF_Datasets({'train': electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
-                           hf_toker=electra_tokenizer, n_inp=2)
+    # hf_dsets = HF_Datasets({'train': electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
+    #                        hf_toker=electra_tokenizer, n_inp=2)
 
     # data loader
-    dls = hf_dsets.dataloaders(bs=config["batch_size"], num_workers=config["num_workers"], pin_memory=False,
-                               shuffle_train=True,
-                               srtkey_fc=False,
-                               cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
+    # dls = hf_dsets.dataloaders(bs=config["batch_size"], num_workers=config["num_workers"], pin_memory=False,
+    #                            shuffle_train=True,
+    #                            srtkey_fc=False,
+    #                            cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
 
     # Random Sampler used during training.
-    data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
+    # data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
 
 
 
@@ -260,7 +275,7 @@ if __name__ == "__main__":
 
 
     def set_seed(seed_value):
-        dls[0].rng = random.Random(seed_value)  # for fastai dataloader
+        # dls[0].rng = random.Random(seed_value)  # for fastai dataloader
         random.seed(seed_value)
         np.random.seed(seed_value)
         torch.manual_seed(seed_value)
@@ -282,15 +297,15 @@ if __name__ == "__main__":
 
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
-    dl = dls[0]
+    # dl = dls[0]
 
     config["sample_size"] = len(dataset)
     print('DATASET SIZE: ', len(dataset))
-    print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
+    # print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
     print("steps", config["steps"])
 
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(data_loader, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
+    pre_train(dataset, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
