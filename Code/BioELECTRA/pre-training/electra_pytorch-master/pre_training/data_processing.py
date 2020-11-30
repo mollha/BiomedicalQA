@@ -272,12 +272,12 @@ class MaskedLM:
         yb: last target drawn from self.dl (potentially modified by callbacks).
         --------------------------------
         """
-
-        input_ids, sent_lengths = inputs
+        # _ used to be sent_ALengths
+        input_ids, _ = inputs
         masked_inputs, labels, is_mlm_applied = self.mask_tokens(input_ids)
 
         # return self.learn.xb, self.learn.yb
-        return (masked_inputs, sent_lengths, is_mlm_applied, labels), (labels,)
+        return (masked_inputs, is_mlm_applied, labels), (labels,)
 
 
 

@@ -56,7 +56,7 @@ class ELECTRAModel(nn.Module):
     dtype = torch.float32
     self.gumbel_dist = torch.distributions.gumbel.Gumbel(torch.tensor(0., device=device, dtype=dtype), torch.tensor(1., device=device, dtype=dtype))
 
-  def forward(self, masked_inputs, sentA_lenths, is_mlm_applied, labels):
+  def forward(self, masked_inputs, is_mlm_applied, labels):
     """
     masked_inputs (Tensor[int]): (B, L)
     sentA_lenths (Tensor[int]): (B, L)
@@ -67,7 +67,7 @@ class ELECTRAModel(nn.Module):
     # the attention mask is the tensortext of true and false
     # the token_type_ids is the tensor of zeros and ones
 
-    attention_mask, token_type_ids = self._get_pad_mask_and_token_type(masked_inputs, sentA_lenths)
+    attention_mask, token_type_ids = self._get_pad_mask_and_token_type(masked_inputs)
 
     gen_logits = self.generator(masked_inputs, attention_mask, token_type_ids)[0] # (B, L, vocab size)
     # reduce size to save space and speed
@@ -88,7 +88,7 @@ class ELECTRAModel(nn.Module):
 
     return mlm_gen_logits, generated, disc_logits, is_replaced, attention_mask, is_mlm_applied
 
-  def _get_pad_mask_and_token_type(self, input_ids, sentA_lenths):
+  def _get_pad_mask_and_token_type(self, input_ids):
     """
     Only cost you about 500 µs for (128, 128) on GPU, but so that your dataset won't need to save attention_mask and token_type_ids and won't be unnecessarily large,
     thus, preventing cpu processes loading batches from consuming lots of cpu memory and slow down the machine.
@@ -98,9 +98,10 @@ class ELECTRAModel(nn.Module):
     # input token is a pad token
     attention_mask = input_ids != self.electra_tokenizer.pad_token_id
 
-    # get the padded length of the sequences
-    # e.g. (128, 60) if input ids is TensorText, or torch.Size([128, 48]) (if input_ids is a tensor)
-    seq_len = input_ids.shape[1]
+    #
+    # # get the padded length of the sequences
+    # # e.g. (128, 60) if input ids is TensorText, or torch.Size([128, 48]) (if input_ids is a tensor)
+    # seq_len = input_ids.shape[1]
 
     # create a list of lists containing zeros and ones.
     # for every length, x, in sentA_lengths, create a list beginning with x zeros,
@@ -109,8 +110,12 @@ class ELECTRAModel(nn.Module):
     # token_type_ids = torch.tensor([ ([0]*len + [1]*(seq_len-len)) for len in sentA_lenths.tolist()],
     #                               device=input_ids.device)
 
-    token_type_ids = torch.tensor([[0 if boolean else 1 for boolean in sub_mask] for sub_mask in iter(attention_mask)],
-                                    device=input_ids.device)
+    # token_type_ids = torch.tensor([[0 if boolean else 1 for boolean in sub_mask] for sub_mask in iter(attention_mask)],
+    #                                 device=input_ids.device)
+
+    token_type_ids = torch.tensor([[int(not boolean) for boolean in sub_mask] for sub_mask in iter(attention_mask)],
+                                  device=input_ids.device)
+
 
     # print("are my tensors equal?", torch.all(torch.eq(token_type_ids, token_type_ids_2)))
     # print(token_type_ids)

@@ -136,18 +136,22 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
             # train model one step
             model.train()
-            print(batch)
-
-            print("Length of batch", len(batch))
-            print("Type of batch", type(batch))
-
-            print("Length of first element in batch", len(batch[0]))
-            print("Type of first element in batch", type(batch[0]))
-
-            print("Length of first element in batch", len(batch[1]))
-            print("Type of first element in batch", type(batch[1]))
+            # print(batch)
+            #
+            # print("Length of batch", len(batch))
+            # print("Type of batch", type(batch))
+            #
+            # print("Length of first element in batch", len(batch[0]))
+            # print("Type of first element in batch", type(batch[0]))
+            #
+            # print("Length of first element in batch", len(batch[1]))
+            # print("Type of first element in batch", type(batch[1]))
 
             batch = tuple(t.to(settings["device"]) for t in batch)
+            print(batch)
+            # batch is probably not a tuple anymore, since removing sentA_lengths
+
+
             # print(len(batch[0]))
             # print("batch size", len(batch))
 
