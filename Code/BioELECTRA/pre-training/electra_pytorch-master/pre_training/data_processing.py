@@ -175,7 +175,8 @@ class ELECTRADataProcessor(object):
 
 
         # todo add padding here. check this its probs wrong
-        input_ids += [0] * (self._max_length - len(input_ids))
+        input_ids += [self.tokenizer.pad_token_id] * (self._max_length - len(input_ids))
+
 
         if self.minimize_data_size:
             return {

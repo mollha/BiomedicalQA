@@ -97,6 +97,7 @@ class ELECTRAModel(nn.Module):
     # get a TensorText object (like a list) of booleans indicating whether each
     # input token is a pad token
     attention_mask = input_ids != self.electra_tokenizer.pad_token_id
+    print(attention_mask)
 
     #
     # # get the padded length of the sequences

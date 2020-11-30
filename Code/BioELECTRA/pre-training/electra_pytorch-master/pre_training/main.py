@@ -146,9 +146,14 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             #
             # print("Length of first element in batch", len(batch[1]))
             # print("Type of first element in batch", type(batch[1]))
+            batch = batch["input_ids"]
+            batch = (batch,)
 
-            batch = tuple(t.to(settings["device"]) for t in batch)
-            print(batch)
+            # batch = tuple(batch.to(settings["device"]))
+            # print(batch.to(settings["device"]))
+            # batch = tuple(batch)
+
+            # print(batch)
             # batch is probably not a tuple anymore, since removing sentA_lengths
 
 
@@ -264,8 +269,8 @@ if __name__ == "__main__":
     hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText},
                            hf_toker=electra_tokenizer, n_inp=1)
 
-    print(electra_dataset[0], dataset[0])
-    print(electra_dataset[1], dataset[1])
+    # print(electra_dataset[0], dataset[0])
+    # print(electra_dataset[1], dataset[1])
     # Random Sampler used during training.
 
     data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
@@ -276,8 +281,8 @@ if __name__ == "__main__":
                                srtkey_fc=False,
                                cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')[0]
 
-    print(dl.one_batch())
-    # print(next(iter(data_loader)))
+    # print(dl.one_batch())
+    print(next(iter(data_loader)))
 
     # # 5. Train
     # Seed & PyTorch benchmark
@@ -311,14 +316,14 @@ if __name__ == "__main__":
     # dl = dls[0]
 
     config["sample_size"] = len(dataset)
-    print('DATASET SIZE: ', len(dataset))
-    print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
-
-    print("steps", config["steps"])
+    # print('DATASET SIZE: ', len(dataset))
+    # print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
+    #
+    # print("steps", config["steps"])
 
 
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(dl, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
+    pre_train(data_loader, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
