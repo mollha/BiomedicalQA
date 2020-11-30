@@ -245,8 +245,6 @@ if __name__ == "__main__":
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
 
 
-
-
     print('Load in the dataset.')
     dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
         'train']
@@ -254,14 +252,17 @@ if __name__ == "__main__":
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
     electra_dataset = ELECTRAProcessor(dataset).map(
-        cache_file_name=f'./electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
+        cache_file_name=f'./electra_custom_dataset_{config["max_length"]}.arrow', num_proc=1)
 
     print(electra_dataset[0])
     print(electra_dataset[1])
     print(electra_dataset[2])
 
-    hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
-                           hf_toker=electra_tokenizer, n_inp=2)
+    # hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
+    #                        hf_toker=electra_tokenizer, n_inp=2)
+
+    hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText},
+                           hf_toker=electra_tokenizer, n_inp=1)
 
     print(electra_dataset[0], dataset[0])
     print(electra_dataset[1], dataset[1])

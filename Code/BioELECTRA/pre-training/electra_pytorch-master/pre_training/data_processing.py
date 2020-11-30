@@ -67,7 +67,7 @@ class ELECTRADataProcessor(object):
         """
 
         if self.minimize_data_size:
-            new_example = {'input_ids': [], 'sentA_length': []}
+            new_example = {'input_ids': []}
         else:
             new_example = {'input_ids': [], 'input_mask': [], 'segment_ids': []}
 
@@ -125,7 +125,6 @@ class ELECTRADataProcessor(object):
         # this is called when the target length is reached
 
         # 10% chance to only have one segment as in classification tasks
-        print('Heya', self.minimize_data_size)
 
         if random.random() < 0.1:
             first_segment_target_length = 100000
@@ -169,37 +168,30 @@ class ELECTRADataProcessor(object):
         # Create a "sentence" of input ids from the first segment
         input_ids = [self.tokenizer.cls_token_id] + first_segment + [self.tokenizer.sep_token_id]
 
-
-        # get the length of the input ids
-        sentA_length = len(input_ids)
-
-        # produce segment ids, all zeros, matching the length of the input ids
-        segment_ids = [0] * sentA_length
-
         # if a second segment exists, then extend input_ids to include the ids of
         # the second segment and another separator token.
         if second_segment:
             input_ids += second_segment + [self.tokenizer.sep_token_id]
 
-            # extend segment ids to length of second segment + 1,
-            segment_ids += [1] * (len(second_segment) + 1)
+
+        # todo add padding here. check this its probs wrong
+        input_ids += [0] * (self._max_length - len(input_ids))
 
         if self.minimize_data_size:
             return {
-                'input_ids': input_ids,
-                'sentA_length': sentA_length,
+                'input_ids': input_ids
             }
-        else:
-            # pad the input data
-            input_mask = [1] * len(input_ids)
-            input_ids += [0] * (self._max_length - len(input_ids))
-            input_mask += [0] * (self._max_length - len(input_mask))
-            segment_ids += [0] * (self._max_length - len(segment_ids))
-            return {
-                'input_ids': input_ids,
-                'input_mask': input_mask,
-                'segment_ids': segment_ids,
-            }
+        # else:
+        #     # pad the input data
+        #     input_mask = [1] * len(input_ids)
+        #     input_ids += [0] * (self._max_length - len(input_ids))
+        #     input_mask += [0] * (self._max_length - len(input_mask))
+        #     segment_ids += [0] * (self._max_length - len(segment_ids))
+        #     return {
+        #         'input_ids': input_ids,
+        #         'input_mask': input_mask,
+        #         'segment_ids': segment_ids,
+        #     }
 
 
 """
@@ -272,8 +264,7 @@ class MaskedLM:
         yb: last target drawn from self.dl (potentially modified by callbacks).
         --------------------------------
         """
-        # _ used to be sent_ALengths
-        input_ids, _ = inputs
+        input_ids = inputs[0]
         masked_inputs, labels, is_mlm_applied = self.mask_tokens(input_ids)
 
         # return self.learn.xb, self.learn.yb
