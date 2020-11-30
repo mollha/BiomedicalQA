@@ -6,122 +6,76 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from functools import partial
-
-# Create dummy csv data
-nb_samples = 111
-a = np.arange(nb_samples)
-
-string_a = [str(x) for x in a]
-df = pd.DataFrame(string_a, columns=["data"])
-df.to_csv('data.csv', index=False)
+import random
+import os
+import re
 
 
-# # Create Dataset
-# class CSVDataset(torch.utils.data.Dataset):
-#     def __init__(self, path_to_csv, header=False):
-#         super(CSVDataset).__init__()
-#
-#         self.path_to_csv = path_to_csv
-#         self.header = header
-#         self.iterator = self.get_iterator()
-#         self.len = self.count_csv_rows()
-#
-#     def get_iterator(self):
-#         return pd.read_csv(self.path_to_csv, header=[0] if self.header else None, iterator=True)
-#
-#     def __getitem__(self, index):
-#         current_index = 0
-#         iterator = self.get_iterator()
-#
-#         while current_index < index:
-#             current_index += 1
-#             next(iterator)
-#
-#         return next(iterator)
-#
-#     def __len__(self):
-#         return self.len
-#
-#     def count_csv_rows(self) -> int:
-#         """
-#         Given a path to a CSV file, count the number of data samples using lazy-loading.
-#         Each chunk is iterated over and the total sizes are summed to calculate overall length.
-#
-#         :param header: flag indicating whether the csv file contains a header row
-#         :return: number of rows in csv
-#         """
-#
-#         tfr = self.get_iterator()
-#         row_count = 0
-#
-#         while True:
-#             try:
-#                 chunk = next(tfr)
-#                 row_count += len(chunk)
-#             except StopIteration:
-#                 return row_count - 1 if self.header else row_count
-#
+
+""" Completely overhaul the way data is read in
+ Essentially, we need to read in text and produce training examples.
+ 
+ 
+ 
+ """
+
+
+
 
 class ELECTRADataProcessor(object):
     """Given a stream of input text, creates pre-training examples."""
 
-    def __init__(self, tokenizer, max_length, text_col='text', lines_delimiter='\n',
+    def __init__(self, hf_dset, tokenizer, max_length, text_col='text', lines_delimiter='\n',
                  minimize_data_size=True, apply_cleaning=True):
+        # turn minimize data_size off because we are using a custom dataset
+        # which does not do automatic padding like fastai.
+
         self.tokenizer = tokenizer
         self._current_sentences = []
         self._current_length = 0
         self._max_length = max_length
         self._target_length = max_length
 
+        self.hf_dset = hf_dset
         self.text_col = text_col
         self.lines_delimiter = lines_delimiter
         self.minimize_data_size = minimize_data_size
         self.apply_cleaning = apply_cleaning
 
-    # def map(self, **kwargs):
-    #     "Some settings of datasets.Dataset.map for ELECTRA data processing"
-    #     # This is a powerful method inspired by the tf.data.Dataset map method
-    #     # applies a processing function to each example in a dataset
-    #     # can be done independently or in a batch.
-    #
-    #     """
-    #     batched = True means that batches of examples are provided to function
-    #     input_columns are the columns to be passed into function as positional arguments
-    #     If None, a dict mapping to all formatted columns is passed as one argument.
-    #
-    #     remove_columns =  Remove a selection of columns while doing the mapping.
-    #     function = the function to be applied to batches
-    #     """
-    #
-    #     num_proc = kwargs.pop('num_proc', os.cpu_count())
-    #     return self.hf_dset.my_map(
-    #         function=self,
-    #         batched=True,
-    #         remove_columns=self.hf_dset.column_names,  # this is must b/c we will return different number of rows
-    #         disable_nullable=True,
-    #         input_columns=[self.text_col],
-    #         writer_batch_size=10 ** 4,
-    #         num_proc=num_proc,
-    #         **kwargs
-    #     )
+    def map(self, **kwargs):
+        "Some settings of datasets.Dataset.map for ELECTRA data processing"
+
+        num_proc = kwargs.pop('num_proc', os.cpu_count())
+        return self.hf_dset.my_map(
+            function=self,
+            batched=True,
+            remove_columns=self.hf_dset.column_names,  # this is must b/c we will return different number of rows
+            disable_nullable=True,
+            input_columns=[self.text_col],
+            writer_batch_size=10 ** 4,
+            num_proc=num_proc,
+            **kwargs
+        )
 
     def __call__(self, texts):
         """
         Call method allows instances of classes to behave like functions.
+
+        I am starting to think that texts is the WHOLE dataset, not just an individual batch.
         :param texts:
         :return:
         """
+
         if self.minimize_data_size:
             new_example = {'input_ids': [], 'sentA_length': []}
         else:
             new_example = {'input_ids': [], 'input_mask': [], 'segment_ids': []}
 
-        for text in texts:  # for every doc in batch
+        for text in texts:  # for every doc
+            for line in re.split(self.lines_delimiter, text):  # for every paragraph
 
-            for line in re.split(self.lines_delimiter, text):  # for every paragraph in doc
-
-                if re.fullmatch(r'\s*', line):  # empty string or string with all space characters
-                    continue
+                if re.fullmatch(r'\s*', line):
+                    continue  # empty string or string with all space characters
 
                 # filter out lines that are shorter than 80 characters
                 if self.apply_cleaning and len(line) < 80:
@@ -132,6 +86,8 @@ class ELECTRADataProcessor(object):
                     for k, v in example.items():
                         new_example[k].append(v)
 
+            # self.add_line() to current_length.
+            # We want to check that there is at least one token to build an example from.
             if self._current_length != 0:
                 example = self._create_example()
                 for k, v in example.items():
@@ -140,76 +96,93 @@ class ELECTRADataProcessor(object):
         return new_example
 
     def add_line(self, line):
+        """
+        Given a single line, clean it, convert it to token ids.
+        Add the token ids to the list of current sentences.
+
+        Call create example when we are exceeding target length.
+        """
+
         """Adds a line of text to the current example being built."""
-        # clean the line by removing leading and trailing spaces and newlines.
+        # clean the line by removing leading and trailing spaces
+        # and newlines.
         line = line.strip().replace("\n", " ").replace("()", "")
 
-        tokens = self.tokenizer.tokenize(line)  # create tokens using the tokenizer provided
-        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)  # convert the tokens to ids
+        # create tokens using the tokenizer provided
+        tokens = self.tokenizer.tokenize(line)
 
+        # convert the tokens to ids
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
         self._current_sentences.append(token_ids)
         self._current_length += len(token_ids)
 
         if self._current_length >= self._target_length:
             return self._create_example()
-
         return None
 
     def _create_example(self):
         """Creates a pre-training example from the current list of sentences."""
-        # 10% chance to only have one segment as in classification tasks
-        # -3 due to not yet having [CLS]/[SEP] tokens in the input text
-        segment_1_target_length = 100000 if random() < 0.1 else (self._target_length - 3) // 2
-        segment_1, segment_2 = [], []
+        # this is called when the target length is reached
 
+        # 10% chance to only have one segment as in classification tasks
+        print('Heya', self.minimize_data_size)
+
+        if random.random() < 0.1:
+            first_segment_target_length = 100000
+        else:
+            # -3 due to not yet having [CLS]/[SEP] tokens in the input text
+            first_segment_target_length = (self._target_length - 3) // 2
+
+        first_segment = []
+        second_segment = []
         for sentence in self._current_sentences:
             # the sentence goes to the first segment if (1) the first segment is
             # empty, (2) the sentence doesn't put the first segment over length or
             # (3) 50% of the time when it does put the first segment over length
-
-            sentence_under_length = (len(segment_1) + len(sentence) < segment_1_target_length)
-            first_segment_under_length = (len(segment_1) < segment_1_target_length)
-
-            if (len(segment_1) == 0 or sentence_under_length or
-                    (len(segment_2) == 0 and first_segment_under_length and random() < 0.5)):
-                segment_1 += sentence
+            if (len(first_segment) == 0 or
+                    len(first_segment) + len(sentence) < first_segment_target_length or
+                    (len(second_segment) == 0 and
+                     len(first_segment) < first_segment_target_length and
+                     random.random() < 0.5)):
+                first_segment += sentence
             else:
-                segment_2 += sentence
+                second_segment += sentence
 
         # trim to max_length while accounting for not-yet-added [CLS]/[SEP] tokens
-        # segment examples if they exceed the maximum length
-        segment_1 = segment_1[:self._max_length - 2]
-        segment_2 = segment_2[:max(0, self._max_length - len(segment_1) - 3)]
+        first_segment = first_segment[:self._max_length - 2]
+        second_segment = second_segment[:max(0, self._max_length - len(first_segment) - 3)]
 
         # prepare to start building the next example
         self._current_sentences = []
         self._current_length = 0
 
         # small chance for random-length instead of max_length-length example
-        self._target_length = randint(5, self._max_length) if random() < 0.05 else self._max_length
+        if random.random() < 0.05:
+            self._target_length = random.randint(5, self._max_length)
+        else:
+            self._target_length = self._max_length
 
-        return self._make_example(segment_1, segment_2)
+        return self._make_example(first_segment, second_segment)
 
-    def _make_example(self, segment_1, segment_2):
-        """Converts two "segments" of text into a tf.train.Example."""
-        # The training example is a dictionary of "input_ids" "sentA_length" not sure which one this is
+    def _make_example(self, first_segment, second_segment):
+        """Converts two "segments" of text into a train Example."""
+        # Create a "sentence" of input ids from the first segment
+        input_ids = [self.tokenizer.cls_token_id] + first_segment + [self.tokenizer.sep_token_id]
 
-        # sep_token: special token separating two different sentences in the same input
-        # cls_token: special token representing the class of the input. It is a sentence-level
-        # representation for classification
 
-        # this is used by BERT and ELECTRA
-
-        input_ids = [self.tokenizer.cls_token_id] + segment_1 + [self.tokenizer.sep_token_id]
+        # get the length of the input ids
         sentA_length = len(input_ids)
 
-        # length of input ids is the sentA_length
-
+        # produce segment ids, all zeros, matching the length of the input ids
         segment_ids = [0] * sentA_length
 
-        if segment_2:
-            input_ids += segment_2 + [self.tokenizer.sep_token_id]
-            segment_ids += [1] * (len(segment_2) + 1)
+        # if a second segment exists, then extend input_ids to include the ids of
+        # the second segment and another separator token.
+        if second_segment:
+            input_ids += second_segment + [self.tokenizer.sep_token_id]
+
+            # extend segment ids to length of second segment + 1,
+            segment_ids += [1] * (len(second_segment) + 1)
 
         if self.minimize_data_size:
             return {
@@ -217,6 +190,7 @@ class ELECTRADataProcessor(object):
                 'sentA_length': sentA_length,
             }
         else:
+            # pad the input data
             input_mask = [1] * len(input_ids)
             input_ids += [0] * (self._max_length - len(input_ids))
             input_mask += [0] * (self._max_length - len(input_mask))
@@ -226,90 +200,6 @@ class ELECTRADataProcessor(object):
                 'input_mask': input_mask,
                 'segment_ids': segment_ids,
             }
-
-
-# Create Dataset
-class CSVDataset(torch.utils.data.IterableDataset):
-    def __init__(self, path_to_csv, chunk_size, transform, header=False):
-        super(CSVDataset).__init__()
-
-        self.path_to_csv = path_to_csv
-        self.chunk_size = chunk_size
-        self.header = header
-        self.iterator = self.get_iterator()
-        self.transform = transform
-
-        self.len = self.count_csv_chunks()
-
-    def __iter__(self):
-        return self
-
-    def get_iterator(self):
-        return pd.read_csv(self.path_to_csv, header=[0] if self.header else None, chunksize=self.chunk_size, iterator=True)
-
-    def __next__(self):
-        data_frame = next(self.iterator)
-        texts = [item_list[0] for item_list in data_frame.values]
-
-
-        return self.transform(texts)
-
-        # return (torch.tensor(column_data.values, dtype=torch.float32) for _, column_data in data_frame.iteritems())
-        # return data_frame.values
-
-    def __len__(self):
-        return self.len
-
-    def count_csv_rows(self) -> int:
-        """
-        Given a path to a CSV file, count the number of data samples using lazy-loading.
-        Each chunk is iterated over and the total sizes are summed to calculate overall length.
-
-        :param header: flag indicating whether the csv file contains a header row
-        :return: number of rows in csv
-        """
-
-        tfr = self.get_iterator()
-        row_count = 0
-
-        while True:
-            try:
-                chunk = next(tfr)
-                row_count += len(chunk)
-            except StopIteration:
-                return row_count - 1 if self.header else row_count
-
-    def count_csv_chunks(self) -> int:
-        """
-        Given a path to a CSV file, count the number of chunks of data using lazy-loading.
-
-        :return: number of chunks in csv
-        """
-
-        tfr = self.get_iterator()
-        chunk_count = 0
-        first_chunk = True
-
-        while True:
-            try:
-                chunk = next(tfr)
-                if not first_chunk or len(chunk) != 1 or not self.header:
-                    chunk_count += 1
-                first_chunk = False
-
-            except StopIteration:
-                return chunk_count
-
-
-
-# loader = DataLoader(dataset, batch_size=10, num_workers=1, shuffle=False)
-
-# print(len(loader))
-#
-# for batch_idx, data in enumerate(loader):
-#     print('len loader', len(loader))
-#     print('batch: {}\tdata: {}'.format(batch_idx, data))
-
 
 
 """

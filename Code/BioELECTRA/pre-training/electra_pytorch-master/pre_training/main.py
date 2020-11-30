@@ -1,23 +1,22 @@
-import os
-from time import time
-import torch
-
-from torch import save, ones, int64, nn, no_grad
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from tqdm import tqdm, trange
-from transformers import AdamW, get_linear_schedule_with_warmup
-from torch.utils.tensorboard import SummaryWriter
-
-
-from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset
+from data_processing import ELECTRADataProcessor, MaskedLM
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
 import pickle
+
+import os
+from time import time
+import torch
+from torch import save, ones, int64, nn, no_grad
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+from tqdm import tqdm, trange
+from transformers import MODEL_FOR_QUESTION_ANSWERING_MAPPING, AdamW, get_linear_schedule_with_warmup
+from transformers.data.metrics.squad_metrics import compute_predictions_logits
+from transformers.data.processors.squad import SquadResult
+from torch.utils.tensorboard import SummaryWriter
+
 import datetime
-
-
 
 now = datetime.datetime.now()
 today = datetime.date.today()
@@ -56,7 +55,7 @@ def update_settings(settings, update):
     return settings
 
 
-def pre_train(dataset, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
+def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
@@ -110,6 +109,7 @@ def pre_train(dataset, model, tokenizer, scheduler, optimizer, settings, checkpo
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["epochs_trained"], int(settings["training_epochs"]), desc="Epoch")
+
     loss_function = ELECTRALoss()
 
     # # 2. Masked language model objective
@@ -120,29 +120,50 @@ def pre_train(dataset, model, tokenizer, scheduler, optimizer, settings, checkpo
                    replace_prob=0.0 if config["electra_mask_style"] else 0.1,
                    orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
-    # iterate over all epochs e.g. len(train_iterator) = num_epochs
+
     for epoch_number in train_iterator:
-        epoch_iterator = tqdm(dataset, desc="Iteration")
-        print(len(dataset))
+        print('Max epochs', len(train_iterator))
+        epoch_iterator = tqdm(data_loader, desc="Iteration")
 
-        for step in range(len(dataset)):
-
-            batch = next(dataset)
+        for step, batch in enumerate(epoch_iterator):
 
             # Skip past any already trained steps if resuming training
             if settings["steps_trained"] > 0:
                 settings["steps_trained"] -= 1
                 continue
 
-            model.train()
-            batch = tuple(t.to(settings["device"]) for t in batch) #
+            # MASK INPUTS HERE
 
+            # train model one step
+            model.train()
+            print(batch)
+
+            print("Length of batch", len(batch))
+            print("Type of batch", type(batch))
+
+            print("Length of first element in batch", len(batch[0]))
+            print("Type of first element in batch", type(batch[0]))
+
+            print("Length of first element in batch", len(batch[1]))
+            print("Type of first element in batch", type(batch[1]))
+
+            batch = tuple(t.to(settings["device"]) for t in batch)
+            # print(len(batch[0]))
+            # print("batch size", len(batch))
+
+
+            # inputs = {'input_ids': batch[0], 'sentA_length': batch[0]}
+            # inputs = (masked_inputs, sent_lengths, is_mlm_applied, labels),  targets = (labels,)
             inputs, targets = mlm.mask_batch(batch)
+
             outputs = model(*inputs)
 
-            loss = loss_function(outputs, *targets)
-            loss.backward()
+            # model outputs are always tuple in transformers (see doc)
+            # loss = outputs[0]
 
+            loss = loss_function(outputs, *targets)
+
+            loss.backward()
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
@@ -173,8 +194,9 @@ def pre_train(dataset, model, tokenizer, scheduler, optimizer, settings, checkpo
     save_model(model, tokenizer, optimizer, scheduler, settings, total_training_loss, checkpoint_dir)
 
 
-# define config here
-config = {
+if __name__ == "__main__":
+    # define config here
+    config = {
         'device': "cuda:0" if torch.cuda.is_available() else "cpu:0",
         # "cuda:0" if torch.cuda.is_available() else "cpu:0",
         'seed': 0,
@@ -189,9 +211,6 @@ config = {
         "steps_trained": 0,
         "update_steps": 500
     }
-
-
-if __name__ == "__main__":
 
     # Merge general config with model specific config
     # Setting of different sizes
@@ -216,61 +235,47 @@ if __name__ == "__main__":
     edl_cache_dir.mkdir(exist_ok=True)
 
     # Print info
-    print(f"Process ID: {os.getpid()}")
+    print(f"process id: {os.getpid()}")
 
     # creating this partial function is the first place that electra_tokenizer is used.
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"])
+
+
+
 
     print('Load in the dataset.')
     dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
         'train']
 
-    # transformed_dataset = FaceLandmarksDataset(csv_file='data/faces/face_landmarks.csv',
-    #                                            root_dir='data/faces/',
-    #                                            transform=transforms.Compose([
-    #                                                Rescale(256),
-    #                                                RandomCrop(224),
-    #                                                ToTensor()
-    #                                            ]))
-    #
-    dp = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
-
-
-    dataset = CSVDataset('./datasets/fibro_abstracts.csv', chunk_size=config["batch_size"], header=True, transform=dp)
-
-
-    # transformed_dataset = FaceLandmarksDataset(csv_file='data/faces/face_landmarks.csv',
-    #                                            root_dir='data/faces/',
-    #                                            transform=transforms.Compose([
-    #                                                Rescale(256),
-    #                                                RandomCrop(224),
-    #                                                ToTensor()
-    #                                            ]))
-    #
-
-
     print('Create or load cached ELECTRA-compatible data.')
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
-    # electra_dataset = ELECTRAProcessor(dataset).map(
-    #     cache_file_name=f'electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
+    electra_dataset = ELECTRAProcessor(dataset).map(
+        cache_file_name=f'./electra_customdataset_{config["max_length"]}.arrow', num_proc=1)
 
+    print(electra_dataset[0])
+    print(electra_dataset[1])
+    print(electra_dataset[2])
 
+    hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
+                           hf_toker=electra_tokenizer, n_inp=2)
 
-    # hf_dsets = HF_Datasets({'train': electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
-    #                        hf_toker=electra_tokenizer, n_inp=2)
-
-    # data loader
-    # dls = hf_dsets.dataloaders(bs=config["batch_size"], num_workers=config["num_workers"], pin_memory=False,
-    #                            shuffle_train=True,
-    #                            srtkey_fc=False,
-    #                            cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')
-
+    print(electra_dataset[0], dataset[0])
+    print(electra_dataset[1], dataset[1])
     # Random Sampler used during training.
-    # data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
+
+    data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
 
 
+    dl = hf_dsets.dataloaders(bs=config["batch_size"], num_workers=config["num_workers"], pin_memory=False,
+                               shuffle_train=True,
+                               srtkey_fc=False,
+                               cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')[0]
 
+    print(dl.one_batch())
+    # print(next(iter(data_loader)))
 
+    # # 5. Train
+    # Seed & PyTorch benchmark
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
 
 
@@ -297,15 +302,18 @@ if __name__ == "__main__":
 
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
+
     # dl = dls[0]
 
     config["sample_size"] = len(dataset)
     print('DATASET SIZE: ', len(dataset))
-    # print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
+    print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
+
     print("steps", config["steps"])
+
 
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(dataset, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
+    pre_train(dl, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="")
