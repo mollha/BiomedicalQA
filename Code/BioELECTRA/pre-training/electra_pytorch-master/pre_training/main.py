@@ -31,8 +31,8 @@ config = {
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "training_epochs": 9999,
     "batch_size": 30,
-    "epochs_trained": 0,
-    "steps_trained": 0,
+    "current_epoch": 0,
+    "current_step": 0,
     "global_step": 0,   # total steps over all epochs
     "update_steps": 10,  # Save checkpoint and log every X updates steps.
     "analyse_all_checkpoints": True
@@ -46,7 +46,7 @@ def set_seed(seed_value):
 
 
 def analyse_checkpoint(tb_writer, model, settings, total_training_loss):
-    tb_writer.add_scalar("checkpoint_{}", settings["epochs_trained"])
+    tb_writer.add_scalar("checkpoint_{}", settings["current_epoch"])
     tb_writer.add_scalar("Avg. training loss = {}", total_training_loss / settings["global_step"])
 
 
@@ -89,7 +89,7 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
     tb_writer = SummaryWriter()  # Create a SummaryWriter()
 
     # Resume training from the epoch we left off at earlier.
-    train_iterator = trange(settings["epochs_trained"], int(settings["training_epochs"]), desc="Epoch")
+    train_iterator = trange(settings["current_epoch"], int(settings["training_epochs"]), desc="Epoch")
 
     loss_function = ELECTRALoss()
 
@@ -101,9 +101,12 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
                    replace_prob=0.0 if config["electra_mask_style"] else 0.1,
                    orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
-    steps_trained = settings["steps_trained"]
+    steps_trained = settings["current_step"]
 
     for epoch_number in train_iterator:
+        # update the number of epochs
+        settings["current_epoch"] = epoch_number
+
         print('Number of Epochs', len(train_iterator))
         epoch_iterator = tqdm(data_loader, desc="Iteration")
 
@@ -125,12 +128,12 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
 
             # model outputs are always tuple in transformers (see doc)
             loss = loss_function(outputs, *targets)
-
             loss.backward()
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
 
+            # perform steps
             optimizer.step()
             scheduler.step()  # Update learning rate schedule
             model.zero_grad()
@@ -150,18 +153,16 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
                 tb_writer.add_scalar("loss", (total_training_loss - logging_loss) / settings["update_steps"], settings["global_step"])
                 logging_loss = total_training_loss
 
-            settings["steps_trained"] = step
+            settings["current_step"] = step
             settings["global_step"] += 1
 
-            print("Steps trained", settings["steps_trained"])
+            print("Steps trained", settings["current_step"])
             print("Global steps", settings["global_step"])
 
             # Save model checkpoint
             if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
                 save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
 
-        # update the number of epochs that have passed.
-        settings["epochs_trained"] = epoch_number
     tb_writer.close()
 
     # ------------- SAVE FINE-TUNED MODEL ONCE MORE AT THE END OF TRAINING -------------
@@ -223,4 +224,4 @@ if __name__ == "__main__":
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
 
-    pre_train(data_loader, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="01_12_20.16_20_03")
+    pre_train(data_loader, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="small_0_38")
