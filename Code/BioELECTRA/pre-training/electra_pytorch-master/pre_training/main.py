@@ -146,7 +146,6 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             #
             # print("Length of first element in batch", len(batch[1]))
             # print("Type of first element in batch", type(batch[1]))
-            batch = batch["input_ids"]
             batch = (batch,)
             print(batch)
 
@@ -247,61 +246,13 @@ if __name__ == "__main__":
     # Print info
     print(f"process id: {os.getpid()}")
 
-    # creating this partial function is the first place that electra_tokenizer is used.
-    ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"],
-                               device=config["device"])
-
     newELECTRADataProcessor = newELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
                                device=config["device"])
 
-
     print('Load in the dataset.')
-    dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
-        'train']
-
-    print('Length pre-electra', len(dataset))
-    # trying an alternative method for loading data
+    # todo see if its possible to implement caching? e.g. cache_dir='../datasets' in huggingface datasets
     dataset = CSVDataset('./datasets/fibro_abstracts.csv', transform=newELECTRADataProcessor)
-
-    # new_electra_dataset = newELECTRADataProcessor([dataset_2[0], dataset_2[1]])
-
     data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
-    one_batch = next(iter(data_loader))
-    print('length of one batch', len(one_batch))
-
-    # need to create some way of mapping now
-    print('Create or load cached ELECTRA-compatible data.')
-    quit()
-
-    # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
-    electra_dataset = ELECTRAProcessor(dataset).map(
-        cache_file_name=f'./electra_custom_dataset_{config["max_length"]}.arrow', num_proc=1)
-
-    print('Length post-electra', len(electra_dataset))
-    # print(electra_dataset[0])
-    # print(electra_dataset[1])
-    # print(electra_dataset[2])
-
-
-    # hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
-    #                        hf_toker=electra_tokenizer, n_inp=2)
-    for val in electra_dataset:
-        val["input_ids"] = torch.tensor(val["input_ids"], device=config["device"])
-
-    print(electra_dataset[0], type(electra_dataset[0]["input_ids"]))
-
-    print("pre modification")
-    hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText},
-                           hf_toker=electra_tokenizer, n_inp=1)
-
-
-
-    print(electra_dataset[0], dataset[0])
-    # Random Sampler used during training.
-
-    # todo find out if there is a way to cache
-    # todo set shuffle back to true
-    data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
 
     # # 5. Train
     # Seed & PyTorch benchmark
@@ -331,8 +282,6 @@ if __name__ == "__main__":
 
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
-
-    # dl = dls[0]
 
     config["sample_size"] = len(dataset)
     # print('DATASET SIZE: ', len(dataset))

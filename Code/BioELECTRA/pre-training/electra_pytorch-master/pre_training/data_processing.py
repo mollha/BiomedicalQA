@@ -29,8 +29,6 @@ class CSVDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        print('idx', idx)
-
         text = self.df.iloc[idx, 0]
         if self.transform:
             sample = self.transform(text)
