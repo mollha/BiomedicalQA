@@ -1,6 +1,9 @@
 import torch
+import os
+from pathlib import Path
 from torch import nn
 import torch.nn.functional
+import datetime
 
 """ Vanilla ELECTRA settings
     """
@@ -31,6 +34,58 @@ large_config = {
         "max_length": 512,
         "generator_size_divisor": 4
     }
+
+
+# ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
+def load_checkpoint(path_to_checkpoint, model, optimizer, scheduler):
+    # Load in optimizer, tokenizer and scheduler states
+    path_to_optimizer = os.path.join(path_to_checkpoint, "optimizer.pt")
+    if os.path.isfile(path_to_optimizer):
+        optimizer.load_state_dict(torch.load(path_to_optimizer))
+
+    path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
+    if os.path.isfile(path_to_scheduler):
+        scheduler.load_state_dict(torch.load(path_to_scheduler))
+
+    path_to_model = os.path.join(path_to_checkpoint, "model.pt")
+    if os.path.isfile(path_to_model):
+        model.load_state_dict(torch.load(path_to_model))
+
+    settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
+
+    print("Re-instating settings - {}".format(settings))
+    print("----------------------------------------------")
+    print("Resuming training from epoch {} and step: {}\n"
+          .format(settings["epochs_trained"], settings["steps_trained"]))
+
+    return model, optimizer, scheduler, settings
+
+
+def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir):
+    now = datetime.datetime.now()
+    today = datetime.date.today()
+
+    # WE NEED TO CREATE A NEW CHECKPOINT NAME
+    checkpoint_name = "{}_{}_{}".format(settings["size"], settings["epochs_trained"], settings["steps_trained"])
+
+    # save the time and date of when the model was last saved
+    settings["saved_on"] = today.strftime("%d_%m_%y")
+    settings["saved_at"] = now.strftime("%H_%M_%S")
+
+    # ------------- save fine-tuned optimizer, scheduler and model -------------
+    save_dir = os.path.join(checkpoint_dir, checkpoint_name)
+    Path(save_dir).mkdir(exist_ok=False, parents=True)
+
+    # save training settings with trained model
+    torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
+    torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
+    torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
+    torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
+    # the tokenizer state is saved with the model
+
+    print("Saving model checkpoint, optimizer and scheduler states to {}".format(save_dir))
+
+# --------------------------------------------------------------------------------
 
 
 def get_model_config(model_size):

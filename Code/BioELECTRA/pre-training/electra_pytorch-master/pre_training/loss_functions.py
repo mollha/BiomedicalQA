@@ -14,6 +14,7 @@ class ELECTRALoss:
         self.discriminator_loss_function = nn.BCEWithLogitsLoss()
 
     def __call__(self, pred, targ_ids):
+        # model outputs (i.e. pred) are always tuple in transformers (see doc)
         mlm_gen_logits, generated, disc_logits, is_replaced, non_pad, is_mlm_applied = pred
         disc_logits = disc_logits.masked_select(non_pad)  # -> 1d tensor
         is_replaced = is_replaced.masked_select(non_pad)  # -> 1d tensor
