@@ -1,4 +1,4 @@
-from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset
+from data_processing import newELECTRADataProcessor, ELECTRADataProcessor, MaskedLM, CSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
@@ -251,16 +251,27 @@ if __name__ == "__main__":
     ELECTRAProcessor = partial(ELECTRADataProcessor, tokenizer=electra_tokenizer, max_length=config["max_length"],
                                device=config["device"])
 
+    newELECTRADataProcessor = newELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
+                               device=config["device"])
+
+
     print('Load in the dataset.')
     dataset = datasets.load_dataset('csv', cache_dir='../datasets', data_files='./datasets/fibro_abstracts.csv')[
         'train']
 
     print('Length pre-electra', len(dataset))
     # trying an alternative method for loading data
-    dataset_2 = CSVDataset('./datasets/fibro_abstracts.csv')
+    dataset = CSVDataset('./datasets/fibro_abstracts.csv', transform=newELECTRADataProcessor)
+
+    # new_electra_dataset = newELECTRADataProcessor([dataset_2[0], dataset_2[1]])
+
+    data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
+    one_batch = next(iter(data_loader))
+    print('length of one batch', len(one_batch))
 
     # need to create some way of mapping now
     print('Create or load cached ELECTRA-compatible data.')
+    quit()
 
     # apply_cleaning is true by default e.g. ELECTRAProcessor(dataset, apply_cleaning=False) if no cleaning
     electra_dataset = ELECTRAProcessor(dataset).map(
@@ -270,7 +281,7 @@ if __name__ == "__main__":
     # print(electra_dataset[0])
     # print(electra_dataset[1])
     # print(electra_dataset[2])
-    quit()
+
 
     # hf_dsets = HF_Datasets({"train": electra_dataset}, cols={'input_ids': TensorText, 'sentA_length': noop},
     #                        hf_toker=electra_tokenizer, n_inp=2)

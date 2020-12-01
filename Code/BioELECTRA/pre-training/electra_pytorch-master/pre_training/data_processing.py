@@ -15,6 +15,7 @@ class CSVDataset(Dataset):
     """CSV dataset."""
 
     def __init__(self, csv_file, transform=None):
+        super(CSVDataset, self).__init__()
         """
         Args:
             csv_file (string): Path to the csv file with annotations.
@@ -28,6 +29,8 @@ class CSVDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
+        print('idx', idx)
+
         text = self.df.iloc[idx, 0]
         if self.transform:
             sample = self.transform(text)
@@ -36,24 +39,46 @@ class CSVDataset(Dataset):
 
 
 
-class newElectraDataProcessor(object):
-    def __init__(self, hf_dset, tokenizer, max_length, device, text_col='text', lines_delimiter='\n'):
+class newELECTRADataProcessor(object):
+    def __init__(self, tokenizer, max_length, device, text_col='text', lines_delimiter='\n'):
         # turn minimize data_size off because we are using a custom dataset
         # which does not do automatic padding like fastai.
 
         self.tokenizer = tokenizer
-        self._current_sentences = []
-        self._current_length = 0
         self._max_length = max_length
         self._target_length = max_length
         self.device = device
 
-        self.hf_dset = hf_dset
         self.text_col = text_col
         self.lines_delimiter = lines_delimiter
 
 
-    def __call__(self, batch):
+    # def __call__(self, batch):
+    #     """
+    #     Call method allows instances of classes to behave like functions.
+    #
+    #     texts is the WHOLE dataset, not just an individual batch.
+    #     :param texts:
+    #     :return:
+    #     """
+    #
+    #     # e.g. batch could be a list of strings
+    #     # new_example = {'input_ids': []}
+    #     new_example = []
+    #
+    #     for text in batch:  # for every doc
+    #         # decide on the target length
+    #         self._target_length = random.randint(5, self._max_length) if random.random() < 0.05 else self._max_length
+    #
+    #         processed_sample = self.process_sample(text)
+    #         processed_sample = np.array(processed_sample)
+    #         # new_example["input_ids"].append(processed_sample)
+    #         new_example.append(processed_sample)
+    #
+    #     return torch.IntTensor(new_example, device=self.device)
+
+
+    def __call__(self, text):
         """
         Call method allows instances of classes to behave like functions.
 
@@ -62,39 +87,11 @@ class newElectraDataProcessor(object):
         :return:
         """
 
-        # e.g. batch could be a list of strings
-
-        for text in batch:
-
-
-        new_example = {'input_ids': []}
-
-        for text in texts:  # for every doc
-            for line in re.split(self.lines_delimiter, text):  # for every paragraph
-
-                if re.fullmatch(r'\s*', line):
-                    continue  # empty string or string with all space characters
-
-                # filter out lines that are shorter than 80 characters
-                if self.apply_cleaning and len(line) < 80:
-                    continue
-
-                example = self.add_line(line)
-                if example:
-                    for k, v in example.items():
-                        new_example[k].append(v)
-
-            # self.add_line() to current_length.
-            # We want to check that there is at least one token to build an example from.
-            if self._current_length != 0:
-                example = self._create_example()
-                for k, v in example.items():
-                    new_example[k].append(v)
-
-        return new_example
-
-
-    def trim_sample(self, sample: str):
+        # decide on the target length
+        # todo remove import random and simplify random.random
+        self._target_length = randint(5, self._max_length) if random.random() < 0.05 else self._max_length
+        processed_sample = self.process_sample(text)
+        return np.array(processed_sample)
 
 
     def process_sample(self, sample: str):
@@ -103,7 +100,6 @@ class newElectraDataProcessor(object):
         :param sample:
         :return:
         """
-
         line = sample.strip().replace("\n", " ").replace("()", "")
 
         # create tokens using the tokenizer provided
@@ -111,36 +107,24 @@ class newElectraDataProcessor(object):
 
         # convert the tokens to ids - returns list of token ids
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-        number_of_tokens = len(token_ids)
 
-        if self._current_length >= self._target_length:
-            return self._create_example()
+        # reduce this to the max_length - 2 (accounts for added tokens)
+        # snip to target_length
+        additional_tokens = len(token_ids) - self._target_length - 2
 
+        if additional_tokens > 0:
+            # token_ids must be trimmed
+            first_half = randint(0, additional_tokens)
+            second_half = additional_tokens - first_half
+            token_ids = token_ids[first_half : len(token_ids) - second_half]
 
+        # Create a "sentence" of input ids from the first segment
+        input_ids = [self.tokenizer.cls_token_id] + token_ids + [self.tokenizer.sep_token_id]
 
-        lines_in_sample = re.split(self.lines_delimiter, sample)
+        # add padding to max_length
+        input_ids += [self.tokenizer.pad_token_id] * (self._max_length - len(input_ids))
 
-        create_example = []
-
-        ''.join(sequenceofstrings)
-
-        for line in lines_in_sample:
-            if re.fullmatch(r'\s*', line):
-                continue
-
-
-
-
-
-            # filter out lines that are shorter than 80 characters
-            if self.apply_cleaning and len(line) < 80:
-                continue
-
-            example = self.add_line(line)
-            if example:
-                for k, v in example.items():
-                    new_example[k].append(v)
-
+        return input_ids
 
 
 class ELECTRADataProcessor(object):
