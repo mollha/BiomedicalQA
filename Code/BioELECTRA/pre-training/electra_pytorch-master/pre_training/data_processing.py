@@ -4,28 +4,149 @@ import re
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from functools import partial
 import random
 import os
 import re
 
 
+class CSVDataset(Dataset):
+    """CSV dataset."""
 
-""" Completely overhaul the way data is read in
- Essentially, we need to read in text and produce training examples.
- 
- 
- 
- """
+    def __init__(self, csv_file, transform=None):
+        """
+        Args:
+            csv_file (string): Path to the csv file with annotations.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.df = pd.read_csv(csv_file)
+        self.transform = transform
 
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        text = self.df.iloc[idx, 0]
+        if self.transform:
+            sample = self.transform(text)
+            return sample
+        return text
+
+
+
+class newElectraDataProcessor(object):
+    def __init__(self, hf_dset, tokenizer, max_length, device, text_col='text', lines_delimiter='\n'):
+        # turn minimize data_size off because we are using a custom dataset
+        # which does not do automatic padding like fastai.
+
+        self.tokenizer = tokenizer
+        self._current_sentences = []
+        self._current_length = 0
+        self._max_length = max_length
+        self._target_length = max_length
+        self.device = device
+
+        self.hf_dset = hf_dset
+        self.text_col = text_col
+        self.lines_delimiter = lines_delimiter
+
+
+    def __call__(self, batch):
+        """
+        Call method allows instances of classes to behave like functions.
+
+        texts is the WHOLE dataset, not just an individual batch.
+        :param texts:
+        :return:
+        """
+
+        # e.g. batch could be a list of strings
+
+        for text in batch:
+
+
+        new_example = {'input_ids': []}
+
+        for text in texts:  # for every doc
+            for line in re.split(self.lines_delimiter, text):  # for every paragraph
+
+                if re.fullmatch(r'\s*', line):
+                    continue  # empty string or string with all space characters
+
+                # filter out lines that are shorter than 80 characters
+                if self.apply_cleaning and len(line) < 80:
+                    continue
+
+                example = self.add_line(line)
+                if example:
+                    for k, v in example.items():
+                        new_example[k].append(v)
+
+            # self.add_line() to current_length.
+            # We want to check that there is at least one token to build an example from.
+            if self._current_length != 0:
+                example = self._create_example()
+                for k, v in example.items():
+                    new_example[k].append(v)
+
+        return new_example
+
+
+    def trim_sample(self, sample: str):
+
+
+    def process_sample(self, sample: str):
+        """
+        Sample is a string from the dataset (i.e. a single example)
+        :param sample:
+        :return:
+        """
+
+        line = sample.strip().replace("\n", " ").replace("()", "")
+
+        # create tokens using the tokenizer provided
+        tokens = self.tokenizer.tokenize(line)
+
+        # convert the tokens to ids - returns list of token ids
+        token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+        number_of_tokens = len(token_ids)
+
+        if self._current_length >= self._target_length:
+            return self._create_example()
+
+
+
+        lines_in_sample = re.split(self.lines_delimiter, sample)
+
+        create_example = []
+
+        ''.join(sequenceofstrings)
+
+        for line in lines_in_sample:
+            if re.fullmatch(r'\s*', line):
+                continue
+
+
+
+
+
+            # filter out lines that are shorter than 80 characters
+            if self.apply_cleaning and len(line) < 80:
+                continue
+
+            example = self.add_line(line)
+            if example:
+                for k, v in example.items():
+                    new_example[k].append(v)
 
 
 
 class ELECTRADataProcessor(object):
     """Given a stream of input text, creates pre-training examples."""
 
-    def __init__(self, hf_dset, tokenizer, max_length, text_col='text', lines_delimiter='\n',
+    def __init__(self, hf_dset, tokenizer, max_length, device, text_col='text', lines_delimiter='\n',
                  minimize_data_size=True, apply_cleaning=True):
         # turn minimize data_size off because we are using a custom dataset
         # which does not do automatic padding like fastai.
@@ -35,6 +156,7 @@ class ELECTRADataProcessor(object):
         self._current_length = 0
         self._max_length = max_length
         self._target_length = max_length
+        self.device = device
 
         self.hf_dset = hf_dset
         self.text_col = text_col
@@ -43,9 +165,10 @@ class ELECTRADataProcessor(object):
         self.apply_cleaning = apply_cleaning
 
     def map(self, **kwargs):
-        "Some settings of datasets.Dataset.map for ELECTRA data processing"
+        " Some settings of datasets.Dataset.map for ELECTRA data processing "
 
         num_proc = kwargs.pop('num_proc', os.cpu_count())
+        print(type(self.hf_dset))
         return self.hf_dset.my_map(
             function=self,
             batched=True,
@@ -61,15 +184,12 @@ class ELECTRADataProcessor(object):
         """
         Call method allows instances of classes to behave like functions.
 
-        I am starting to think that texts is the WHOLE dataset, not just an individual batch.
+        texts is the WHOLE dataset, not just an individual batch.
         :param texts:
         :return:
         """
 
-        if self.minimize_data_size:
-            new_example = {'input_ids': []}
-        else:
-            new_example = {'input_ids': [], 'input_mask': [], 'segment_ids': []}
+        new_example = {'input_ids': []}
 
         for text in texts:  # for every doc
             for line in re.split(self.lines_delimiter, text):  # for every paragraph
@@ -156,11 +276,7 @@ class ELECTRADataProcessor(object):
         self._current_length = 0
 
         # small chance for random-length instead of max_length-length example
-        if random.random() < 0.05:
-            self._target_length = random.randint(5, self._max_length)
-        else:
-            self._target_length = self._max_length
-
+        self._target_length = random.randint(5, self._max_length) if random.random() < 0.05 else self._max_length
         return self._make_example(first_segment, second_segment)
 
     def _make_example(self, first_segment, second_segment):
@@ -173,27 +289,12 @@ class ELECTRADataProcessor(object):
         if second_segment:
             input_ids += second_segment + [self.tokenizer.sep_token_id]
 
-
-        # todo add padding here. check this its probs wrong
+        # todo Check that padding was added correctly
         input_ids += [self.tokenizer.pad_token_id] * (self._max_length - len(input_ids))
 
-
-        if self.minimize_data_size:
-            return {
-                'input_ids': input_ids
-            }
-        # else:
-        #     # pad the input data
-        #     input_mask = [1] * len(input_ids)
-        #     input_ids += [0] * (self._max_length - len(input_ids))
-        #     input_mask += [0] * (self._max_length - len(input_mask))
-        #     segment_ids += [0] * (self._max_length - len(segment_ids))
-        #     return {
-        #         'input_ids': input_ids,
-        #         'input_mask': input_mask,
-        #         'segment_ids': segment_ids,
-        #     }
-
+        return {
+            'input_ids': input_ids
+        }
 
 """
 Modified from HuggingFace/transformers (https://github.com/huggingface/transformers/blob/0a3d0e02c5af20bfe9091038c4fd11fb79175546/src/transformers/data/data_collator.py#L102). 
