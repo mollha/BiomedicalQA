@@ -59,7 +59,6 @@ class ELECTRAModel(nn.Module):
   def forward(self, masked_inputs, is_mlm_applied, labels):
     """
     masked_inputs (Tensor[int]): (B, L)
-    sentA_lenths (Tensor[int]): (B, L)
     is_mlm_applied (Tensor[boolean]): (B, L), True for positions chosen by mlm probability
     labels (Tensor[int]): (B, L), -100 for positions where are not mlm applied
     """
@@ -97,31 +96,11 @@ class ELECTRAModel(nn.Module):
     # get a TensorText object (like a list) of booleans indicating whether each
     # input token is a pad token
     attention_mask = input_ids != self.electra_tokenizer.pad_token_id
-    print(attention_mask)
-
-    #
-    # # get the padded length of the sequences
-    # # e.g. (128, 60) if input ids is TensorText, or torch.Size([128, 48]) (if input_ids is a tensor)
-    # seq_len = input_ids.shape[1]
 
     # create a list of lists containing zeros and ones.
-    # for every length, x, in sentA_lengths, create a list beginning with x zeros,
-    # then add seq_len - x ones.
-
-    # token_type_ids = torch.tensor([ ([0]*len + [1]*(seq_len-len)) for len in sentA_lenths.tolist()],
-    #                               device=input_ids.device)
-
-    # token_type_ids = torch.tensor([[0 if boolean else 1 for boolean in sub_mask] for sub_mask in iter(attention_mask)],
-    #                                 device=input_ids.device)
-
+    # for every boolean in the attention mask, replace this with 0 if positive and 1 if negative.
     token_type_ids = torch.tensor([[int(not boolean) for boolean in sub_mask] for sub_mask in iter(attention_mask)],
                                   device=input_ids.device)
-
-
-    # print("are my tensors equal?", torch.all(torch.eq(token_type_ids, token_type_ids_2)))
-    # print(token_type_ids)
-    # print(token_type_ids_2)
-
     return attention_mask, token_type_ids
 
   def sample(self, logits):

@@ -273,16 +273,9 @@ if __name__ == "__main__":
     # print(electra_dataset[1], dataset[1])
     # Random Sampler used during training.
 
+    # todo find out if there is a way to cache
     data_loader = DataLoader(electra_dataset, shuffle=True, batch_size=config["batch_size"])
 
-
-    dl = hf_dsets.dataloaders(bs=config["batch_size"], num_workers=config["num_workers"], pin_memory=False,
-                               shuffle_train=True,
-                               srtkey_fc=False,
-                               cache_dir='../datasets/electra_dataloader', cache_name='dl_{split}.json')[0]
-
-    # print(dl.one_batch())
-    print(next(iter(data_loader)))
 
     # # 5. Train
     # Seed & PyTorch benchmark
@@ -320,7 +313,6 @@ if __name__ == "__main__":
     # print('DATASET SIZE AFTER ELECTRAFYING: ', len(electra_dataset))
     #
     # print("steps", config["steps"])
-
 
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
