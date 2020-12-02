@@ -1,14 +1,55 @@
 from random import randint, random
 import os
 import re
-import numpy as np
 import pandas as pd
+import pathlib
 import torch
-from torch.utils.data import DataLoader, Dataset
+import numpy as np
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
 import random
 import os
 import re
+
+
+# Create Dataset
+class IterableCSVDataset(IterableDataset):
+    """
+    Custom CSV pytorch dataset for reading
+    """
+
+    def __init__(self, data_directory: str, batch_size: int, shuffle=True):
+        super(IterableCSVDataset).__init__()
+
+        self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
+        self._current_csv_idx = 0   # keep track of the current file we are reading from
+        self._batch_size = batch_size
+        self._current_iterator = None
+        self._shuffle = shuffle
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        while True:
+            try:
+                batch = next(self._current_iterator)
+                return batch if not self._shuffle else batch.sample(frac=1).reset_index(drop=True)
+            except (StopIteration, TypeError):
+                print("caught")
+                # If the current_iterator has been exhausted, or does not yet exist, then we need to create one.
+                self._current_csv_idx += 1
+
+                # check that there are files remaining
+                if self._current_csv_idx < len(self._list_paths_to_csv):
+                    csv_name = self._list_paths_to_csv[self._current_csv_idx]  # get the name of the next file
+                    self._current_iterator = self.build_iterator_from_csv(csv_name)  # pandas.io.parsers.TextFileReader
+                else:
+                    # there is no more data to explore
+                    raise StopIteration
+
+    def build_iterator_from_csv(self, path_to_csv):
+        return pd.read_csv(path_to_csv, skiprows=1, chunksize=self._batch_size, iterator=True, delimiter="|")
 
 
 class CSVDataset(Dataset):

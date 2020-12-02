@@ -1,10 +1,10 @@
-from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset
+from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset, IterableCSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
 import pickle
-
+import numpy as np
 import os
 from time import time
 import torch
@@ -190,6 +190,11 @@ if __name__ == "__main__":
     print('Load in the dataset.')
     dataset = CSVDataset('./datasets/fibro_abstracts.csv', transform=pre_processor)
     data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
+
+    csv_data_dir = '../datasets/PubMed/processed_data'
+    iterable_dataset = IterableCSVDataset(csv_data_dir, config["batch_size"])
+
+    print(next(iter(iterable_dataset)))
 
     # # 5. Train - Seed & PyTorch benchmark
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
