@@ -1,4 +1,4 @@
-from data_processing import newELECTRADataProcessor, ELECTRADataProcessor, MaskedLM, CSVDataset
+from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
@@ -32,12 +32,11 @@ config = {
     "training_epochs": 9999,
     "batch_size": 30,
     "current_epoch": 0,
-    "current_step": 0,
-    "global_step": 0,   # total steps over all epochs
+    "steps_trained": 0,
+    "global_step": -1,   # total steps over all epochs
     "update_steps": 10,  # Save checkpoint and log every X updates steps.
     "analyse_all_checkpoints": True
 }
-
 
 def set_seed(seed_value):
     random.seed(seed_value)
@@ -45,9 +44,9 @@ def set_seed(seed_value):
     torch.manual_seed(seed_value)
 
 
-def analyse_checkpoint(tb_writer, model, settings, total_training_loss):
+def analyse_checkpoint(tb_writer, model, settings):
     tb_writer.add_scalar("checkpoint_{}", settings["current_epoch"])
-    tb_writer.add_scalar("Avg. training loss = {}", total_training_loss / settings["global_step"])
+    tb_writer.add_scalar("lr", scheduler.get_lr()[0], settings["global_step"])
 
 
 def update_settings(settings, update):
@@ -57,7 +56,7 @@ def update_settings(settings, update):
     return settings
 
 
-def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, checkpoint_name=""):
+def pre_train(data_loader, model, scheduler, optimizer, settings, checkpoint_name=""):
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
@@ -84,13 +83,12 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
     model.zero_grad()
 
     # Added here for reproducibility
-    # TODO SET SEED HERE AGAIN
+    set_seed(settings["seed"])
 
     tb_writer = SummaryWriter()  # Create a SummaryWriter()
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["current_epoch"], int(settings["training_epochs"]), desc="Epoch")
-
     loss_function = ELECTRALoss()
 
     # # 2. Masked language model objective
@@ -101,7 +99,8 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
                    replace_prob=0.0 if config["electra_mask_style"] else 0.1,
                    orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
-    steps_trained = settings["current_step"]
+    # resume training from the next step
+    steps_trained = settings["steps_trained"] + 1
 
     for epoch_number in train_iterator:
         # update the number of epochs
@@ -120,14 +119,10 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             batch = (batch,)
             inputs, targets = mlm.mask_batch(batch)
 
-            # train model one step
-            model.train()
+            model.train()  # train model one step
 
-            # inputs = (masked_inputs, sent_lengths, is_mlm_applied, labels),  targets = (labels,)
-            outputs = model(*inputs)
-
-            # model outputs are always tuple in transformers (see doc)
-            loss = loss_function(outputs, *targets)
+            outputs = model(*inputs)  # inputs = (masked_inputs, is_mlm_applied, labels)
+            loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
             total_training_loss += loss.item()
 
@@ -138,29 +133,24 @@ def pre_train(data_loader, model, tokenizer, scheduler, optimizer, settings, che
             scheduler.step()  # Update learning rate schedule
             model.zero_grad()
 
+            settings["steps_trained"] = step
+            settings["global_step"] += 1
+
+            print("\n{} steps trained in current epoch\n{} steps trained overall."
+                  .format(settings["steps_trained"], settings["global_step"]))
+
             # Log metrics
-            if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
+            if settings["global_step"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
                 # Only evaluate when single GPU otherwise metrics may not average well
-                # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
+                # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
 
                 if settings["analyse_all_checkpoints"]:
                     # pass some objects over to be analysed
                     # I am not sure how this will be implemented yet, but will allow us to write some data to
                     # tensorboard about the state of pre-trained checkpoints.
-                    analyse_checkpoint(tb_writer, model, settings, total_training_loss)
+                    analyse_checkpoint(tb_writer, model, settings)
 
-                tb_writer.add_scalar("lr", scheduler.get_lr()[0], settings["global_step"])
-                tb_writer.add_scalar("loss", (total_training_loss - logging_loss) / settings["update_steps"], settings["global_step"])
-                logging_loss = total_training_loss
-
-            settings["current_step"] = step
-            settings["global_step"] += 1
-
-            print("Steps trained", settings["current_step"])
-            print("Global steps", settings["global_step"])
-
-            # Save model checkpoint
-            if settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
+                # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
 
     tb_writer.close()
@@ -194,13 +184,11 @@ if __name__ == "__main__":
 
     # Print info
     print(f"process id: {os.getpid()}")
-
-    newELECTRADataProcessor = newELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
-                               device=config["device"])
+    pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
+                                         device=config["device"])
 
     print('Load in the dataset.')
-    # todo see if its possible to implement caching? e.g. cache_dir='../datasets' in huggingface datasets
-    dataset = CSVDataset('./datasets/fibro_abstracts.csv', transform=newELECTRADataProcessor)
+    dataset = CSVDataset('./datasets/fibro_abstracts.csv', transform=pre_processor)
     data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
 
     # # 5. Train - Seed & PyTorch benchmark
@@ -214,8 +202,6 @@ if __name__ == "__main__":
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
 
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
-    # dls.to(torch.device(config["device"]))
-
     config["sample_size"] = len(dataset)
 
     # Prepare optimizer and schedule (linear warm up and decay)
@@ -223,5 +209,4 @@ if __name__ == "__main__":
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
-
-    pre_train(data_loader, electra_model, electra_tokenizer, scheduler, optimizer, config, checkpoint_name="small_0_38")
+    pre_train(data_loader, electra_model, scheduler, optimizer, config, checkpoint_name="")
