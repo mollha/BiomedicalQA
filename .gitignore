@@ -1,8 +1,9 @@
-MeetingNotes
-Code/Datasets
+*.DS_Store
+Code/datasets/
+Code/qa_datasets/*
 
-Code/BioBERT/datasets/*
-Code/BioBERT/question-answering/runs/*
-.DS_Store
+!Code/datasets/PubMed/processed_data/pm_5000.csv
+Code/pre_training/checkpoints/*
+Code/pre_training/runs/*
+ShellScripts/runs
 *.pyc
- question-answering/__pycache__/*.pyc
