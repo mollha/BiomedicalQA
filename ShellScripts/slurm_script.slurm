@@ -5,12 +5,13 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --mem=28g
+#SBATCH --job-name=language_model_mh
 
 # Partition: cpu | gpu-small | gpu-large
-#SBATCH -p gpu-bigmem
+#SBATCH -p gpu-large
 
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
-#SBATCH --qos=long-high-prio
+#SBATCH --qos=short
 
 # TIME
 #SBATCH -t 48:00:00
