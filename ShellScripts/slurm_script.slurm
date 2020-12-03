@@ -11,7 +11,7 @@
 #SBATCH --job-name=language_model_mh
 #SBATCH -p ug-gpu-small
 #SBATCH --qos=debug
-#SBATCH -t 2:00:00
+#SBATCH -t 24:00:00
 #SBATCH --mem=28g
 
 # Source the bash profile (required to use the module command)
