@@ -22,7 +22,7 @@ config = {
     'electra_mask_style': True,
     'size': 'small',
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "training_epochs": 9999,
+    "training_epochs": 1000,    # todo change this for proper training 9999,
     "batch_size": 30,
     "current_epoch": 0,
     "steps_trained": 0,
@@ -83,6 +83,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     model.to(settings["device"])
 
     valid_checkpoint = False
+    path_to_checkpoint = None
 
     if checkpoint_name.lower() == "recent":
         subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
@@ -95,13 +96,14 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
         if os.path.exists(path_to_checkpoint):
             print("Checkpoint '{}' exists - Loading config values from memory.".format(path_to_checkpoint))
             # if the directory with the checkpoint name exists, we can retrieve the correct config from here
-            model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler)
-            settings = update_settings(settings, new_settings)
             valid_checkpoint = True
         else:
             print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
 
-    if not valid_checkpoint:
+    if valid_checkpoint:
+        model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler)
+        settings = update_settings(settings, new_settings)
+    else:
         print("Pre-training from scratch - no checkpoint provided.")
 
     print("Save model checkpoints every {} steps.".format(settings["update_steps"]))

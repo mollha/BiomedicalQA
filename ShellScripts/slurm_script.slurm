@@ -4,13 +4,13 @@
 # cores in each node.
 #SBATCH -N 1
 #SBATCH -c 1
-#SBATCH --mem=14g
+#SBATCH --mem=32g
 
 # Partition: cpu | gpu-small | gpu-large
-#SBATCH -p cpu
+#SBATCH -p gpu-bigmem
 
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
-#SBATCH --qos=long-cpu
+#SBATCH --qos=long-high-prio
 
 # TIME
 #SBATCH -t 48:00:00
