@@ -77,27 +77,31 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
-    checkpoint_dir = "checkpoints/pretrain"
+    checkpoint_dir = (base_path / 'checkpoints/pretrain').resolve()
     Path(checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
     model.to(settings["device"])
 
-    path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
-    if checkpoint_name:
-        if checkpoint_name.lower() == "recent":
-            subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
-            if len(subfolders) > 0:
-                path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
-                print("\nPre-training from the most advanced checkpoint - {}".format(path_to_checkpoint))
+    valid_checkpoint = False
 
+    if checkpoint_name.lower() == "recent":
+        subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
+        if len(subfolders) > 0:
+            path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
+            print("\nPre-training from the most advanced checkpoint - {}".format(path_to_checkpoint))
+            valid_checkpoint = True
+    elif checkpoint_name:
+        path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
             print("Checkpoint '{}' exists - Loading config values from memory.".format(path_to_checkpoint))
             # if the directory with the checkpoint name exists, we can retrieve the correct config from here
             model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler)
             settings = update_settings(settings, new_settings)
+            valid_checkpoint = True
         else:
             print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
-    else:
+
+    if not valid_checkpoint:
         print("Pre-training from scratch - no checkpoint provided.")
 
     print("Save model checkpoints every {} steps.".format(settings["update_steps"]))
@@ -187,6 +191,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
 
 if __name__ == "__main__":
+    base_path = Path(__file__).parent
     # Merge general config with model specific config
     # Setting of different sizes
     model_specific_config = get_model_config(config['size'])
@@ -204,8 +209,7 @@ if __name__ == "__main__":
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
     # Path to data
-    Path('../datasets', exist_ok=True)
-    Path('checkpoints/pretrain').mkdir(exist_ok=True, parents=True)
+    Path((base_path / '../datasets').resolve(), exist_ok=True)
 
     # Print info
     print(f"process id: {os.getpid()}")
@@ -213,10 +217,7 @@ if __name__ == "__main__":
                                          device=config["device"])
 
     print('Load in the dataset.')
-    # dataset = CSVDataset('./qa_datasets/fibro_abstracts.csv', transform=pre_processor)
-    # data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
-
-    csv_data_dir = '../datasets/PubMed/processed_data'
+    csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=pre_processor)
 
     # # 5. Train - Seed & PyTorch benchmark

@@ -17,12 +17,16 @@ class IterableCSVDataset(IterableDataset):
     def __init__(self, data_directory: str, batch_size: int, device, transform=None, shuffle=True):
         super(IterableCSVDataset).__init__()
 
-        self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
         self._batch_size = batch_size
         self._shuffle = shuffle
         self._transform = transform
         self._device = device
         self._dataset_size = None
+        self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
+
+        if len(self._list_paths_to_csv) == 0:
+            raise FileNotFoundError("CSV files not found in directory {}. Pre-training cancelled."
+                                    .format(data_directory))
 
     def __iter__(self):
         # When calling for a new iterable, reset csv_idx and current_iterator
