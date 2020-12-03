@@ -150,9 +150,9 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                 steps_trained -= 1
                 continue
 
-            batch = (batch,)
+            batch.to(settings["device"])
             inputs, targets = mlm.mask_batch(batch)
-            inputs.to(settings["device"])
+
             model.train()  # train model one step
             outputs = model(*inputs)  # inputs = (masked_inputs, is_mlm_applied, labels)
 
