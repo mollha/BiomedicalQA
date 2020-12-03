@@ -12,7 +12,7 @@
 #SBATCH -p ug-gpu-small
 #SBATCH --qos=debug
 #SBATCH -t 2:00:00
-#SBATCH --mem=14g
+#SBATCH --mem=28g
 
 # Source the bash profile (required to use the module command)
 source /etc/profile
