@@ -206,8 +206,6 @@ if __name__ == "__main__":
     # Path to data
     Path('../datasets', exist_ok=True)
     Path('checkpoints/pretrain').mkdir(exist_ok=True, parents=True)
-    edl_cache_dir = Path("../../../datasets/electra_dataloader")
-    edl_cache_dir.mkdir(exist_ok=True)
 
     # Print info
     print(f"process id: {os.getpid()}")
