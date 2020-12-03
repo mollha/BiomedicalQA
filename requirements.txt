@@ -40,8 +40,6 @@ hugdatafast==1.0.0
 idna==2.10
 importlib-metadata==2.0.0
 importlib-resources==3.3.0
-ipython==7.19.0
-ipython-genutils==0.2.0
 iso8601==0.1.13
 jedi==0.17.2
 joblib==0.17.0
