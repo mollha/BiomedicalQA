@@ -4,7 +4,7 @@
 # cores in each node.
 #SBATCH -N 1
 #SBATCH -c 1
-#SBATCH --mem=32g
+#SBATCH --mem=28g
 
 # Partition: cpu | gpu-small | gpu-large
 #SBATCH -p gpu-bigmem
