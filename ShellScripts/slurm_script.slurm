@@ -11,7 +11,7 @@
 #SBATCH -p ug-gpu-small
 
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
-#SBATCH --qos=short
+#SBATCH --qos=debug
 
 # TIME
 #SBATCH -t 48:00:00
