@@ -1,20 +1,18 @@
 #!/bin/bash
 
-# X number of nodes with Y number of
-# cores in each node.
+# X number of nodes with Y number of cores in each node.
+# p - Partition: cpu | res-gpu-small | res-gpu-large | ug-gpu-small
+# QOS: debug | short | long-high-prio | long-low-prio | long-cpu
+# t - TIME
+
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
 #SBATCH --job-name=language_model_mh
-
-# Partition: cpu | res-gpu-small | res-gpu-large | ug-gpu-small
 #SBATCH -p ug-gpu-small
-
-# QOS: debug | short | long-high-prio | long-low-prio | long-cpu
 #SBATCH --qos=debug
-
-# TIME
-#SBATCH -t 48:00:00
+#SBATCH -t 2:00:00
+#SBATCH --mem=14g
 
 # Source the bash profile (required to use the module command)
 source /etc/profile
