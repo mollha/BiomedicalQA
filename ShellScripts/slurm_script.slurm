@@ -13,6 +13,8 @@
 #SBATCH --qos=debug
 #SBATCH -t 2:00:00
 #SBATCH --mem=28g
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user molly.hayward@durham.ac.uk
 
 # Source the bash profile (required to use the module command)
 source /etc/profile
