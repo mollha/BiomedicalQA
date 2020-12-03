@@ -5,7 +5,6 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH --mem=28g
 #SBATCH --job-name=language_model_mh
 
 # Partition: cpu | res-gpu-small | res-gpu-large | ug-gpu-small
