@@ -8,7 +8,7 @@
 #SBATCH --job-name=language_model_mh
 
 # Partition: cpu | gpu-small | gpu-large
-#SBATCH -p res-gpu-large
+#SBATCH -p res-gpu-small
 
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
 #SBATCH --qos=short
