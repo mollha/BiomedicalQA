@@ -12,7 +12,7 @@ small_config = {
     "mask_prob": 0.15,
     "lr": 5e-4,
     "batch_size": 128,
-    "steps": 10 ** 6,
+    "max_steps": 10 ** 6,
     "max_length": 128,
     "generator_size_divisor": 4
 }
@@ -21,7 +21,7 @@ base_config = {
     "mask_prob": 0.15,
     "lr": 2e-4,
     "batch_size": 256,
-    "steps": 766 * 1000,
+    "max_steps": 766 * 1000,
     "max_length": 512,
     "generator_size_divisor": 3
 }
@@ -30,7 +30,7 @@ large_config = {
     "mask_prob": 0.25,
     "lr": 2e-4,
     "batch_size": 2048,
-    "steps": 400 * 1000,
+    "max_steps": 400 * 1000,
     "max_length": 512,
     "generator_size_divisor": 4
 }

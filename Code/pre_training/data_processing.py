@@ -1,15 +1,11 @@
 from random import randint, random
-import os
-import re
 import pandas as pd
 import pathlib
 import torch
 import numpy as np
-from torch.utils.data import DataLoader, Dataset, IterableDataset
+from torch.utils.data import IterableDataset
 from functools import partial
 import random
-import os
-import re
 
 
 # Create Dataset
@@ -18,27 +14,39 @@ class IterableCSVDataset(IterableDataset):
     Custom CSV pytorch dataset for reading
     """
 
-    def __init__(self, data_directory: str, batch_size: int, shuffle=True):
+    def __init__(self, data_directory: str, batch_size: int, device, transform=None, shuffle=True):
         super(IterableCSVDataset).__init__()
 
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
-        self._current_csv_idx = 0   # keep track of the current file we are reading from
         self._batch_size = batch_size
-        self._current_iterator = None
         self._shuffle = shuffle
+        self._transform = transform
+        self._device = device
+        self._dataset_size = None
 
     def __iter__(self):
+        # When calling for a new iterable, reset csv_idx and current_iterator
+        self._current_csv_idx = 0
+        self._current_iterator = None
+        self._intermediate_dataset_size = 0
+
         return self
 
     def __next__(self):
         while True:
             try:
                 batch = next(self._current_iterator)
-                return batch if not self._shuffle else batch.sample(frac=1).reset_index(drop=True)
-            except (StopIteration, TypeError):
-                print("caught")
+                self._intermediate_dataset_size += len(batch)
+                batch = batch if not self._shuffle else batch.sample(frac=1).reset_index(drop=True)
+                if self._transform:
+                    batch = self._transform.process_batch(batch['text'].values.tolist())
+                return batch
+
+            except (StopIteration, TypeError) as e:
+
                 # If the current_iterator has been exhausted, or does not yet exist, then we need to create one.
-                self._current_csv_idx += 1
+                if type(e) != TypeError:
+                    self._current_csv_idx += 1
 
                 # check that there are files remaining
                 if self._current_csv_idx < len(self._list_paths_to_csv):
@@ -46,35 +54,13 @@ class IterableCSVDataset(IterableDataset):
                     self._current_iterator = self.build_iterator_from_csv(csv_name)  # pandas.io.parsers.TextFileReader
                 else:
                     # there is no more data to explore
-                    raise StopIteration
+                    if self._dataset_size is None:
+                        self._dataset_size = self._intermediate_dataset_size
+                        print("Dataset size: ", self._dataset_size)
+                    return None
 
     def build_iterator_from_csv(self, path_to_csv):
-        return pd.read_csv(path_to_csv, skiprows=1, chunksize=self._batch_size, iterator=True, delimiter="|")
-
-
-class CSVDataset(Dataset):
-    """CSV dataset."""
-
-    def __init__(self, csv_file, transform=None):
-        super(CSVDataset, self).__init__()
-        """
-        Args:
-            csv_file (string): Path to the csv file with annotations.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
-        self.df = pd.read_csv(csv_file)
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx):
-        text = self.df.iloc[idx, 0]
-        if self.transform:
-            sample = self.transform(text)
-            return sample
-        return text
+        return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, delimiter="|")
 
 
 class ELECTRADataProcessor(object):
@@ -98,13 +84,9 @@ class ELECTRADataProcessor(object):
         :param text:
         :return:
         """
-
-        # decide on the target length
-        # todo remove import random and simplify random.random
         self._target_length = randint(5, self._max_length) if random.random() < 0.05 else self._max_length
         processed_sample = self.process_sample(text)
-        return np.array(processed_sample)
-
+        return np.array(processed_sample, dtype=np.int32)
 
     def process_sample(self, sample: str):
         """
@@ -122,22 +104,28 @@ class ELECTRADataProcessor(object):
 
         # reduce this to the max_length - 2 (accounts for added tokens)
         # snip to target_length
-        additional_tokens = len(token_ids) - self._target_length - 2
+        additional_tokens = len(token_ids) - self._target_length + 2
 
         if additional_tokens > 0:
             # token_ids must be trimmed
             first_half = randint(0, additional_tokens)
             second_half = additional_tokens - first_half
-            token_ids = token_ids[first_half : len(token_ids) - second_half]
+            token_ids = token_ids[first_half: len(token_ids) - second_half]
 
         # Create a "sentence" of input ids from the first segment
         input_ids = [self.tokenizer.cls_token_id] + token_ids + [self.tokenizer.sep_token_id]
 
         # add padding to max_length
         input_ids += [self.tokenizer.pad_token_id] * (self._max_length - len(input_ids))
-
         return input_ids
 
+    def process_batch(self, texts):
+        sample_list = []
+
+        for text in texts:
+            sample_list.append(self(text))
+
+        return torch.LongTensor(np.stack(sample_list))
 
 
 """

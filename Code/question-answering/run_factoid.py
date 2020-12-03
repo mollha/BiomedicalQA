@@ -50,6 +50,8 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
             )
         )
 
+    print(train_dataset)
+
     # Random Sampler used during training.
     data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=settings["batch_size"])
 
@@ -103,9 +105,12 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
     # TODO SET SEED HERE AGAIN
 
     tb_writer = SummaryWriter()  # Create a SummaryWriter()
-    for _ in train_iterator:
+    for epoch_number in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
+
         for step, batch in enumerate(epoch_iterator):
+            print(type(batch))
+            print("batch size", len(batch))
 
             # Skip past any already trained steps if resuming training
             if steps_trained_in_current_epoch > 0:

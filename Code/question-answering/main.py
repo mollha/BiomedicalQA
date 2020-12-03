@@ -43,14 +43,14 @@ eval_settings = {
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
 colab_datasets = {
-    "bioasq": {"train_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-               "golden_file": "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/7B_golden.json",
+    "bioasq": {"train_file": "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+               "golden_file": "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/7B_golden.json",
                "official_eval_dir": "gdrive/My Drive/BioBERT/question-answering/scripts/bioasq_eval"},
 }
 
 local_datasets = {
-    "bioasq": {"train_file": "../datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-               "golden_file": "../datasets/QA/BioASQ/7B_golden.json",
+    "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+               "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
                "official_eval_dir": "./scripts/bioasq_eval"},
 }
 
@@ -80,7 +80,7 @@ def load_pretrained_model_tokenizer(model_path, uncased_model, device):
 def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, output_examples=False):
     overwrite_cached_features = True
     max_seq_length = 384  # The maximum total input sequence length after WordPiece tokenization. Sequences " "longer than this will be truncated, and sequences shorter than this will be padded."
-    predict_file = "gdrive/My Drive/BioBERT/datasets/QA/BioASQ/BioASQ-test-factoid-7b.json"  # "..datasets/QA/BioASQ/BioASQ-test-factoid-7b.json" # # The input evaluation file. If a data dir is specified, will look for the file there" If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
+    predict_file = "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/BioASQ-test-factoid-7b.json"  # "..qa_datasets/QA/BioASQ/BioASQ-test-factoid-7b.json" # # The input evaluation file. If a data dir is specified, will look for the file there" If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
     version_2_with_negative = False
     doc_stride = 128  # When splitting up a long document into chunks, how much stride to take between chunks
     max_query_length = 64  # The maximum number of tokens for the question. Questions longer than this will " "be truncated to this length.

@@ -1,25 +1,18 @@
-from data_processing import ELECTRADataProcessor, MaskedLM, CSVDataset, IterableCSVDataset
+from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
-import pickle
 import numpy as np
 import os
-from time import time
 import torch
-from torch import save, ones, int64, nn, no_grad
-from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-from tqdm import tqdm, trange
-from transformers import MODEL_FOR_QUESTION_ANSWERING_MAPPING, AdamW, get_linear_schedule_with_warmup
-from transformers.data.metrics.squad_metrics import compute_predictions_logits
-from transformers.data.processors.squad import SquadResult
+from torch import nn
+from tqdm import trange
+from transformers import AdamW, get_linear_schedule_with_warmup
 from torch.utils.tensorboard import SummaryWriter
-
+from pathlib import Path
 import datetime
 
-now = datetime.datetime.now()
-today = datetime.date.today()
 
 # define config here
 config = {
@@ -37,6 +30,7 @@ config = {
     "update_steps": 10,  # Save checkpoint and log every X updates steps.
     "analyse_all_checkpoints": True
 }
+
 
 def set_seed(seed_value):
     random.seed(seed_value)
@@ -56,28 +50,60 @@ def update_settings(settings, update):
     return settings
 
 
-def pre_train(data_loader, model, scheduler, optimizer, settings, checkpoint_name=""):
+def get_recent_checkpoint(directory: str, subfolders: list):
+
+    def parse_name(subdir: str):
+        config_str = str(subdir)[str(subdir).find(directory) + len(directory):]
+        first_undsc, second_undsc = config_str.find('_'), config_str.rfind('_')
+        return int(config_str[first_undsc + 1: second_undsc]), int(config_str[second_undsc + 1:])
+
+    epochs = {}
+    max_file, max_epoch, max_step_in_epoch = None, None, None
+    for subdirectory in subfolders:
+        epoch, step = parse_name(subdirectory)
+
+        if max_epoch is None or epoch > max_epoch:
+            max_epoch = epoch
+            max_step_in_epoch = step
+            max_file = subdirectory
+        elif epoch == max_epoch:
+            if step > max_step_in_epoch:
+                max_step_in_epoch = step
+                max_file = subdirectory
+    return max_file
+
+
+def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="recent"):
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
-    checkpoint_dir = "./checkpoints/pretrain"
+    checkpoint_dir = "checkpoints/pretrain"
     Path(checkpoint_dir).mkdir(exist_ok=True, parents=True)
+
     model.to(settings["device"])
 
     path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
-    if checkpoint_name and os.path.exists(path_to_checkpoint):
-        print("\nCheckpoint '{}' exists - loading config values from memory.".format(checkpoint_name))
-        # if the directory with the checkpoint name exists, we can retrieve the correct config from here
-        model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler)
-        settings = update_settings(settings, new_settings)
+    if checkpoint_name:
+        if checkpoint_name.lower() == "recent":
+            subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
+            if len(subfolders) > 0:
+                path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
+                print("\nPre-training from the most advanced checkpoint - {}".format(path_to_checkpoint))
 
-    elif checkpoint_name:
-        print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
+        if os.path.exists(path_to_checkpoint):
+            print("Checkpoint '{}' exists - Loading config values from memory.".format(path_to_checkpoint))
+            # if the directory with the checkpoint name exists, we can retrieve the correct config from here
+            model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler)
+            settings = update_settings(settings, new_settings)
+        else:
+            print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
+    else:
+        print("Pre-training from scratch - no checkpoint provided.")
 
     print("Save model checkpoints every {} steps.".format(settings["update_steps"]))
     print("\n---------- BEGIN TRAINING ----------")
-    print("Dataset Size = {}\nNumber of Epochs = {}\nBatch size = {}\n"
-          .format(config["sample_size"], settings["training_epochs"], settings["batch_size"]))
+    print("Current Epoch = {}\nTotal Epochs = {}\nBatch size = {}\n"
+          .format(settings["current_epoch"], settings["training_epochs"], settings["batch_size"]))
 
     total_training_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
@@ -99,17 +125,19 @@ def pre_train(data_loader, model, scheduler, optimizer, settings, checkpoint_nam
                    replace_prob=0.0 if config["electra_mask_style"] else 0.1,
                    orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
 
-    # resume training from the next step
-    steps_trained = settings["steps_trained"] + 1
+    # resume training
+    steps_trained = settings["steps_trained"]
 
     for epoch_number in train_iterator:
-        # update the number of epochs
-        settings["current_epoch"] = epoch_number
+        iterable_dataset = iter(dataset)
+        settings["current_epoch"] = epoch_number  # update the number of epochs
 
-        print('Number of Epochs', len(train_iterator))
-        epoch_iterator = tqdm(data_loader, desc="Iteration")
+        for training_step in range(settings["max_steps"]):
+            batch = next(iterable_dataset)
 
-        for step, batch in enumerate(epoch_iterator):
+            if batch is None:
+                print("Reached the end of the dataset")
+                break
 
             # If resuming training from a checkpoint, overlook previously trained steps.
             if steps_trained > 0:
@@ -118,10 +146,9 @@ def pre_train(data_loader, model, scheduler, optimizer, settings, checkpoint_nam
 
             batch = (batch,)
             inputs, targets = mlm.mask_batch(batch)
-
             model.train()  # train model one step
-
             outputs = model(*inputs)  # inputs = (masked_inputs, is_mlm_applied, labels)
+
             loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
             total_training_loss += loss.item()
@@ -133,16 +160,16 @@ def pre_train(data_loader, model, scheduler, optimizer, settings, checkpoint_nam
             scheduler.step()  # Update learning rate schedule
             model.zero_grad()
 
-            settings["steps_trained"] = step
+            settings["steps_trained"] = training_step
             settings["global_step"] += 1
-
-            print("\n{} steps trained in current epoch\n{} steps trained overall."
-                  .format(settings["steps_trained"], settings["global_step"]))
 
             # Log metrics
             if settings["global_step"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
                 # Only evaluate when single GPU otherwise metrics may not average well
                 # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
+
+                print("{} steps trained in current epoch, {} steps trained overall."
+                      .format(settings["steps_trained"], settings["global_step"]))
 
                 if settings["analyse_all_checkpoints"]:
                     # pass some objects over to be analysed
@@ -178,8 +205,8 @@ if __name__ == "__main__":
 
     # Path to data
     Path('../datasets', exist_ok=True)
-    Path('./checkpoints/pretrain').mkdir(exist_ok=True, parents=True)
-    edl_cache_dir = Path("../datasets/electra_dataloader")
+    Path('checkpoints/pretrain').mkdir(exist_ok=True, parents=True)
+    edl_cache_dir = Path("../../../datasets/electra_dataloader")
     edl_cache_dir.mkdir(exist_ok=True)
 
     # Print info
@@ -188,30 +215,27 @@ if __name__ == "__main__":
                                          device=config["device"])
 
     print('Load in the dataset.')
-    dataset = CSVDataset('./datasets/fibro_abstracts.csv', transform=pre_processor)
-    data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
+    # dataset = CSVDataset('./qa_datasets/fibro_abstracts.csv', transform=pre_processor)
+    # data_loader = DataLoader(dataset, shuffle=True, batch_size=config["batch_size"])
 
     csv_data_dir = '../datasets/PubMed/processed_data'
-    iterable_dataset = IterableCSVDataset(csv_data_dir, config["batch_size"])
-
-    print(next(iter(iterable_dataset)))
+    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=pre_processor)
 
     # # 5. Train - Seed & PyTorch benchmark
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
     set_seed(config["seed"])
 
     # Generator and Discriminator
-    generator = ElectraForMaskedLM(generator_config)
-    discriminator = ElectraForPreTraining(discriminator_config)
+    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{config["size"]}-generator')
+    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(f'google/electra-{config["size"]}-discriminator')
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
 
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
-    config["sample_size"] = len(dataset)
 
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["steps"])
-    pre_train(data_loader, electra_model, scheduler, optimizer, config, checkpoint_name="")
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["max_steps"])
+    pre_train(dataset, electra_model, scheduler, optimizer, config)
