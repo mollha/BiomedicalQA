@@ -8,4 +8,4 @@ parent_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 cd "$parent_path"
 
 # get the data from the pubmed baseline - reject md5 files to get only the zipped data
-wget -r --no-parent --no-directories ftp://ftp.ncbi.nlm.nih.gov/pubmed/baseline/ > ../out.log 2> ../err.log --reject "*.md5"
+wget -r --no-parent --no-directories ftp://ftp.ncbi.nlm.nih.gov/pubmed/baseline/ --reject "*.md5"
