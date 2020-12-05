@@ -11,7 +11,7 @@
 #SBATCH --job-name=language_model_mh
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=debug
-#SBATCH -t 2:00:00
+#SBATCH -t 2-0:0:0
 #SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
