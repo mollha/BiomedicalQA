@@ -23,6 +23,7 @@ class IterableCSVDataset(IterableDataset):
         self._transform = transform
         self._device = device
         self._dataset_size = None
+
         self._drop_incomplete_batches = drop_incomplete_batches
         self._max_dataset_size = max_dataset_size
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
@@ -48,6 +49,20 @@ class IterableCSVDataset(IterableDataset):
                 if self._drop_incomplete_batches and num_samples_in_batch < self._batch_size:
                     # this batch is an incomplete batch, so drop it
                     continue
+
+                # if this is positive, we have too many samples, so we need to trim
+                dispensable_samples = (self._intermediate_dataset_size + num_samples_in_batch) - self._max_dataset_size
+
+                if self._max_dataset_size and dispensable_samples > 0:
+                    if dispensable_samples >= self._batch_size:
+                        # if we had to trim the batch in the last epoch too, we can't return any more samples
+                        # if we return None, the training loop will know we have reached the end of the training data
+                        return None
+
+                    # we need to trim the dataset now as we have exceeded the max_dataset_size
+                    # remove the number of dispensable samples in place
+                    batch.drop(batch.tail(dispensable_samples).index, inplace=True)
+                    num_samples_in_batch -= dispensable_samples
 
                 self._intermediate_dataset_size += num_samples_in_batch
                 batch = batch if not self._shuffle else batch.sample(frac=1).reset_index(drop=True)
