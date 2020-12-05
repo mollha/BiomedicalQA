@@ -1,9 +1,14 @@
 *.DS_Store
-Code/datasets/
+Code/datasets/BioASQ
+Code/datasets/PubMed/raw_data/*.xml*
 Code/qa_datasets/*
 
+# Ignore CSV files, except sample data which should be allowed to be used on NCC.
+Code/datasets/PubMed/processed_data/pm_*.csv
 !Code/datasets/PubMed/processed_data/pm_5000.csv
-Code/pre_training/checkpoints/*
+
+Code/pre_training/checkpoints/pretrain/small_*
+!Code/pre_training/checkpoints/pretrain/small_53_20
 Code/pre_training/runs/*
 ShellScripts/runs
 *.pyc
