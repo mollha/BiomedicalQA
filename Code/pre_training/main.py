@@ -13,6 +13,12 @@ from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 import datetime
 
+# TODO LIST
+# Figure out good times to checkpoint -> always checkpoint in the last training step of an epoch!
+# Work out how data is loaded from batches (e.g. after a file is read, how does it transition to the next file)
+# Configure the time limit for running a job.
+# Choose whether or not to run with sample data (NCC will eventually have all processed data ready to be used.)
+
 
 # define config here
 config = {
