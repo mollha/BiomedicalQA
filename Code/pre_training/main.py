@@ -11,11 +11,7 @@ from tqdm import trange
 from transformers import AdamW, get_linear_schedule_with_warmup
 from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
-import datetime
 
-# TODO LIST
-# Figure out good times to checkpoint -> always checkpoint in the last training step of an epoch!
-# Configure the time limit for running a job.
 
 # define config here
 config = {
@@ -30,7 +26,7 @@ config = {
     "current_epoch": 0,
     "steps_trained": 0,
     "global_step": -1,   # total steps over all epochs
-    "update_steps": 10,  # Save checkpoint and log every X updates steps.
+    "update_steps": 20,  # Save checkpoint and log every X updates steps.
     "analyse_all_checkpoints": True,
     "max_dataset_size": None,   # cap the number of samples to be used in training
 }
@@ -147,6 +143,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
             if batch is None:
                 print("Reached the end of the dataset")
+                save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
                 break
 
             # If resuming training from a checkpoint, overlook previously trained steps.
