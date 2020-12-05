@@ -14,7 +14,8 @@ class IterableCSVDataset(IterableDataset):
     Custom CSV pytorch dataset for reading
     """
 
-    def __init__(self, data_directory: str, batch_size: int, device, transform=None, shuffle=True):
+    def __init__(self, data_directory: str, batch_size: int, device, max_dataset_size=None, transform=None,
+                 shuffle=True, drop_incomplete_batches=True):
         super(IterableCSVDataset).__init__()
 
         self._batch_size = batch_size
@@ -22,6 +23,8 @@ class IterableCSVDataset(IterableDataset):
         self._transform = transform
         self._device = device
         self._dataset_size = None
+        self._drop_incomplete_batches = drop_incomplete_batches
+        self._max_dataset_size = max_dataset_size
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
 
         if len(self._list_paths_to_csv) == 0:
@@ -40,7 +43,13 @@ class IterableCSVDataset(IterableDataset):
         while True:
             try:
                 batch = next(self._current_iterator)
-                self._intermediate_dataset_size += len(batch)
+                num_samples_in_batch = len(batch)
+
+                if self._drop_incomplete_batches and num_samples_in_batch < self._batch_size:
+                    # this batch is an incomplete batch, so drop it
+                    continue
+
+                self._intermediate_dataset_size += num_samples_in_batch
                 batch = batch if not self._shuffle else batch.sample(frac=1).reset_index(drop=True)
                 if self._transform:
                     batch = self._transform.process_batch(batch['text'].values.tolist())
