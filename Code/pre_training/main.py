@@ -15,10 +15,7 @@ import datetime
 
 # TODO LIST
 # Figure out good times to checkpoint -> always checkpoint in the last training step of an epoch!
-# Work out how data is loaded from batches (e.g. after a file is read, how does it transition to the next file)
 # Configure the time limit for running a job.
-# Choose whether or not to run with sample data (NCC will eventually have all processed data ready to be used.)
-
 
 # define config here
 config = {
@@ -34,7 +31,8 @@ config = {
     "steps_trained": 0,
     "global_step": -1,   # total steps over all epochs
     "update_steps": 10,  # Save checkpoint and log every X updates steps.
-    "analyse_all_checkpoints": True
+    "analyse_all_checkpoints": True,
+    "max_dataset_size": None,   # cap the number of samples to be used in training
 }
 
 

@@ -10,7 +10,7 @@ from utils_qa import transform_n2b_factoid, eval_bioasq_standard, to_list
 from torch.utils.tensorboard import SummaryWriter
 
 
-""" Finetuning the library models for question-answering on SQuAD (DistilBERT, Bert, XLM, XLNet)."""
+""" Finetuning the library models for fine_tuning on SQuAD (DistilBERT, Bert, XLM, XLNet)."""
 
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_QUESTION_ANSWERING_MAPPING.keys())

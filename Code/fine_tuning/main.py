@@ -45,7 +45,7 @@ eval_settings = {
 colab_datasets = {
     "bioasq": {"train_file": "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
                "golden_file": "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/7B_golden.json",
-               "official_eval_dir": "gdrive/My Drive/BioBERT/question-answering/scripts/bioasq_eval"},
+               "official_eval_dir": "gdrive/My Drive/BioBERT/fine_tuning/scripts/bioasq_eval"},
 }
 
 local_datasets = {
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     run_on_colab = False
 
     # output folder for model checkpoints and predictions
-    save_dir = "gdrive/My Drive/BioBERT/question-answering/output" if run_on_colab else "./output"
+    save_dir = "gdrive/My Drive/BioBERT/fine_tuning/output" if run_on_colab else "./output"
     datasets = colab_datasets if run_on_colab else local_datasets
 
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
