@@ -10,6 +10,7 @@ def parse_pm_file_name(name: str):
 
 
 def find_xml_files(directory: str):
+    print(directory)
     zipped = list(pathlib.Path(directory).glob('*.xml.gz'))
     xml = list(pathlib.Path(directory).glob('*.xml'))
     # return zipped, xml
