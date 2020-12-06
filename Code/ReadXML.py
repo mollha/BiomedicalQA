@@ -10,6 +10,7 @@ def parse_pm_file_name(name: str):
 
 
 def find_xml_files(directory):
+    print(str(directory))
     zipped = list(directory.glob('*.xml.gz'))
     xml = list(directory.glob('*.xml'))
     # return zipped, xml
@@ -104,7 +105,6 @@ if __name__ == "__main__":
     base_path = pathlib.Path(__file__).parent
 
     # Process each file in the Dataset directory
-    root_data_directory = (base_path / './Datasets/PubMed/raw_data').resolve()
     raw_data_directory = (base_path / './Datasets/PubMed/raw_data').resolve()
     processed_data_directory = (base_path / './Datasets/PubMed/processed_data').resolve()
     overwrite = True
