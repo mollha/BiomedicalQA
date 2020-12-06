@@ -9,10 +9,9 @@ def parse_pm_file_name(name: str):
     return identifier
 
 
-def find_xml_files(directory: str):
-    print(directory)
-    zipped = list(pathlib.Path(directory).glob('*.xml.gz'))
-    xml = list(pathlib.Path(directory).glob('*.xml'))
+def find_xml_files(directory):
+    zipped = list(directory.glob('*.xml.gz'))
+    xml = list(directory.glob('*.xml'))
     # return zipped, xml
     print(len(zipped), len(xml))
     return zipped, xml
@@ -27,7 +26,7 @@ class ParseXMLFiles:
         self.base_path = pathlib.Path(__file__).parent
 
     def initiate(self, file_to_parse):
-        csv_identifier = processed_data_directory + "/pm_" + parse_pm_file_name(str(file_to_parse)) + ".csv"
+        csv_identifier = str(processed_data_directory) + "/pm_" + parse_pm_file_name(str(file_to_parse)) + ".csv"
         print("Parsing file {}".format(file_to_parse))
         if not overwrite and pathlib.Path(csv_identifier).is_file():
             return
@@ -110,7 +109,7 @@ if __name__ == "__main__":
     processed_data_directory = (base_path / './Datasets/PubMed/processed_data').resolve()
     overwrite = True
 
-    zipped_files, xml_files = find_xml_files(str(raw_data_directory))
+    zipped_files, xml_files = find_xml_files(raw_data_directory)
     zipped_files.sort()
     xml_files.sort()
 
