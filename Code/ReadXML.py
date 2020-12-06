@@ -13,7 +13,7 @@ def find_xml_files(directory: str):
     zipped = list(pathlib.Path(directory).glob('*.xml.gz'))
     xml = list(pathlib.Path(directory).glob('*.xml'))
     # return zipped, xml
-    return zipped[0:3], []
+    return zipped, xml
 
 
 class ParseXMLFiles:
@@ -100,8 +100,10 @@ class ParseXMLFiles:
 
 
 if __name__ == "__main__":
+    base_path = pathlib.Path(__file__).parent
+
     # Process each file in the Dataset directory
-    root_data_directory = './Datasets/PubMed'
+    root_data_directory = (base_path / './Datasets/PubMed').resolve()
     raw_data_directory = root_data_directory + "/raw_data"
     processed_data_directory = root_data_directory + "/processed_data"
     overwrite = True
