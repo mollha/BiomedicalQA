@@ -103,12 +103,12 @@ if __name__ == "__main__":
     base_path = pathlib.Path(__file__).parent
 
     # Process each file in the Dataset directory
-    root_data_directory = (base_path / './Datasets/PubMed').resolve()
-    raw_data_directory = root_data_directory + "/raw_data"
-    processed_data_directory = root_data_directory + "/processed_data"
+    root_data_directory = (base_path / './Datasets/PubMed/raw_data').resolve()
+    raw_data_directory = (base_path / './Datasets/PubMed/raw_data').resolve()
+    processed_data_directory = (base_path / './Datasets/PubMed/processed_data').resolve()
     overwrite = True
 
-    zipped_files, xml_files = find_xml_files(raw_data_directory)
+    zipped_files, xml_files = find_xml_files(str(raw_data_directory))
     zipped_files.sort()
     xml_files.sort()
 
