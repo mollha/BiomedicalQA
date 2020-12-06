@@ -193,6 +193,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     # ------------- SAVE FINE-TUNED MODEL ONCE MORE AT THE END OF TRAINING -------------
     save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
 
+# make sure tokenizers are being saved correctly, explore vocab size before and after pre-training
 
 if __name__ == "__main__":
     base_path = Path(__file__).parent
