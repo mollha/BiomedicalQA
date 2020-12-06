@@ -14,6 +14,7 @@ def find_xml_files(directory: str):
     zipped = list(pathlib.Path(directory).glob('*.xml.gz'))
     xml = list(pathlib.Path(directory).glob('*.xml'))
     # return zipped, xml
+    print(len(zipped), len(xml))
     return zipped, xml
 
 
