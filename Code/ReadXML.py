@@ -82,6 +82,7 @@ class ParseXMLFiles:
                             joined_line = "".join(line_components)
                             self.abstract_lengths[0][0] += len(joined_line)
                             self.abstract_lengths[0][1] += 1
+                            csv.write(joined_line + "\n")
             else:
                 self.articles_with_title_but_no_abstract += 1
 
@@ -89,6 +90,7 @@ class ParseXMLFiles:
                     joined_line = "".join(line_components)
                     self.abstract_lengths[1][0] += len(joined_line)
                     self.abstract_lengths[1][1] += 1
+                    csv.write(joined_line + "\n")
 
         csv.close()
 
