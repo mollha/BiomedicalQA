@@ -1,6 +1,5 @@
 from tokenizers import Tokenizer
 import pathlib
-import pandas as pd
 from transformers import ElectraTokenizerFast
 from tokenizers.models import WordPiece
 from tokenizers import normalizers
@@ -8,7 +7,6 @@ from tokenizers.normalizers import Lowercase, NFD, StripAccents
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.processors import TemplateProcessing
 from tokenizers.trainers import WordPieceTrainer
-from tokenizers import decoders
 
 """
 --- Code for training a Biomedical-domain tokenizer ----
