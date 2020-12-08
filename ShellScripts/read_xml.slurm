@@ -8,8 +8,8 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH -p gpu-bigmem
-#SBATCH -t 2:00:00
-#SBATCH --mem=56g
+#SBATCH -t 4:00:00
+#SBATCH --mem=28g
 #SBATCH --qos=debug
 
 # Source the bash profile (required to use the module command)
