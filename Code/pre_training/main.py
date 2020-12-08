@@ -15,7 +15,7 @@ from pathlib import Path
 
 # define config here
 config = {
-    'device': "cuda:0" if torch.cuda.is_available() else "cpu:0",
+    'device': "cuda" if torch.cuda.is_available() else "cpu",
     'seed': 0,
     'adam_bias_correction': False,
     'electra_mask_style': True,
@@ -50,7 +50,8 @@ def update_settings(settings, update):
     return settings
 
 
-def get_recent_checkpoint(directory: str, subfolders: list):
+def get_recent_checkpoint(directory, subfolders):
+    directory = str(directory)
 
     def parse_name(subdir: str):
         config_str = str(subdir)[str(subdir).find(directory) + len(directory):]
@@ -101,7 +102,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler)
+        model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
         print("Pre-training from scratch - no checkpoint provided.")
@@ -213,6 +214,7 @@ if __name__ == "__main__":
 
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
+
     # Path to data
     Path((base_path / '../datasets').resolve(), exist_ok=True)
 
@@ -230,6 +232,7 @@ if __name__ == "__main__":
     set_seed(config["seed"])
 
     # Generator and Discriminator
+    # TODO CHECK IF THEY SHOULD BE LOADED IN REVERSE ORDER
     generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{config["size"]}-generator')
     discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(f'google/electra-{config["size"]}-discriminator')
     discriminator.electra.embeddings = generator.electra.embeddings

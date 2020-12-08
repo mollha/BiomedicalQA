@@ -54,7 +54,7 @@ def get_model_config(model_size: str) -> dict:
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
 def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    scheduler: torch.optim.lr_scheduler) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -74,16 +74,17 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     """
     # Load in optimizer, tokenizer and scheduler states
     path_to_optimizer = os.path.join(path_to_checkpoint, "optimizer.pt")
+
     if os.path.isfile(path_to_optimizer):
-        optimizer.load_state_dict(torch.load(path_to_optimizer))
+        optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
 
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
-        scheduler.load_state_dict(torch.load(path_to_scheduler))
+        scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
 
     path_to_model = os.path.join(path_to_checkpoint, "model.pt")
     if os.path.isfile(path_to_model):
-        model.load_state_dict(torch.load(path_to_model))
+        model.load_state_dict(torch.load(path_to_model, map_location=torch.device(device)))
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
 
@@ -91,6 +92,8 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     print("Resuming training from epoch {} and step: {}\n"
           .format(settings["current_epoch"], settings["steps_trained"]))
 
+    # update the device as this may have changed since last checkpoint.
+    settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     return model, optimizer, scheduler, settings
 
 

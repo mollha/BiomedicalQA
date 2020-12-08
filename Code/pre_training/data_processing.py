@@ -127,6 +127,7 @@ class ELECTRADataProcessor(object):
 
         # create tokens using the tokenizer provided
         tokens = self.tokenizer.tokenize(line)
+        print(tokens)
 
         # convert the tokens to ids - returns list of token ids
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
