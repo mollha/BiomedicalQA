@@ -7,6 +7,7 @@
 
 #SBATCH -N 1
 #SBATCH -c 1
+#SBATCH --gres=gpu
 #SBATCH -p gpu-bigmem
 #SBATCH -t 2:00:00
 #SBATCH --mem=28g
