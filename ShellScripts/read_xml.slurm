@@ -10,7 +10,7 @@
 #SBATCH --gres=gpu
 #SBATCH -p gpu-bigmem
 #SBATCH -t 12:00:00
-#SBATCH --mem=28g
+#SBATCH --mem=56g
 #SBATCH --qos=long-high-prio
 
 # Source the bash profile (required to use the module command)
