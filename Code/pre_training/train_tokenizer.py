@@ -67,7 +67,7 @@ def create_tokenizers(additional_vocab_path):
         model_files = electra_tokenizer.model.save("bio_tokenizer", "electra-duo-corpus")
         electra_tokenizer.model = WordPiece.from_file(*model_files, unk_token="[UNK]")
         electra_tokenizer.save("bio_tokenizer/electra-duo-corpus.json")
-        electra_tokenizer.save_pretrained('bio_tokenizer/bio_electra_tokenizer')
+        electra_tokenizer.save_pretrained('bio_tokenizer/bio_electra_{}_tokenizer'.format(size))
 
     file.close()
 
