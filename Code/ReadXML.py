@@ -26,12 +26,12 @@ class ParseXMLFiles:
         self.abstract_lengths = [[0, 0], [0, 0]]
         self.base_path = pathlib.Path(__file__).parent
 
-    def initiate(self, file_to_parse):
-        csv_identifier = str(processed_data_directory) + "/pm_" + parse_pm_file_name(str(file_to_parse)) + ".csv"
-        print("Parsing file {}".format(file_to_parse))
+    def initiate(self, file_name, file):
+        csv_identifier = str(processed_data_directory) + "/pm_" + parse_pm_file_name(str(file_name)) + ".csv"
+        print("Parsing file {}".format(file_name))
         if not overwrite and pathlib.Path(csv_identifier).is_file():
             return
-        self.parse_xml_file(f.read(), path_to_csv=(self.base_path / csv_identifier).resolve())
+        self.parse_xml_file(file.read(), path_to_csv=(self.base_path / csv_identifier).resolve())
 
     def parse_xml_file(self, file_content: str, path_to_csv: str):
         # Create a new file that can be written to, checking first if it already exists
@@ -119,12 +119,12 @@ if __name__ == "__main__":
 
     for file in zipped_files:
         f = gzip.open(file, 'rb')
-        xml_parser.initiate(file)
+        xml_parser.initiate(str(file), f)
         f.close()
 
     for file in xml_files:
         with open(file, 'r') as f:
-            xml_parser.initiate(file)
+            xml_parser.initiate(str(file), f)
 
     xml_parser.print_stats()
 
