@@ -10,7 +10,7 @@
 #SBATCH --gres=gpu
 #SBATCH --job-name=language_model_mh
 #SBATCH -p gpu-bigmem
-#SBATCH --qos=debug
+#SBATCH --qos=long-high-prio
 #SBATCH -t 2:00:00
 #SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
