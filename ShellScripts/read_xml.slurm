@@ -9,7 +9,7 @@
 #SBATCH -c 1
 #SBATCH -p gpu-bigmem
 #SBATCH --mem=56g
-#SBATCH --qos=long-high-prio
+#SBATCH --qos=long-cpu
 
 # Source the bash profile (required to use the module command)
 source /etc/profile
