@@ -72,6 +72,8 @@ def create_tokenizers(additional_vocab_path):
 
 if __name__ == "__main__":
     path_to_vocab = (base_path / "bio_tokenizer/electra-pubmed-vocab.txt").resolve()
+    path_to_output_dir = (base_path / "bio_tokenizer").resolve()
+    pathlib.Path(path_to_output_dir).mkdir(exist_ok=True, parents=True)
     vocab_exists = path_to_vocab.exists()
 
     print("Path to {} {}, {} vocab.".format(str(path_to_vocab), "exists" if vocab_exists else "does not exist",
