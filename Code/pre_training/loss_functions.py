@@ -1,6 +1,6 @@
 from fastai.losses import CrossEntropyLossFlat
 import torch.nn as nn
-from torch import sum, isnan
+import torch
 
 
 def confusion_matrix(prediction, truth):
@@ -14,7 +14,8 @@ def confusion_matrix(prediction, truth):
 
     Attribution: https://gist.github.com/the-bass/cae9f3976866776dea17a5049013258d
     """
-
+    print("prediction", prediction)
+    print("truth", truth)
     confusion_vector = prediction / truth
     # Element-wise division of the 2 tensors returns a new tensor which holds a
     # unique value for each case:
@@ -23,10 +24,10 @@ def confusion_matrix(prediction, truth):
     #   nan   where prediction and truth are 0 (True Negative)
     #   0     where prediction is 0 and truth is 1 (False Negative)
 
-    true_positives = sum(confusion_vector == 1).item()
-    false_positives = sum(confusion_vector == float('inf')).item()
-    true_negatives = sum(isnan(confusion_vector)).item()
-    false_negatives = sum(confusion_vector == 0).item()
+    true_positives = torch.sum(confusion_vector == 1).item()
+    false_positives = torch.sum(confusion_vector == float('inf')).item()
+    true_negatives = torch.sum(torch.isnan(confusion_vector)).item()
+    false_negatives = torch.sum(confusion_vector == 0).item()
 
     return true_positives, false_positives, true_negatives, false_negatives
 
@@ -48,14 +49,18 @@ class ELECTRALoss:
             "true_negatives": 0,
             "false_negatives": 0,
             "avg_disc_loss": [0, 0],
-            "avg_gen_loss": [0, 0]
+            "avg_gen_loss": [0, 0],
+            "avg_combined_loss": [0, 0]
         }
 
         self.generator_losses = []
         self.discriminator_losses = []
+        self.combined_losses = []
         self.discriminator_accuracy = []
         self.discriminator_precision = []
         self.discriminator_recall = []
+
+        self.sigmoid_fc = nn.Sigmoid()
 
     def __call__(self, pred, targ_ids):
         # model outputs (i.e. pred) are always tuple in transformers (see doc)
@@ -67,11 +72,14 @@ class ELECTRALoss:
 
         # calculate discriminator accuracy
         # get tensor of correct and incorrect answers
+        disc_predictions = torch.round(self.sigmoid_fc(disc_logits.float()))
+
         true_positives, false_positives, \
-        true_negatives, false_negatives = confusion_matrix(disc_logits.float(), is_replaced.float())
+        true_negatives, false_negatives = confusion_matrix(disc_predictions, is_replaced.float())
 
         gen_loss = self.generator_loss_function(mlm_gen_logits.float(), targ_ids[is_mlm_applied])
         disc_loss = self.discriminator_loss_function(disc_logits.float(), is_replaced.float())
+
         generator_loss = gen_loss * self.loss_weights[0]
         discriminator_loss = disc_loss * self.loss_weights[1]
 
@@ -80,6 +88,8 @@ class ELECTRALoss:
         self.mid_epoch_stats["avg_disc_loss"][1] += 1
         self.mid_epoch_stats["avg_gen_loss"][0] += gen_loss
         self.mid_epoch_stats["avg_gen_loss"][1] += 1
+        self.mid_epoch_stats["avg_combined_loss"][0] += generator_loss + discriminator_loss
+        self.mid_epoch_stats["avg_combined_loss"][1] += 1
 
         self.mid_epoch_stats["true_positives"] += true_positives
         self.mid_epoch_stats["false_positives"] += false_positives
@@ -95,6 +105,7 @@ class ELECTRALoss:
         """
         avg_disc_loss = self.mid_epoch_stats["avg_disc_loss"]
         avg_gen_loss = self.mid_epoch_stats["avg_gen_loss"]
+        avg_combined_loss = self.mid_epoch_stats["avg_combined_loss"]
 
         true_positives = self.mid_epoch_stats["true_positives"]
         false_positives = self.mid_epoch_stats["false_positives"]
@@ -103,6 +114,7 @@ class ELECTRALoss:
 
         self.generator_losses.append(avg_gen_loss[0] / avg_gen_loss[1])
         self.discriminator_losses.append(avg_disc_loss[0] / avg_disc_loss[1])
+        self.combined_losses.append(avg_combined_loss[0] / avg_combined_loss[1])
 
         self.discriminator_accuracy.append((true_positives + false_positives) /
                                            (true_positives + false_positives + true_negatives + false_negatives))
@@ -116,9 +128,10 @@ class ELECTRALoss:
             "true_negatives": 0,
             "false_negatives": 0,
             "avg_disc_loss": [0, 0],
-            "avg_gen_loss": [0, 0]
+            "avg_gen_loss": [0, 0],
+            "avg_combined_loss": [0, 0]
         }
 
     def get_statistics(self):
-        return self.generator_losses, self.discriminator_losses, self.discriminator_accuracy,\
+        return self.combined_losses, self.generator_losses, self.discriminator_losses, self.discriminator_accuracy, \
                self.discriminator_precision, self.discriminator_recall
