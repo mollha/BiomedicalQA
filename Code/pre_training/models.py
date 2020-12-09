@@ -81,7 +81,7 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
         optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
 
     path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
-    loss_function = None
+    loss_function = ELECTRALoss()
     if os.path.isfile(path_to_loss_fc):
         with open(path_to_loss_fc, 'rb') as input_file:
             loss_function = pickle.load(input_file)
