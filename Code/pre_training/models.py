@@ -54,7 +54,7 @@ def get_model_config(model_size: str) -> dict:
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
 def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, loss_function, device: str) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -66,6 +66,7 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
                 ﹂scheduler.pt
                 ﹂train_settings.bin
 
+    :param loss_function: loss function containing training statistics
     :param path_to_checkpoint: a string pointing to the location of the directory containing a model checkpoint
     :param model: model skeleton to be populated with saved (pre-trained) model state
     :param optimizer: optimizer skeleton to be populated with saved (pre-trained) optimizer state
@@ -77,6 +78,10 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     if os.path.isfile(path_to_optimizer):
         optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
+
+    path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pt")
+    if os.path.isfile(path_to_loss_fc):
+        loss_function.load_state_dict(torch.load(path_to_loss_fc, map_location=torch.device(device)))
 
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
@@ -94,10 +99,10 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     # update the device as this may have changed since last checkpoint.
     settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    return model, optimizer, scheduler, settings
+    return model, optimizer, scheduler, loss_function, settings
 
 
-def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir):
+def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
@@ -116,10 +121,11 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir):
     torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
     torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
     torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
+    torch.save(loss_function.state_dict(), os.path.join(save_dir, "loss_function.pt"))
     torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
     # the tokenizer state is saved with the model
 
-    print("Saving model checkpoint, optimizer and scheduler states to {}".format(save_dir))
+    print("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
 
 
 # --------------------------------------------------------------------------------

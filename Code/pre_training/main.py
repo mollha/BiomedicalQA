@@ -19,6 +19,8 @@ config = {
     'seed': 0,
     'adam_bias_correction': False,
     'electra_mask_style': True,
+    'generator_loss': [],
+    'discriminator_loss': [],
     'size': 'small',
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "training_epochs": 1000,    # todo change this for proper training 9999,
@@ -80,6 +82,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     # Make the checkpoint directory if it does not exist already.
     checkpoint_dir = (base_path / 'checkpoints/pretrain').resolve()
     Path(checkpoint_dir).mkdir(exist_ok=True, parents=True)
+    loss_function = ELECTRALoss()
 
     model.to(settings["device"])
 
@@ -102,7 +105,9 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        model, optimizer, scheduler, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer, scheduler, settings["device"])
+        model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
+                                                                                   scheduler, loss_function,
+                                                                                   settings["device"])
         settings = update_settings(settings, new_settings)
     else:
         print("Pre-training from scratch - no checkpoint provided.")
@@ -122,7 +127,6 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["current_epoch"], int(settings["training_epochs"]), desc="Epoch")
-    loss_function = ELECTRALoss()
 
     # # 2. Masked language model objective
     mlm = MaskedLM(mask_tok_id=electra_tokenizer.mask_token_id,
@@ -144,7 +148,6 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
             if batch is None:
                 print("Reached the end of the dataset")
-                save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
                 break
 
             # If resuming training from a checkpoint, overlook previously trained steps.
@@ -187,7 +190,11 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                     analyse_checkpoint(tb_writer, model, settings)
 
                 # Save model checkpoint
-                save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
+                save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+
+        save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+        loss_function.update_statistics()
+
 
     tb_writer.close()
 
@@ -233,6 +240,7 @@ if __name__ == "__main__":
 
     # Generator and Discriminator
     # TODO CHECK IF THEY SHOULD BE LOADED IN REVERSE ORDER
+    # TODO SAVE THE ELECTRA LOSS STATE
     generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{config["size"]}-generator')
     discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(f'google/electra-{config["size"]}-discriminator')
     discriminator.electra.embeddings = generator.electra.embeddings
