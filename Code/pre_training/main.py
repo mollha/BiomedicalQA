@@ -23,11 +23,11 @@ config = {
     'size': 'small',
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "training_epochs": 1000,    # todo change this for proper training 9999,
-    "batch_size": 30,
+    "batch_size": 128,
     "current_epoch": 0,
     "steps_trained": 0,
     "global_step": -1,   # total steps over all epochs
-    "update_steps": 2,  # Save checkpoint and log every X updates steps.
+    "update_steps": 500,  # Save checkpoint and log every X updates steps.
     "analyse_all_checkpoints": True,
     "max_dataset_size": 500,   # cap the number of samples to be used in training, set to None if no limit
 }
