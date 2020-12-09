@@ -9,7 +9,6 @@ import torch
 from torch import nn
 from tqdm import trange
 from transformers import AdamW, get_linear_schedule_with_warmup
-from torch.utils.tensorboard import SummaryWriter
 from pathlib import Path
 
 
@@ -28,7 +27,7 @@ config = {
     "current_epoch": 0,
     "steps_trained": 0,
     "global_step": -1,   # total steps over all epochs
-    "update_steps": 1050,  # Save checkpoint and log every X updates steps.
+    "update_steps": 2,  # Save checkpoint and log every X updates steps.
     "analyse_all_checkpoints": True,
     "max_dataset_size": 500,   # cap the number of samples to be used in training, set to None if no limit
 }
@@ -38,11 +37,6 @@ def set_seed(seed_value):
     random.seed(seed_value)
     np.random.seed(seed_value)
     torch.manual_seed(seed_value)
-
-
-def analyse_checkpoint(tb_writer, model, settings):
-    tb_writer.add_scalar("checkpoint_{}", settings["current_epoch"])
-    tb_writer.add_scalar("lr", scheduler.get_lr()[0], settings["global_step"])
 
 
 def update_settings(settings, update):
@@ -60,7 +54,6 @@ def get_recent_checkpoint(directory, subfolders):
         first_undsc, second_undsc = config_str.find('_'), config_str.rfind('_')
         return int(config_str[first_undsc + 1: second_undsc]), int(config_str[second_undsc + 1:])
 
-    epochs = {}
     max_file, max_epoch, max_step_in_epoch = None, None, None
     for subdirectory in subfolders:
         epoch, step = parse_name(subdirectory)
@@ -106,8 +99,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     if valid_checkpoint:
         model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
-                                                                                   scheduler, loss_function,
-                                                                                   settings["device"])
+                                                                                   scheduler, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
         print("Pre-training from scratch - no checkpoint provided.")
@@ -122,8 +114,6 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     # Added here for reproducibility
     set_seed(settings["seed"])
-
-    tb_writer = SummaryWriter()  # Create a SummaryWriter()
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["current_epoch"], int(settings["training_epochs"]), desc="Epoch")
@@ -183,25 +173,15 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                 print("{} steps trained in current epoch, {} steps trained overall."
                       .format(settings["steps_trained"], settings["global_step"]))
 
-                if settings["analyse_all_checkpoints"]:
-                    # pass some objects over to be analysed
-                    # I am not sure how this will be implemented yet, but will allow us to write some data to
-                    # tensorboard about the state of pre-trained checkpoints.
-                    analyse_checkpoint(tb_writer, model, settings)
-
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
         save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
         loss_function.update_statistics()
 
-
-    tb_writer.close()
-
     # ------------- SAVE FINE-TUNED MODEL ONCE MORE AT THE END OF TRAINING -------------
     save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
 
-# make sure tokenizers are being saved correctly, explore vocab size before and after pre-training
 
 if __name__ == "__main__":
     base_path = Path(__file__).parent
@@ -221,7 +201,6 @@ if __name__ == "__main__":
 
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
-
     # Path to data
     Path((base_path / '../datasets').resolve(), exist_ok=True)
 
@@ -239,8 +218,6 @@ if __name__ == "__main__":
     set_seed(config["seed"])
 
     # Generator and Discriminator
-    # TODO CHECK IF THEY SHOULD BE LOADED IN REVERSE ORDER
-    # TODO SAVE THE ELECTRA LOSS STATE
     generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{config["size"]}-generator')
     discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(f'google/electra-{config["size"]}-discriminator')
     discriminator.electra.embeddings = generator.electra.embeddings

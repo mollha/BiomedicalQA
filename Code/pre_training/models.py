@@ -4,6 +4,7 @@ from pathlib import Path
 from torch import nn
 import torch.nn.functional
 import datetime
+import pickle
 
 # ------------------ DEFINE CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
 # i.e. Vanilla ELECTRA Model settings are outlined in the paper: https://arxiv.org/abs/2003.10555
@@ -54,7 +55,7 @@ def get_model_config(model_size: str) -> dict:
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
 def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    scheduler: torch.optim.lr_scheduler, loss_function, device: str) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -79,9 +80,10 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     if os.path.isfile(path_to_optimizer):
         optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
 
-    path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pt")
+    path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
     if os.path.isfile(path_to_loss_fc):
-        loss_function.load_state_dict(torch.load(path_to_loss_fc, map_location=torch.device(device)))
+        with open(path_to_loss_fc, 'rb') as input_file:
+            loss_function = pickle.load(input_file)
 
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
@@ -121,7 +123,10 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
     torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
     torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
     torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
-    torch.save(loss_function.state_dict(), os.path.join(save_dir, "loss_function.pt"))
+
+    with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
+        pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
+
     torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
     # the tokenizer state is saved with the model
 
