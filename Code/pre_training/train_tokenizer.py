@@ -22,7 +22,7 @@ base_path = pathlib.Path(__file__).parent
 
 
 def find_text_files(directory):
-    return [str(file) for file in list(directory.glob('*.csv'))][0:5]
+    return [str(file) for file in list(directory.glob('*.csv'))]
 
 
 def train_bio_tokenizer(path_to_output: str):
