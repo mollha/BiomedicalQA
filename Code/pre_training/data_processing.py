@@ -89,6 +89,7 @@ class IterableCSVDataset(IterableDataset):
                     return None
 
     def build_iterator_from_csv(self, path_to_csv):
+        print("Reading CSV {}".format(path_to_csv))
         return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, delimiter="|")
 
 
