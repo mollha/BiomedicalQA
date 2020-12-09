@@ -14,8 +14,7 @@ def confusion_matrix(prediction, truth):
 
     Attribution: https://gist.github.com/the-bass/cae9f3976866776dea17a5049013258d
     """
-    print("prediction", prediction)
-    print("truth", truth)
+
     confusion_vector = prediction / truth
     # Element-wise division of the 2 tensors returns a new tensor which holds a
     # unique value for each case:
