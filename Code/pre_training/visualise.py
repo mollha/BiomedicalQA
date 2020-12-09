@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import os
 import torch
 from pathlib import Path
+import pickle
 
 base_path = Path(__file__).parent
 checkpoint_dir = (base_path / 'checkpoints/pretrain').resolve()
@@ -17,20 +18,23 @@ def draw_graph(graph_title, data, data_label, epochs, y_label=None, more_data=No
     plt.title(graph_title)
     plt.xlabel("Epochs")
     y_label = y_label if y_label is not None else data_label
-    graph_save_name = y_label.lower().replace(" ", "_") + "_" + str(epochs) + "_epochs.png"
+    graph_save_name = y_label.lower().replace(" ", "_") + "_epochs.png"
 
     plt.ylabel(y_label)
     plt.legend()
-    plt.savefig((base_path / graph_save_name).resolve())
+    plt.savefig((graphs_path / graph_save_name).resolve())
     plt.show()
 
 
 def load_stats_from_checkpoint(path_to_checkpoint):
-    loss_function = torch.load(os.path.join(path_to_checkpoint, "loss_function.pt"))
+    path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
+    if os.path.isfile(path_to_loss_fc):
+        with open(path_to_loss_fc, 'rb') as input_file:
+            loss_function = pickle.load(input_file)
 
     loss_function.get_statistics()
 
-    generator_losses, discriminator_losses, discriminator_accuracy, \
+    combined_losses, generator_losses, discriminator_losses, discriminator_accuracy, \
     discriminator_precision, discriminator_recall = loss_function.get_statistics()
     num_epochs = range(1, len(generator_losses) + 1)
 
@@ -42,6 +46,12 @@ def load_stats_from_checkpoint(path_to_checkpoint):
                y_label="Loss",
                more_data=discriminator_losses,
                more_data_label="Discriminator loss")
+
+    print("Creating graph of Combined Loss")
+    draw_graph(graph_title="Loss during pre-training",
+               data=combined_losses,
+               data_label="Loss",
+               epochs=num_epochs)
 
     print("Creating graph of Discriminator Accuracy")
     draw_graph(graph_title="Discriminator Accuracy during pre-training",
