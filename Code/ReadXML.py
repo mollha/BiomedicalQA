@@ -83,20 +83,11 @@ class ParseXMLFiles:
                             self.abstract_lengths[0][0] += len(joined_line)
                             self.abstract_lengths[0][1] += 1
                             csv.write(joined_line + "\n")
-            else:
-                self.articles_with_title_but_no_abstract += 1
-
-                if len(line_components) > 0:
-                    joined_line = "".join(line_components)
-                    self.abstract_lengths[1][0] += len(joined_line)
-                    self.abstract_lengths[1][1] += 1
-                    csv.write(joined_line + "\n")
 
         csv.close()
 
     def print_stats(self):
         print("\nTotal Articles:", self.total_articles)
-        print("Articles without an Abstract: ", self.articles_with_title_but_no_abstract)
         print("Abstract Types Used: ", self.abstract_types)
 
         print("\nAverage length of sample without Abstract: ", "%.2f" % (self.abstract_lengths[1][0] / self.abstract_lengths[1][1]))
