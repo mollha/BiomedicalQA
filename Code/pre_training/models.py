@@ -165,7 +165,6 @@ class ELECTRAModel(nn.Module):
         # the token_type_ids is the tensor of zeros and ones
 
         attention_mask, token_type_ids = self._get_pad_mask_and_token_type(masked_inputs)
-
         gen_logits = self.generator(masked_inputs, attention_mask, token_type_ids)[0]  # (B, L, vocab size)
         # reduce size to save space and speed
         mlm_gen_logits = gen_logits[is_mlm_applied, :]  # ( #mlm_positions, vocab_size)
