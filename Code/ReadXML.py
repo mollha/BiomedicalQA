@@ -93,7 +93,7 @@ class ParseXMLFiles:
         print("\nAverage length of sample without Abstract: ", "%.2f" % (self.abstract_lengths[1][0] / self.abstract_lengths[1][1]))
         print("Average length of sample with Abstract: ", "%.2f" % (self.abstract_lengths[0][0] / self.abstract_lengths[0][1]))
 
-
+# find way to collect dataset stats
 if __name__ == "__main__":
     base_path = pathlib.Path(__file__).parent
 

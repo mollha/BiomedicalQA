@@ -22,14 +22,14 @@ config = {
     'discriminator_loss': [],
     'size': 'small',
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "training_epochs": 1000,    # todo change this for proper training 9999,
+    "training_epochs": 9999,    # todo change this for proper training 9999,
     "batch_size": 128,
     "current_epoch": 0,
     "steps_trained": 0,
     "global_step": -1,   # total steps over all epochs
     "update_steps": 10000,  # Save checkpoint and log every X updates steps. - based on rate of NCC (1000 steps every 12 mins)
     "analyse_all_checkpoints": True,
-    "max_dataset_size": 500,   # cap the number of samples to be used in training, set to None if no limit
+    "max_dataset_size": 14000000,   # cap the number of samples to be used in training, set to None if no limit
 }
 
 
