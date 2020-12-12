@@ -91,7 +91,7 @@ class IterableCSVDataset(IterableDataset):
 
     def build_iterator_from_csv(self, path_to_csv):
         print("Reading CSV {}".format(path_to_csv))
-        return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, sep="||", error_bad_lines=False)
+        return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, sep=r'||', error_bad_lines=False)
 
 
 class ELECTRADataProcessor(object):
