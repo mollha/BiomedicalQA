@@ -27,6 +27,7 @@ class IterableCSVDataset(IterableDataset):
         self._drop_incomplete_batches = drop_incomplete_batches
         self._max_dataset_size = max_dataset_size
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
+        self._list_paths_to_csv.sort()
 
         if len(self._list_paths_to_csv) == 0:
             raise FileNotFoundError("CSV files not found in directory {}. Pre-training cancelled."
