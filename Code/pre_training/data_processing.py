@@ -91,7 +91,7 @@ class IterableCSVDataset(IterableDataset):
 
     def build_iterator_from_csv(self, path_to_csv):
         print("Reading CSV {}".format(path_to_csv))
-        return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, delimiter="||", error_bad_lines=False, dtype=str)
+        return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, sep="||", error_bad_lines=False)
 
 
 class ELECTRADataProcessor(object):
@@ -115,6 +115,7 @@ class ELECTRADataProcessor(object):
         :param text:
         :return:
         """
+        text = str(text)
         self._target_length = randint(5, self._max_length) if random.random() < 0.05 else self._max_length
         processed_sample = self.process_sample(text)
         return np.array(processed_sample, dtype=np.int32)

@@ -14,16 +14,11 @@ from transformers import (
     squad_convert_examples_to_features,
 )
 
-
-# ------------- SPECIFY MODELS AND THEIR RELEVANT PATHS -------------
 # Ensure that lowercase model is used for model_type
-models = {
-    "biobert": {"model_type": "bert", "model_path": "dmis-lab/biobert-base-cased-v1.1", "uncased": False},
-    "electra": {"model_type": "electra", "model_path": "google/electra-base-discriminator", "uncased": False}
-}
+
 
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
-train_settings = {
+config = {
     "batch_size": 8,
     "epochs": 1,
     "learning_rate": 8e-6,  # The initial learning rate for Adam.
@@ -31,7 +26,8 @@ train_settings = {
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
     "max_grad_norm": 1.0,  # Max gradient norm.
     "evaluate_all_checkpoints": False,
-    "update_steps": 500
+    "update_steps": 500,
+    "size": "small"
 }
 
 eval_settings = {
@@ -42,13 +38,8 @@ eval_settings = {
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
-colab_datasets = {
-    "bioasq": {"train_file": "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-               "golden_file": "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/7B_golden.json",
-               "official_eval_dir": "gdrive/My Drive/BioBERT/fine_tuning/scripts/bioasq_eval"},
-}
 
-local_datasets = {
+datasets = {
     "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
                "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
                "official_eval_dir": "./scripts/bioasq_eval"},
@@ -151,15 +142,15 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
 
 
 if __name__ == "__main__":
-    run_on_colab = False
-
     # output folder for model checkpoints and predictions
-    save_dir = "gdrive/My Drive/BioBERT/fine_tuning/output" if run_on_colab else "./output"
-    datasets = colab_datasets if run_on_colab else local_datasets
+    save_dir = "./output"
+
+    # model_type always
 
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
     train_model, evaluate_model = True, True
-    model_info, dataset_info = models["biobert"], datasets["bioasq"]
+    model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
+    dataset_info = datasets["bioasq"]
 
     # Setup CUDA, GPU & distributed training
     device = device("cuda" if cuda.is_available() else "cpu")
@@ -167,14 +158,14 @@ if __name__ == "__main__":
     print("Device: {}, GPU available: {}".format(str(device).upper(), gpu_available))
 
     set_seed(0, gpu_available)  # fix seed for reproducibility
-    model, tokenizer = load_pretrained_model_tokenizer(model_info["model_path"], model_info["uncased"], device)
+    model, tokenizer = load_pretrained_model_tokenizer(f'google/electra-{config["size"]}-discriminator', uncased_model=False, device=device)
 
     # Training
     if train_model:
-        training_set = load_and_cache_examples(tokenizer, model_info["model_path"], dataset_info["train_file"],
+        training_set = load_and_cache_examples(tokenizer, f'google/electra-{config["size"]}-discriminator', dataset_info["train_file"],
                                                evaluate=False, output_examples=False)
 
-        train(training_set, model, tokenizer, model_info, device, save_dir, train_settings, dataset_info)
+        train(training_set, model, tokenizer, model_info, device, save_dir, config, dataset_info)
 
     # --------------- LOAD FINE-TUNED MODEL AND VOCAB ---------------
     model = AutoModelForQuestionAnswering.from_pretrained(save_dir)
@@ -187,7 +178,7 @@ if __name__ == "__main__":
             print("Loading checkpoints saved during training for evaluation")
             checkpoints = [save_dir]
 
-            if train_settings["evaluate_all_checkpoints"]:
+            if config["evaluate_all_checkpoints"]:
                 checkpoints = list(
                     path.dirname(c)
                     for c in sorted(glob(save_dir + "/**/" + WEIGHTS_NAME, recursive=True))
@@ -208,5 +199,5 @@ if __name__ == "__main__":
                                                                   evaluate=True, output_examples=True)
 
             # Evaluate
-            evaluate(model, tokenizer, model_info["model_type"], save_dir, device, dataset, examples, features,
+            evaluate(model, tokenizer, save_dir, device, dataset, examples, features,
                      dataset_info, eval_settings, prefix=global_step)

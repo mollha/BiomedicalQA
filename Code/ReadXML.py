@@ -90,8 +90,8 @@ class ParseXMLFiles:
         print("\nTotal Articles:", self.total_articles)
         print("Abstract Types Used: ", self.abstract_types)
 
-        print("\nAverage length of sample without Abstract: ", "%.2f" % (self.abstract_lengths[1][0] / self.abstract_lengths[1][1]))
         print("Average length of sample with Abstract: ", "%.2f" % (self.abstract_lengths[0][0] / self.abstract_lengths[0][1]))
+        print("\nAverage length of sample without Abstract: ", "%.2f" % (self.abstract_lengths[1][0] / self.abstract_lengths[1][1]))
 
 
 # find way to collect dataset stats

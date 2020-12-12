@@ -129,10 +129,10 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
                 "end_positions": batch[4],
             }
 
-            if model_info["model_type"] in ["xlm", "roberta", "distilbert", "camembert"]:
+            if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
                 del inputs["token_type_ids"]
 
-            if model_info["model_type"] in ["xlnet", "xlm"]:
+            if "electra" in ["xlnet", "xlm"]:
                 inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
                 if version_2_with_negative:
                     inputs.update({"is_impossible": batch[7]})
@@ -162,7 +162,7 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
                     # Only evaluate when single GPU otherwise metrics may not average well
                     # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
                     if settings["evaluate_all_checkpoints"]:
-                        results = evaluate(model, tokenizer, model_info["model_type"], save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
+                        results = evaluate(model, tokenizer, "electra", save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
                         for key, value in results.items():
                             tb_writer.add_scalar("eval_{}".format(key), value, global_step)
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
@@ -179,7 +179,7 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
     save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
 
 
-def evaluate(model, tokenizer, model_type, save_dir, device, test_set, examples, features, dataset_info, eval_settings, prefix=""):
+def evaluate(model, tokenizer, save_dir, device, test_set, examples, features, dataset_info, eval_settings, prefix=""):
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -204,13 +204,13 @@ def evaluate(model, tokenizer, model_type, save_dir, device, test_set, examples,
                 "token_type_ids": batch[2],
             }
 
-            if model_type in ["xlm", "roberta", "distilbert", "camembert"]:
+            if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
                 del inputs["token_type_ids"]
 
             feature_indices = batch[3]
 
             # XLNet and XLM use more arguments for their predictions
-            if model_type in ["xlnet", "xlm"]:
+            if "electra" in ["xlnet", "xlm"]:
                 inputs.update({"cls_index": batch[4], "p_mask": batch[5]})
                 # for lang_id-sensitive xlm models
                 if hasattr(model, "config") and hasattr(model.config, "lang2id"):
