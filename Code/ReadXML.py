@@ -76,7 +76,7 @@ class ParseXMLFiles:
                     abstract_text_tag = element.find('AbstractText')
 
                     if abstract_text_tag is not None and abstract_text_tag.text is not None:
-                        line_components.extend([". ", abstract_text_tag.text])
+                        line_components.extend([" ", abstract_text_tag.text])
 
                         if len(line_components) > 0:
                             joined_line = "".join(line_components)
@@ -92,6 +92,7 @@ class ParseXMLFiles:
 
         print("\nAverage length of sample without Abstract: ", "%.2f" % (self.abstract_lengths[1][0] / self.abstract_lengths[1][1]))
         print("Average length of sample with Abstract: ", "%.2f" % (self.abstract_lengths[0][0] / self.abstract_lengths[0][1]))
+
 
 # find way to collect dataset stats
 if __name__ == "__main__":
