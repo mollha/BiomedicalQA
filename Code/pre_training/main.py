@@ -98,8 +98,8 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
-                                                                                   scheduler, settings["device"])
+        model, optimizer, scheduler, loss_function, dataset, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
+                                                                                   scheduler, dataset, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
         print("Pre-training from scratch - no checkpoint provided.")
@@ -201,17 +201,6 @@ if __name__ == "__main__":
 
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
-    path_to_biotokenizer = os.path.join(base_path, f'bio_tokenizer/bio_electra_{config["size"]}_tokenizer')
-
-    # if os.path.exists(path_to_biotokenizer):
-    #     print("Using biotokenizer from save file - {}".format(f'bio_electra_{config["size"]}_tokenizer'))
-    #     # get tokenizer from save file
-    #     electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
-    # else:
-    #     print("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
-
-    electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
-
     # Path to data
     Path((base_path / '../datasets').resolve(), exist_ok=True)
 
@@ -222,7 +211,7 @@ if __name__ == "__main__":
 
     print('Load in the dataset.')
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
-    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=pre_processor)
+    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], config["batch_size"], transform=pre_processor)
 
     # # 5. Train - Seed & PyTorch benchmark
     torch.backends.cudnn.benchmark = torch.cuda.is_available()

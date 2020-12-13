@@ -55,7 +55,7 @@ def get_model_config(model_size: str) -> dict:
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
 def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, dataset_state, device: str) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -86,6 +86,11 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
         with open(path_to_loss_fc, 'rb') as input_file:
             loss_function = pickle.load(input_file)
 
+    path_to_dataset_state = os.path.join(path_to_checkpoint, "dataset_state.pkl")
+    if os.path.isfile(path_to_dataset_state):
+        with open(path_to_dataset_state, 'rb') as input_file:
+            dataset_state = pickle.load(input_file)
+
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
         scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
@@ -102,10 +107,10 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     # update the device as this may have changed since last checkpoint.
     settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    return model, optimizer, scheduler, loss_function, settings
+    return model, optimizer, scheduler, loss_function, dataset_state, settings
 
 
-def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
+def save_checkpoint(model, optimizer, scheduler, loss_function, dataset_state, settings, checkpoint_dir):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
@@ -127,6 +132,9 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
 
     with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
         pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
+
+    with open(os.path.join(save_dir, "dataset_state.pkl"), 'wb') as output:  # Overwrites any existing file.
+        pickle.dump(dataset_state, output, pickle.HIGHEST_PROTOCOL)
 
     torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
     # the tokenizer state is saved with the model
