@@ -3,9 +3,23 @@ import pandas as pd
 import pathlib
 import torch
 import numpy as np
-from torch.utils.data import IterableDataset
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
 import random
+
+
+class MappedCSVDataset(Dataset):
+    def __init__(self, csv_file):
+        self.dataframe = pd.read_csv(csv_file, sep='\|\|', error_bad_lines=False, skiprows=1, engine="python")
+
+    def __len__(self):
+        return len(self.dataframe)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        return self.dataframe.iloc[idx, 0]
 
 
 # Create Dataset
@@ -14,20 +28,16 @@ class IterableCSVDataset(IterableDataset):
     Custom CSV pytorch dataset for reading
     """
 
-    def __init__(self, data_directory: str, batch_size: int, device, max_dataset_size=None, transform=None,
-                 shuffle=True, drop_incomplete_batches=True):
+    def __init__(self, data_directory: str, batch_size: int, device, transform=None, drop_incomplete_batches=True):
         super(IterableCSVDataset).__init__()
 
         self._batch_size = batch_size
-        self._shuffle = shuffle
         self._transform = transform
         self._device = device
         self._dataset_size = None
 
         self._drop_incomplete_batches = drop_incomplete_batches
-        self._max_dataset_size = max_dataset_size
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
-        self._list_paths_to_csv.sort()
 
         if len(self._list_paths_to_csv) == 0:
             raise FileNotFoundError("CSV files not found in directory {}. Pre-training cancelled."
@@ -38,7 +48,6 @@ class IterableCSVDataset(IterableDataset):
         self._current_csv_idx = 0
         self._current_iterator = None
         self._intermediate_dataset_size = 0
-
         return self
 
     def __next__(self):
@@ -51,25 +60,9 @@ class IterableCSVDataset(IterableDataset):
                     # this batch is an incomplete batch, so drop it
                     continue
 
-                if self._max_dataset_size is not None:
-                    # if this is positive, we have too many samples, so we need to trim
-                    dispensable_samples = (self._intermediate_dataset_size + num_samples_in_batch) - self._max_dataset_size
-
-                    if dispensable_samples > 0:
-                        if dispensable_samples >= self._batch_size:
-                            # if we had to trim the batch in the last epoch too, we can't return any more samples
-                            # if we return None, the training loop will know we have reached the end of the training data
-                            return None
-
-                        # we need to trim the dataset now as we have exceeded the max_dataset_size
-                        # remove the number of dispensable samples in place
-                        batch.drop(batch.tail(dispensable_samples).index, inplace=True)
-                        num_samples_in_batch -= dispensable_samples
-
                 self._intermediate_dataset_size += num_samples_in_batch
-                batch = batch if not self._shuffle else batch.sample(frac=1).reset_index(drop=True)
                 if self._transform:
-                    batch = self._transform.process_batch(batch['text'].values.tolist())
+                    batch = self._transform.process_batch(batch)
                 return batch
 
             except (StopIteration, TypeError) as e:
@@ -91,8 +84,36 @@ class IterableCSVDataset(IterableDataset):
 
     def build_iterator_from_csv(self, path_to_csv):
         print("Reading CSV {}".format(path_to_csv))
-        return pd.read_csv(path_to_csv, header=[0], chunksize=self._batch_size, iterator=True, sep='\|\|', error_bad_lines=False)
 
+        csv_dataset = MappedCSVDataset(path_to_csv)
+        data_loader = DataLoader(csv_dataset, batch_size=self._batch_size, shuffle=True)
+        return iter(data_loader)
+
+    def resume_from_step(self, training_step):
+        for i in range(training_step):
+            next(self)
+        print("Resuming training with csv_idx {}".format(self._current_csv_idx))
+
+    # def save_state(self):
+    #     return {
+    #         "batch_size": self._batch_size,
+    #         "transform": self._transform,
+    #         "device": self._device,
+    #         "dataset_size": self._dataset_size,
+    #         "current_csv_idx": self._current_csv_idx,
+    #         "current_iterator": self._current_iterator,
+    #         "intermediate_dataset_size": self._intermediate_dataset_size
+    #     }
+    #
+    # def load_state(self, state):
+    #     self._batch_size = state["batch_size"]
+    #     self._transform, = state["transform"]
+    #     self._device, = state["device"]
+    #     self._dataset_size = state["dataset_size"]
+    #     self._current_csv_idx = state["current_csv_idx"]
+    #     self._current_iterator = state["current_iterator"]
+    #     self._intermediate_dataset_size = state["intermediate_dataset_size"]
+    #
 
 class ELECTRADataProcessor(object):
     def __init__(self, tokenizer, max_length, device, text_col='text', lines_delimiter='\n'):

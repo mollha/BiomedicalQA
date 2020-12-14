@@ -98,8 +98,8 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        model, optimizer, scheduler, loss_function, dataset, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
-                                                                                   scheduler, dataset, settings["device"])
+        model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
+                                                                                   scheduler, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
         print("Pre-training from scratch - no checkpoint provided.")
@@ -131,6 +131,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     for epoch_number in train_iterator:
         iterable_dataset = iter(dataset)
+        iterable_dataset.resume_from_step(steps_trained)
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
         for training_step in range(settings["max_steps"]):
@@ -211,7 +212,7 @@ if __name__ == "__main__":
 
     print('Load in the dataset.')
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
-    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], config["batch_size"], transform=pre_processor)
+    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=pre_processor)
 
     # # 5. Train - Seed & PyTorch benchmark
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
