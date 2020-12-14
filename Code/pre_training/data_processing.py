@@ -38,6 +38,7 @@ class IterableCSVDataset(IterableDataset):
 
         self._drop_incomplete_batches = drop_incomplete_batches
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
+        self._list_paths_to_csv.sort()
 
         if len(self._list_paths_to_csv) == 0:
             raise FileNotFoundError("CSV files not found in directory {}. Pre-training cancelled."
@@ -94,26 +95,6 @@ class IterableCSVDataset(IterableDataset):
             next(self)
         print("Resuming training with csv_idx {}".format(self._current_csv_idx))
 
-    # def save_state(self):
-    #     return {
-    #         "batch_size": self._batch_size,
-    #         "transform": self._transform,
-    #         "device": self._device,
-    #         "dataset_size": self._dataset_size,
-    #         "current_csv_idx": self._current_csv_idx,
-    #         "current_iterator": self._current_iterator,
-    #         "intermediate_dataset_size": self._intermediate_dataset_size
-    #     }
-    #
-    # def load_state(self, state):
-    #     self._batch_size = state["batch_size"]
-    #     self._transform, = state["transform"]
-    #     self._device, = state["device"]
-    #     self._dataset_size = state["dataset_size"]
-    #     self._current_csv_idx = state["current_csv_idx"]
-    #     self._current_iterator = state["current_iterator"]
-    #     self._intermediate_dataset_size = state["intermediate_dataset_size"]
-    #
 
 class ELECTRADataProcessor(object):
     def __init__(self, tokenizer, max_length, device, text_col='text', lines_delimiter='\n'):

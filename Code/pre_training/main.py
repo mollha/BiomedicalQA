@@ -132,8 +132,8 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     for epoch_number in train_iterator:
         iterable_dataset = iter(dataset)
         iterable_dataset.resume_from_step(steps_trained)
-        settings["current_epoch"] = epoch_number  # update the number of epochs
 
+        settings["current_epoch"] = epoch_number  # update the number of epochs
         for training_step in range(settings["max_steps"]):
             batch = next(iterable_dataset)
 
