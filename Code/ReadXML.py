@@ -9,6 +9,7 @@ def parse_pm_file_name(name: str):
     identifier = name[name.find(prestring) + len(prestring):name.rfind('.xml')]
     return identifier
 
+
 def find_xml_files(directory):
     zipped = list(directory.glob('*.xml.gz'))
     xml = list(directory.glob('*.xml'))

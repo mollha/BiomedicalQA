@@ -28,8 +28,7 @@ config = {
     "steps_trained": 0,
     "global_step": -1,   # total steps over all epochs
     "update_steps": 20000,  # Save checkpoint and log every X updates steps. - based on rate of NCC (1000 steps every 12 mins)
-    "analyse_all_checkpoints": True,
-    "max_dataset_size": 14000000,   # cap the number of samples to be used in training, set to None if no limit
+    "analyse_all_checkpoints": True
 }
 
 
