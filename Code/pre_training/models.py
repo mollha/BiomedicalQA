@@ -5,6 +5,7 @@ from torch import nn
 import torch.nn.functional
 import datetime
 import pickle
+import sys
 
 # ------------------ DEFINE CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
 # i.e. Vanilla ELECTRA Model settings are outlined in the paper: https://arxiv.org/abs/2003.10555
@@ -96,8 +97,8 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
 
-    print("Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
-    print("Resuming training from epoch {} and step: {}\n"
+    sys.stderr.write("Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
+    sys.stderr.write("Resuming training from epoch {} and step: {}\n"
           .format(settings["current_epoch"], settings["steps_trained"]))
 
     # update the device as this may have changed since last checkpoint.
@@ -131,7 +132,7 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
     torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
     # the tokenizer state is saved with the model
 
-    print("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
+    sys.stderr.write("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
 
 
 # --------------------------------------------------------------------------------

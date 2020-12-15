@@ -6,6 +6,8 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
 import random
+import sys
+
 
 
 class MappedCSVDataset(Dataset):
@@ -80,11 +82,11 @@ class IterableCSVDataset(IterableDataset):
                     # there is no more data to explore
                     if self._dataset_size is None:
                         self._dataset_size = self._intermediate_dataset_size
-                        print("Dataset size: ", self._dataset_size)
+                        sys.stderr.write("Dataset size: ", self._dataset_size)
                     return None
 
     def build_iterator_from_csv(self, path_to_csv):
-        print("Reading CSV {}".format(path_to_csv))
+        sys.stderr.write("Reading CSV {}".format(path_to_csv))
 
         csv_dataset = MappedCSVDataset(path_to_csv)
         data_loader = DataLoader(csv_dataset, batch_size=self._batch_size, shuffle=True)
@@ -93,7 +95,7 @@ class IterableCSVDataset(IterableDataset):
     def resume_from_step(self, training_step):
         for i in range(training_step):
             next(self)
-        print("Resuming training with csv_idx {}".format(self._current_csv_idx))
+        sys.stderr.write("Resuming training with csv_idx {}".format(self._current_csv_idx))
 
 
 class ELECTRADataProcessor(object):
