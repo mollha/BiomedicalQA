@@ -10,6 +10,7 @@ from torch import nn
 from tqdm import trange
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pathlib import Path
+import sys
 
 
 # define config here
@@ -85,27 +86,27 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
         subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
-            print("\nPre-training from the most advanced checkpoint - {}".format(path_to_checkpoint))
+            sys.stderr.write("\nPre-training from the most advanced checkpoint - {}".format(path_to_checkpoint))
             valid_checkpoint = True
     elif checkpoint_name:
         path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
-            print("Checkpoint '{}' exists - Loading config values from memory.".format(path_to_checkpoint))
+            sys.stderr.write("Checkpoint '{}' exists - Loading config values from memory.".format(path_to_checkpoint))
             # if the directory with the checkpoint name exists, we can retrieve the correct config from here
             valid_checkpoint = True
         else:
-            print("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
+            sys.stderr.write("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
         model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
                                                                                    scheduler, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
-        print("Pre-training from scratch - no checkpoint provided.")
+        sys.stderr.write("Pre-training from scratch - no checkpoint provided.")
 
-    print("Save model checkpoints every {} steps.".format(settings["update_steps"]))
-    print("\n---------- BEGIN TRAINING ----------")
-    print("Current Epoch = {}\nTotal Epochs = {}\nBatch size = {}\n"
+    sys.stderr.write("Save model checkpoints every {} steps.".format(settings["update_steps"]))
+    sys.stderr.write("\n---------- BEGIN TRAINING ----------")
+    sys.stderr.write("Current Epoch = {}\nTotal Epochs = {}\nBatch size = {}\n"
           .format(settings["current_epoch"], settings["training_epochs"], settings["batch_size"]))
 
     total_training_loss, logging_loss = 0.0, 0.0
@@ -137,7 +138,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             batch = next(iterable_dataset)
 
             if batch is None:
-                print("Reached the end of the dataset")
+                sys.stderr.write("Reached the end of the dataset")
                 break
 
             # If resuming training from a checkpoint, overlook previously trained steps.
@@ -170,7 +171,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                 # Only evaluate when single GPU otherwise metrics may not average well
                 # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
 
-                print("{} steps trained in current epoch, {} steps trained overall."
+                sys.stderr.write("{} steps trained in current epoch, {} steps trained overall."
                       .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
@@ -205,11 +206,11 @@ if __name__ == "__main__":
     Path((base_path / '../datasets').resolve(), exist_ok=True)
 
     # Print info
-    print(f"process id: {os.getpid()}")
+    sys.stderr.write(f"process id: {os.getpid()}")
     pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
                                          device=config["device"])
 
-    print('Load in the dataset.')
+    sys.stderr.write('Load in the dataset.')
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=pre_processor)
 
