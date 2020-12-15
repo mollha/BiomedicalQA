@@ -23,4 +23,4 @@ source /etc/profile
 source ../../venv/bin/activate
 
 # Run your program (replace this with your program)
-python3 ../Code/pre_training/main.py
+stdbuf -oL python3 ../Code/pre_training/main.py
