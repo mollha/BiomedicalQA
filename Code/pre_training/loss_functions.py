@@ -83,11 +83,13 @@ class ELECTRALoss:
         discriminator_loss = disc_loss * self.loss_weights[1]
 
         # Update mid_epoch statistics
-        self.mid_epoch_stats["avg_disc_loss"][0] += disc_loss
+        self.mid_epoch_stats["avg_disc_loss"][0] += float(disc_loss.data)
         self.mid_epoch_stats["avg_disc_loss"][1] += 1
-        self.mid_epoch_stats["avg_gen_loss"][0] += gen_loss
+
+        self.mid_epoch_stats["avg_gen_loss"][0] += float(gen_loss.data)
         self.mid_epoch_stats["avg_gen_loss"][1] += 1
-        self.mid_epoch_stats["avg_combined_loss"][0] += generator_loss + discriminator_loss
+
+        self.mid_epoch_stats["avg_combined_loss"][0] += float(generator_loss.data) + float(discriminator_loss.data)
         self.mid_epoch_stats["avg_combined_loss"][1] += 1
 
         self.mid_epoch_stats["true_positives"] += true_positives

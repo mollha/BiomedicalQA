@@ -9,10 +9,9 @@ import random
 import sys
 
 
-
 class MappedCSVDataset(Dataset):
     def __init__(self, csv_file):
-        self.dataframe = pd.read_csv(csv_file, sep='\|\|', error_bad_lines=False, skiprows=1, engine="python")
+        self.dataframe = pd.read_csv(csv_file, delimiter='|', error_bad_lines=False, skiprows=1)
 
     def __len__(self):
         return len(self.dataframe)
@@ -86,7 +85,7 @@ class IterableCSVDataset(IterableDataset):
                     return None
 
     def build_iterator_from_csv(self, path_to_csv):
-        sys.stderr.write("Reading CSV {}".format(path_to_csv))
+        sys.stderr.write("\nReading CSV {}".format(str(path_to_csv)[-11:]))
 
         csv_dataset = MappedCSVDataset(path_to_csv)
         data_loader = DataLoader(csv_dataset, batch_size=self._batch_size, shuffle=True)
@@ -95,7 +94,7 @@ class IterableCSVDataset(IterableDataset):
     def resume_from_step(self, training_step):
         for i in range(training_step):
             next(self)
-        sys.stderr.write("Resuming training with csv_idx {}".format(self._current_csv_idx))
+        sys.stderr.write("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(self._list_paths_to_csv[self._current_csv_idx])[-11:]))
 
 
 class ELECTRADataProcessor(object):

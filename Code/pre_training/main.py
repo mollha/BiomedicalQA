@@ -12,41 +12,59 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 from pathlib import Path
 import sys
 
-
-# define config here
+# ------------------ SPECIFY GENERAL MODEL CONFIG ------------------
 config = {
     'device': "cuda" if torch.cuda.is_available() else "cpu",
     'seed': 0,
     'adam_bias_correction': False,
-    'electra_mask_style': True,
     'generator_loss': [],
     'discriminator_loss': [],
     'size': 'small',
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "training_epochs": 9999,    # todo change this for proper training 9999,
-    "batch_size": 128,
-    "current_epoch": 0,
-    "steps_trained": 0,
-    "global_step": -1,   # total steps over all epochs
-    "update_steps": 20000,  # Save checkpoint and log every X updates steps. - based on rate of NCC (1000 steps every 12 mins)
-    "analyse_all_checkpoints": True
+    "max_epochs": 9999,
+    "current_epoch": 0,  # track the current epoch in config for saving checkpoints
+    "steps_trained": 0,  # track the steps trained in config for saving checkpoints
+    "global_step": -1,  # total steps over all epochs
+    "update_steps": 20000,
 }
 
 
-def set_seed(seed_value):
+# ----------------- HELPER FUNCTIONS --------------------
+def set_seed(seed_value: int) -> None:
+    """
+    Fix a seed for reproducability.
+    :param seed_value: seed to set
+    :return: None
+    """
     random.seed(seed_value)
     np.random.seed(seed_value)
     torch.manual_seed(seed_value)
 
 
-def update_settings(settings, update):
+def update_settings(settings: dict, update: dict) -> dict:
+    """
+    Override config in settings dict with config in update dict. This allows
+    model specific config to be merged with general training settings to create
+    a single dictionary containing configuration.
+    :param settings: dictionary containing general model settings
+    :param update: dictionary containing update settings.
+    :return: merged config dictionary
+    """
     for key, value in update.items():
         settings[key] = value
 
     return settings
 
 
-def get_recent_checkpoint(directory, subfolders):
+def get_recent_checkpoint(directory, subfolders: list):
+    """
+    Find the name of the most advanced model checkpoint saved in the checkpoints directory.
+    This is the model checkpoint that has been trained the most, so it is the best candidate to
+    start from if no specific checkpoint name was provided to the pre-training loop.
+    :param directory: directory containing model checkpoints.
+    :param subfolders: list of checkpoint directories
+    :return:
+    """
     directory = str(directory)
 
     def parse_name(subdir: str):
@@ -69,6 +87,7 @@ def get_recent_checkpoint(directory, subfolders):
     return max_file
 
 
+# ---------- DEFINE MAIN PRE-TRAINING LOOP ----------
 def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="recent"):
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
@@ -79,36 +98,38 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     model.to(settings["device"])
 
-    valid_checkpoint = False
-    path_to_checkpoint = None
-
+    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT --------
+    valid_checkpoint, path_to_checkpoint = False, None
     if checkpoint_name.lower() == "recent":
         subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
-            sys.stderr.write("\nPre-training from the most advanced checkpoint - {}".format(path_to_checkpoint))
+            sys.stderr.write("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
             valid_checkpoint = True
     elif checkpoint_name:
         path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
-            sys.stderr.write("Checkpoint '{}' exists - Loading config values from memory.".format(path_to_checkpoint))
+            sys.stderr.write(
+                "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
             # if the directory with the checkpoint name exists, we can retrieve the correct config from here
             valid_checkpoint = True
         else:
-            sys.stderr.write("WARNING: Checkpoint {} does not exist at path {}.".format(checkpoint_name, path_to_checkpoint))
+            sys.stderr.write(
+                "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
         model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
                                                                                    scheduler, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
-        sys.stderr.write("Pre-training from scratch - no checkpoint provided.")
+        sys.stderr.write("Pre-training from scratch - no checkpoint provided.\n")
 
-    sys.stderr.write("Save model checkpoints every {} steps.".format(settings["update_steps"]))
+
     sys.stderr.write("\n---------- BEGIN TRAINING ----------")
-    sys.stderr.write("Current Epoch = {}\nTotal Epochs = {}\nBatch size = {}\n"
-          .format(settings["current_epoch"], settings["training_epochs"], settings["batch_size"]))
-
+    sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
+                     .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
+                             settings["steps_trained"], settings["batch_size"], settings["update_steps"],
+                             settings["max_length"]))
     total_training_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
 
@@ -116,15 +137,15 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     set_seed(settings["seed"])
 
     # Resume training from the epoch we left off at earlier.
-    train_iterator = trange(settings["current_epoch"], int(settings["training_epochs"]), desc="Epoch")
+    train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")
 
     # # 2. Masked language model objective
     mlm = MaskedLM(mask_tok_id=electra_tokenizer.mask_token_id,
                    special_tok_ids=electra_tokenizer.all_special_ids,
                    vocab_size=electra_tokenizer.vocab_size,
                    mlm_probability=config["mask_prob"],
-                   replace_prob=0.0 if config["electra_mask_style"] else 0.1,
-                   orginal_prob=0.15 if config["electra_mask_style"] else 0.1)
+                   replace_prob=0.0,
+                   orginal_prob=0.15)
 
     # resume training
     steps_trained = settings["steps_trained"]
@@ -167,12 +188,13 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             settings["global_step"] += 1
 
             # Log metrics
-            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
+            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
+                "update_steps"] == 0:
                 # Only evaluate when single GPU otherwise metrics may not average well
                 # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
 
                 sys.stderr.write("{} steps trained in current epoch, {} steps trained overall."
-                      .format(settings["steps_trained"], settings["global_step"]))
+                                 .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
@@ -184,14 +206,22 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
 
 
+# ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
-    base_path = Path(__file__).parent
-    # Merge general config with model specific config
-    # Setting of different sizes
+    # Log Process ID
+    sys.stderr.write(f"Process ID: {os.getpid()}\n")
+
+    # Override general cofig with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**config, **model_specific_config}
 
-    # ------ DEFINE GENERATOR AND DISCRIMINATOR CONFIG ------
+    # Set torch backend and set seed
+    torch.backends.cudnn.benchmark = torch.cuda.is_available()
+    set_seed(config["seed"])
+
+    base_path = Path(__file__).parent
+
+    # ------ DEFINE GENERATOR, DISCRIMINATOR AND TOKENIZER CONFIG ------
     discriminator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-discriminator')
     generator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-generator')
 
@@ -202,25 +232,10 @@ if __name__ == "__main__":
 
     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
 
-    # Path to data
-    Path((base_path / '../datasets').resolve(), exist_ok=True)
-
-    # Print info
-    sys.stderr.write(f"process id: {os.getpid()}")
-    pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
-                                         device=config["device"])
-
-    sys.stderr.write('Load in the dataset.')
-    csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
-    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=pre_processor)
-
-    # # 5. Train - Seed & PyTorch benchmark
-    torch.backends.cudnn.benchmark = torch.cuda.is_available()
-    set_seed(config["seed"])
-
-    # Generator and Discriminator
+    # ------ CREATE MODEL COMPONENTS AND INITALISE MODEL ------
     generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{config["size"]}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(f'google/electra-{config["size"]}-discriminator')
+    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(
+        f'google/electra-{config["size"]}-discriminator')
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
 
@@ -230,5 +245,15 @@ if __name__ == "__main__":
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
                       correct_bias=config["adam_bias_correction"])
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000, num_training_steps=config["max_steps"])
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
+                                                num_training_steps=config["max_steps"])
+
+    # ------ PREPARE DATA FOR NETWORK CONSUMPTION ------
+    data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
+                                              device=config["device"])
+    csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
+    sys.stderr.write('\nLoading data from {} and initialising Pytorch Dataset.\n'.format(csv_data_dir))
+    dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=data_pre_processor)
+
+    # ------ START THE PRE-TRAINING LOOP ------
     pre_train(dataset, electra_model, scheduler, optimizer, config)
