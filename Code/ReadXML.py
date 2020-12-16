@@ -24,6 +24,7 @@ class ParseXMLFiles:
     def __init__(self, max_dataset_size, max_samples_per_file):
         self.max_dataset_size = max_dataset_size
         self.max_samples_per_file = max_samples_per_file
+        self.shortfall = 0
 
         print("Creating dataset with max dataset size of {} and max samples per file of {}"
               .format(max_dataset_size, max_samples_per_file))
@@ -90,7 +91,9 @@ class ParseXMLFiles:
                         line_components.extend([" ", abstract_text_tag.text])
 
                         if len(line_components) > 0:
-                            if samples_so_far < self.max_samples_per_file and self.articles_parsed < self.max_dataset_size:
+                            if samples_so_far < self.max_samples_per_file + self.shortfall and self.articles_parsed < self.max_dataset_size:
+                                if samples_so_far >= self.max_samples_per_file:
+                                    self.shortfall -= 1
                                 samples_so_far += 1
                                 self.articles_parsed += 1
                                 joined_line = "".join(line_components)
@@ -98,6 +101,9 @@ class ParseXMLFiles:
                                 self.abstract_lengths[1] += 1
                                 csv.write(joined_line + "\n")
                             break
+
+        if samples_so_far < self.max_samples_per_file:
+            self.shortfall += self.max_samples_per_file - samples_so_far
 
         print("{} samples produced from this file. {} articles parsed in total - max dataset size is {}."
               .format(samples_so_far, self.articles_parsed, self.max_dataset_size))
