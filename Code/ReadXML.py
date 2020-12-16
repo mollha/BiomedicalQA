@@ -25,7 +25,7 @@ class ParseXMLFiles:
         self.processed_data_directory = processed_data_directory
         self.current_csv = None
 
-        self.csv_suffix = 0
+        self.csv_suffix = 1
         self.max_dataset_size = max_dataset_size
         self.max_samples_per_file = max_samples_per_file
 
@@ -45,7 +45,7 @@ class ParseXMLFiles:
         """
         string_suffix = str(self.csv_suffix).zfill(4)
         csv_identifier = self.processed_data_directory + "/pm_" + string_suffix + ".csv"
-        print("Creating file '{}'".format("pm_" + string_suffix + ".csv"))
+        print("\nCreating file '{}'".format("pm_" + string_suffix + ".csv"))
 
         path_to_csv = (self.base_path / csv_identifier).resolve()
 
@@ -64,8 +64,10 @@ class ParseXMLFiles:
 
         joined_line = "".join(line_components)
 
-        for component in line_components:
+        for idx in range(len(line_components)):
+            component = line_components[idx]
             if "\n" in component:
+                line_components[idx] = component.replace("\n", " ")
                 raise ValueError("New line spotted!")
 
         self.abstract_lengths[0] += len(joined_line)
@@ -123,9 +125,8 @@ class ParseXMLFiles:
 
                         if len(line_components) > 0:
                             if self.samples_in_file == self.max_samples_per_file:
-                                string_suffix = str(self.csv_suffix).zfill(4)
                                 print("File '{}' contains {} samples - {} samples constructed in total."
-                                      .format("pm_" + (string_suffix + ".csv"), self.samples_in_file,
+                                      .format(str(self.current_csv)[-8:], self.samples_in_file,
                                               self.articles_parsed))
                                 self.create_new_csv()
                                 csv.close()
