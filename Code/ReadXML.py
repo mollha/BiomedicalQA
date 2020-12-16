@@ -21,35 +21,63 @@ def find_xml_files(directory):
 
 
 class ParseXMLFiles:
-    def __init__(self, max_dataset_size, max_samples_per_file):
+    def __init__(self, processed_data_directory, max_dataset_size, max_samples_per_file):
+        self.processed_data_directory = processed_data_directory
+        self.current_csv = None
+
+        self.csv_suffix = 0
         self.max_dataset_size = max_dataset_size
         self.max_samples_per_file = max_samples_per_file
-        self.shortfall = 0
 
-        print("Creating dataset with max dataset size of {} and max samples per file of {}"
+        print("Creating dataset with max dataset size of {} and max samples per file of {}.\n"
               .format(max_dataset_size, max_samples_per_file))
 
+        self.samples_in_file = 0
         self.total_articles = 0
         self.articles_parsed = 0
-
-        self.abstract_types = {}
         self.abstract_lengths = [0, 0]
         self.base_path = pathlib.Path(__file__).parent
 
-    def initiate(self, file_name, file):
-        csv_identifier = str(processed_data_directory) + "/pm_" + parse_pm_file_name(str(file_name)) + ".csv"
-        print("Parsing file {}".format(file_name))
-        if not overwrite and pathlib.Path(csv_identifier).is_file():
-            return
+    def create_new_csv(self):
+        """
+        Given a CSV suffix, create a file with a valid name and write the header line.
+        :return: None
+        """
+        string_suffix = str(self.csv_suffix).zfill(4)
+        csv_identifier = self.processed_data_directory + "/pm_" + string_suffix + ".csv"
+        print("Creating file '{}'".format("pm_" + string_suffix + ".csv"))
 
-        self.parse_xml_file(file.read(), path_to_csv=(self.base_path / csv_identifier).resolve())
-
-    def parse_xml_file(self, file_content: str, path_to_csv: str):
-        # Create a new file that can be written to, checking first if it already exists
+        path_to_csv = (self.base_path / csv_identifier).resolve()
 
         open(path_to_csv, 'w').close()  # Create an empty file
         csv = open(path_to_csv, "a")  # Open the csv in append mode
         csv.write("text\n")
+        csv.close()
+
+        self.csv_suffix += 1
+        self.samples_in_file = 0
+        self.current_csv = path_to_csv
+
+    def write_line(self, line_components, csv):
+
+        if self.samples_in_file < self.max_samples_per_file:
+            self.samples_in_file += 1
+            self.articles_parsed += 1
+            joined_line = "".join(line_components)
+
+            self.abstract_lengths[0] += len(joined_line)
+            self.abstract_lengths[1] += 1
+            csv.write(joined_line + "\n")
+
+    def parse_xml_file(self, file_content: str):
+        if self.articles_parsed >= self.max_dataset_size:
+            return False
+
+        if self.current_csv is None:
+            self.create_new_csv()
+
+        # Create a new file that can be written to, checking first if it already exists
+        csv = open(self.current_csv, "a")  # Open the csv in append mode
 
         tree = et.ElementTree(et.fromstring(file_content))
         root = tree.getroot()
@@ -58,7 +86,7 @@ class ParseXMLFiles:
 
         # ---------------- DEFINE STATISTICS -----------------
         self.total_articles += len(pubmed_articles)
-        samples_so_far = 0
+
         for idx, article in enumerate(pubmed_articles):
             line_components = []
             article_tag = article.find('MedlineCitation').find('Article')
@@ -80,38 +108,29 @@ class ParseXMLFiles:
 
             if len(abstract_elements) > 0:
                 for element in abstract_elements:
-                    try:
-                        self.abstract_types[element.tag] += 1
-                    except KeyError:
-                        self.abstract_types[element.tag] = 1
-
                     abstract_text_tag = element.find('AbstractText')
 
                     if abstract_text_tag is not None and abstract_text_tag.text is not None:
                         line_components.extend([" ", abstract_text_tag.text])
 
                         if len(line_components) > 0:
-                            if samples_so_far < self.max_samples_per_file + self.shortfall and self.articles_parsed < self.max_dataset_size:
-                                if samples_so_far >= self.max_samples_per_file:
-                                    self.shortfall -= 1
-                                samples_so_far += 1
-                                self.articles_parsed += 1
-                                joined_line = "".join(line_components)
-                                self.abstract_lengths[0] += len(joined_line)
-                                self.abstract_lengths[1] += 1
-                                csv.write(joined_line + "\n")
+                            if self.samples_in_file >= self.max_samples_per_file:
+                                string_suffix = str(self.csv_suffix).zfill(4)
+                                print("File '{}' contains {} samples - {} samples constructed in total."
+                                      .format("pm_" + (string_suffix + ".csv"), self.samples_in_file,
+                                              self.articles_parsed))
+                                self.create_new_csv()
+                                csv.close()
+                                csv = open(self.current_csv, "a")
+
+
+                            self.write_line(line_components, csv)
                             break
-
-        if samples_so_far < self.max_samples_per_file:
-            self.shortfall += self.max_samples_per_file - samples_so_far
-
-        print("{} samples produced from this file. {} articles parsed in total - max dataset size is {}."
-              .format(samples_so_far, self.articles_parsed, self.max_dataset_size))
         csv.close()
+        return True
 
     def print_stats(self):
         print("\nTotal Articles:", self.total_articles)
-        print("Abstract Types Used: ", self.abstract_types)
         print("Average length of sample with Abstract: ", "%.2f" % (self.abstract_lengths[0] / self.abstract_lengths[1]))
 
 
@@ -123,21 +142,28 @@ if __name__ == "__main__":
     # Process each file in the Dataset directory
     raw_data_directory = (base_path / './datasets/PubMed/raw_data').resolve()
     processed_data_directory = (base_path / './datasets/PubMed/processed_data').resolve()
-    overwrite = True
-
     zipped_files, xml_files = find_xml_files(raw_data_directory)
 
-    max_samples_per_file = int((max_dataset_size // (len(zipped_files) + len(xml_files))) + 1)
-    xml_parser = ParseXMLFiles(max_dataset_size, max_samples_per_file)
+    # max_samples_per_file = int((max_dataset_size // (len(zipped_files) + len(xml_files))) + 1)
+    max_samples_per_file = 16000
+
+    xml_parser = ParseXMLFiles(str(processed_data_directory), max_dataset_size, max_samples_per_file)
 
     for file in zipped_files:
         f = gzip.open(file, 'rb')
-        xml_parser.initiate(str(file), f)
+
+        print("Opening file {}".format(str(file)))
+        response = xml_parser.parse_xml_file(f.read())
         f.close()
+        if not response:
+            break
 
     for file in xml_files:
         with open(file, 'r') as f:
-            xml_parser.initiate(str(file), f)
+            print("Parsing file {}".format(str(file)))
+            response = xml_parser.parse_xml_file(f.read())
+
+            if not response:
+                break
 
     xml_parser.print_stats()
-
