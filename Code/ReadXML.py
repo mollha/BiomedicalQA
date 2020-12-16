@@ -59,15 +59,18 @@ class ParseXMLFiles:
         self.current_csv = path_to_csv
 
     def write_line(self, line_components, csv):
+        self.samples_in_file += 1
+        self.articles_parsed += 1
 
-        if self.samples_in_file < self.max_samples_per_file:
-            self.samples_in_file += 1
-            self.articles_parsed += 1
-            joined_line = "".join(line_components)
+        joined_line = "".join(line_components)
 
-            self.abstract_lengths[0] += len(joined_line)
-            self.abstract_lengths[1] += 1
-            csv.write(joined_line + "\n")
+        for component in line_components:
+            if "\n" in component:
+                raise ValueError("New line spotted!")
+
+        self.abstract_lengths[0] += len(joined_line)
+        self.abstract_lengths[1] += 1
+        csv.write(joined_line + "\n")
 
     def parse_xml_file(self, file_content: str):
         if self.articles_parsed >= self.max_dataset_size:
@@ -99,6 +102,11 @@ class ParseXMLFiles:
                 # Some titles are contained within braces, and terminated by a full-stop.
                 if title[0] == "[" and title[-2:] == "].":
                     title = title[1:len(title) - 2]
+                    title = title.strip()
+                    # add full-stop if there isn't one
+                    if title[-1] != ".":
+                        title += "."
+
                 line_components.append(title)
 
             # Get the abstract text title
@@ -114,7 +122,7 @@ class ParseXMLFiles:
                         line_components.extend([" ", abstract_text_tag.text])
 
                         if len(line_components) > 0:
-                            if self.samples_in_file >= self.max_samples_per_file:
+                            if self.samples_in_file == self.max_samples_per_file:
                                 string_suffix = str(self.csv_suffix).zfill(4)
                                 print("File '{}' contains {} samples - {} samples constructed in total."
                                       .format("pm_" + (string_suffix + ".csv"), self.samples_in_file,
@@ -123,8 +131,8 @@ class ParseXMLFiles:
                                 csv.close()
                                 csv = open(self.current_csv, "a")
 
-
-                            self.write_line(line_components, csv)
+                            if self.samples_in_file < self.max_samples_per_file:
+                                self.write_line(line_components, csv)
                             break
         csv.close()
         return True
