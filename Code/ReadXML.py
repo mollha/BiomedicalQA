@@ -68,7 +68,6 @@ class ParseXMLFiles:
             component = line_components[idx]
             if "\n" in component:
                 line_components[idx] = component.replace("\n", " ")
-                raise ValueError("New line spotted!")
 
         self.abstract_lengths[0] += len(joined_line)
         self.abstract_lengths[1] += 1
