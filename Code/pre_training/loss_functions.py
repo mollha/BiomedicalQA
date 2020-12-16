@@ -12,17 +12,17 @@ def confusion_matrix(prediction, truth):
     - 0 and 0 (True Negative)
     - 0 and 1 (False Negative)
 
+    Element-wise division of the 2 tensors returns a new tensor which holds a
+    unique value for each case:
+      1     where prediction and truth are 1 (True Positive)
+      inf   where prediction is 1 and truth is 0 (False Positive)
+      nan   where prediction and truth are 0 (True Negative)
+      0     where prediction is 0 and truth is 1 (False Negative)
+
     Attribution: https://gist.github.com/the-bass/cae9f3976866776dea17a5049013258d
     """
 
     confusion_vector = prediction / truth
-    # Element-wise division of the 2 tensors returns a new tensor which holds a
-    # unique value for each case:
-    #   1     where prediction and truth are 1 (True Positive)
-    #   inf   where prediction is 1 and truth is 0 (False Positive)
-    #   nan   where prediction and truth are 0 (True Negative)
-    #   0     where prediction is 0 and truth is 1 (False Negative)
-
     true_positives = torch.sum(confusion_vector == 1).item()
     false_positives = torch.sum(confusion_vector == float('inf')).item()
     true_negatives = torch.sum(torch.isnan(confusion_vector)).item()

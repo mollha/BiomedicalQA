@@ -98,7 +98,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     model.to(settings["device"])
 
-    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT --------
+    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT OR FROM SCRATCH --------
     valid_checkpoint, path_to_checkpoint = False, None
     if checkpoint_name.lower() == "recent":
         subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
@@ -124,7 +124,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     else:
         sys.stderr.write("Pre-training from scratch - no checkpoint provided.\n")
 
-
+    # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     sys.stderr.write("\n---------- BEGIN TRAINING ----------")
     sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
                      .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
@@ -154,6 +154,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
         iterable_dataset = iter(dataset)
         iterable_dataset.resume_from_step(steps_trained)
 
+        # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
         for training_step in range(settings["max_steps"]):
             batch = next(iterable_dataset)
@@ -167,8 +168,8 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                 steps_trained -= 1
                 continue
 
-            batch = batch.to(settings["device"])
-            inputs, targets = mlm.mask_batch(batch)
+            batch = batch.to(settings["device"])  # project batch to correct device
+            inputs, targets = mlm.mask_batch(batch)  # mask the batch before passing it to the model
 
             model.train()  # train model one step
             outputs = model(*inputs)  # inputs = (masked_inputs, is_mlm_applied, labels)
@@ -188,8 +189,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             settings["global_step"] += 1
 
             # Log metrics
-            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
-                "update_steps"] == 0:
+            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
                 # Only evaluate when single GPU otherwise metrics may not average well
                 # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
 
@@ -249,8 +249,7 @@ if __name__ == "__main__":
                                                 num_training_steps=config["max_steps"])
 
     # ------ PREPARE DATA FOR NETWORK CONSUMPTION ------
-    data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"],
-                                              device=config["device"])
+    data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
     sys.stderr.write('\nLoading data from {} and initialising Pytorch Dataset.\n'.format(csv_data_dir))
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=data_pre_processor)
