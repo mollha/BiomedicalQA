@@ -8,7 +8,7 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH -p gpu-bigmem
+#SBATCH -p ug-gpu-sm
 #SBATCH -t 12:00:00
 #SBATCH --mem=56g
 #SBATCH --qos=long-high-prio
