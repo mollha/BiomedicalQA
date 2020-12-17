@@ -121,7 +121,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     if valid_checkpoint:
         model, optimizer, scheduler, loss_function, new_settings = load_checkpoint(path_to_checkpoint, model, optimizer,
                                                                                    scheduler, settings["device"])
-        settings = update_settings(new_settings, settings)
+        settings = update_settings(settings, new_settings)
     else:
         sys.stderr.write("Pre-training from scratch - no checkpoint provided.\n")
 
@@ -214,7 +214,7 @@ if __name__ == "__main__":
 
     # Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
-    config = {**config, **model_specific_config}
+    config = {**model_specific_config, **config}
 
     # Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
