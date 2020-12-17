@@ -21,7 +21,7 @@ config = {
     'discriminator_loss': [],
     # 'batch_size': 128,  # override batch size as not enough memory
     'size': 'base',  # electra small too small for QA
-    'num_workers': 1 if torch.cuda.is_available() else 0,
+    'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
@@ -209,6 +209,8 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
+    torch.multiprocessing.set_start_method('forkserver')
+
     # Log Process ID
     sys.stderr.write(f"Process ID: {os.getpid()}\n")
 
