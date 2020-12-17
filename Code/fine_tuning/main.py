@@ -163,12 +163,19 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
     return dataset
 
 
+# ---------- DEFINE MAIN FINE-TUNING LOOP ----------
+def fine_tune(dataset, model, scheduler, optimizer, settings, checkpoint_name="recent"):
+    pass
+
+
+
+
+
 if __name__ == "__main__":
     base_path = Path(__file__).parent
 
     # output folder for model checkpoints and predictions
     save_dir = "./output"
-
     pre_trained_checkpoint_dir = (base_path / '../pre_training/checkpoints/pretrain').resolve()
 
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
