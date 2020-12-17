@@ -1,22 +1,26 @@
-from torch import cuda, device, manual_seed, save, load
-from os import path
-from random import seed
-from numpy import random
+from torch import save, load
+import torch
+import random
+import os
+import sys
+from pathlib import Path
+import numpy as np
 from glob import glob
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
+from ..pre_training.models import build_electra_model
 from run_factoid import train, evaluate
 
 from transformers import (
     WEIGHTS_NAME,
     AutoConfig,
     AutoModelForQuestionAnswering,
+    ElectraConfig,
+    ElectraForQuestionAnswering,
     AutoTokenizer,
     squad_convert_examples_to_features,
 )
 
 # Ensure that lowercase model is used for model_type
-
-
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
     "batch_size": 8,
@@ -46,13 +50,31 @@ datasets = {
 }
 
 
-def set_seed(seed_value, use_cuda):
-    if use_cuda:
-        cuda.manual_seed_all(seed_value)
-
-    seed(seed_value)
+def set_seed(seed_value):
     random.seed(seed_value)
-    manual_seed(seed_value)
+    np.random.seed(seed_value)
+    torch.manual_seed(seed_value)
+
+
+def load_pretrained_checkpoint(path_to_checkpoint, device):
+    sys.stderr.write("Loading model checkpoint from {}\n".format(path_to_checkpoint))
+    settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
+    model_size = settings["size"]  # get the model size from the checkpoint
+
+    generator, discriminator, electra_tokenizer, disc_config = build_electra_model(model_size, get_config=True)
+
+    path_to_discriminator = os.path.join(path_to_checkpoint, "discriminator.pt")
+    if os.path.isfile(path_to_discriminator):
+        discriminator.load_state_dict(torch.load(path_to_discriminator, map_location=torch.device(device)))
+
+    sys.stderr.write(
+        "Electra model and tokenizer were saved on {} at {}.\n".format(settings["saved_on"], settings["saved_at"]))
+    sys.stderr.write("Model was pre-trained for {} epoch(s) and {} step(s).\n"
+                     .format(settings["current_epoch"], settings["steps_trained"]))
+
+    disc_state_dict = torch.load(path_to_discriminator, map_location=torch.device(device))
+    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(state_dict=disc_state_dict, config=disc_config)
+    return electra_for_qa, electra_tokenizer
 
 
 def load_pretrained_model_tokenizer(model_path, uncased_model, device):
@@ -84,7 +106,7 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
 
     # Load data features from cache or dataset file
     input_dir = data_dir if data_dir else "."
-    cached_features_file = path.join(
+    cached_features_file = os.path.join(
         input_dir,
         "cached_{}_{}_{}".format(
             "dev" if evaluate else "train",
@@ -94,7 +116,7 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
     )
 
     # Init features and dataset from cache if it exists
-    if path.exists(cached_features_file) and not overwrite_cached_features:
+    if os.path.exists(cached_features_file) and not overwrite_cached_features:
         print("Loading features from cached file {}".format(cached_features_file))
         features_and_dataset = load(cached_features_file)
         features, dataset, examples = (
@@ -142,27 +164,30 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
 
 
 if __name__ == "__main__":
+    base_path = Path(__file__).parent
+
     # output folder for model checkpoints and predictions
     save_dir = "./output"
 
-    # model_type always
+    pre_trained_checkpoint_dir = (base_path / '../pre_training/checkpoints/pretrain').resolve()
 
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
     train_model, evaluate_model = True, True
     model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
     dataset_info = datasets["bioasq"]
 
-    # Setup CUDA, GPU & distributed training
-    device = device("cuda" if cuda.is_available() else "cpu")
-    gpu_available = bool(cuda.device_count() > 0)
-    print("Device: {}, GPU available: {}".format(str(device).upper(), gpu_available))
+    # device = device("cuda" if torch.cuda.is_available() else "cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("Device: {}".format(str(device).upper()))
 
-    set_seed(0, gpu_available)  # fix seed for reproducibility
-    model, tokenizer = load_pretrained_model_tokenizer(f'google/electra-{config["size"]}-discriminator', uncased_model=False, device=device)
+    set_seed(0)  # fix seed for reproducibility
+    model, tokenizer = load_pretrained_model_tokenizer(f'google/electra-{config["size"]}-discriminator',
+                                                       uncased_model=False, device=device)
 
     # Training
     if train_model:
-        training_set = load_and_cache_examples(tokenizer, f'google/electra-{config["size"]}-discriminator', dataset_info["train_file"],
+        training_set = load_and_cache_examples(tokenizer, f'google/electra-{config["size"]}-discriminator',
+                                               dataset_info["train_file"],
                                                evaluate=False, output_examples=False)
 
         train(training_set, model, tokenizer, model_info, device, save_dir, config, dataset_info)
@@ -180,7 +205,7 @@ if __name__ == "__main__":
 
             if config["evaluate_all_checkpoints"]:
                 checkpoints = list(
-                    path.dirname(c)
+                    os.path.dirname(c)
                     for c in sorted(glob(save_dir + "/**/" + WEIGHTS_NAME, recursive=True))
                 )
         else:

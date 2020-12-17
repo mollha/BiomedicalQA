@@ -1,6 +1,6 @@
 from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
 from loss_functions import ELECTRALoss
-from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint
+from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
 from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
 import numpy as np
@@ -19,7 +19,7 @@ config = {
     'adam_bias_correction': False,
     'generator_loss': [],
     'discriminator_loss': [],
-    'size': 'small',
+    'size': 'base',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
@@ -145,7 +145,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                    vocab_size=electra_tokenizer.vocab_size,
                    mlm_probability=config["mask_prob"],
                    replace_prob=0.0,
-                   orginal_prob=0.15)
+                   original_prob=0.15)
 
     # resume training
     steps_trained = settings["steps_trained"]
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     # Log Process ID
     sys.stderr.write(f"Process ID: {os.getpid()}\n")
 
-    # Override general cofig with model specific config, for models of different sizes
+    # Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**config, **model_specific_config}
 
@@ -220,26 +220,9 @@ if __name__ == "__main__":
     set_seed(config["seed"])
 
     base_path = Path(__file__).parent
-
-    # ------ DEFINE GENERATOR, DISCRIMINATOR AND TOKENIZER CONFIG ------
-    discriminator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-discriminator')
-    generator_config = ElectraConfig.from_pretrained(f'google/electra-{config["size"]}-generator')
-
-    # note that public electra-small model is actually small++ and don't scale down generator size
-    generator_config.hidden_size = int(discriminator_config.hidden_size / config["generator_size_divisor"])
-    generator_config.num_attention_heads = discriminator_config.num_attention_heads // config["generator_size_divisor"]
-    generator_config.intermediate_size = discriminator_config.intermediate_size // config["generator_size_divisor"]
-
-    electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{config["size"]}-generator')
-
-    # ------ CREATE MODEL COMPONENTS AND INITALISE MODEL ------
-    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{config["size"]}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(
-        f'google/electra-{config["size"]}-discriminator')
-    discriminator.electra.embeddings = generator.electra.embeddings
-    generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
-
+    generator, discriminator, electra_tokenizer = build_electra_model(config['size'])
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
+
 
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01

@@ -2,6 +2,7 @@ import torch
 import os
 from pathlib import Path
 from torch import nn
+from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 import torch.nn.functional
 import datetime
 import pickle
@@ -54,6 +55,36 @@ def get_model_config(model_size: str) -> dict:
     return [small_config, base_config, large_config][index]
 
 
+def build_electra_model(model_size: str, get_config=False):
+
+    # define config for model, discriminator and generator
+    model_config = get_model_config(model_size)
+    discriminator_config = ElectraConfig.from_pretrained(f'google/electra-{model_size}-discriminator')
+    generator_config = ElectraConfig.from_pretrained(f'google/electra-{model_size}-generator')
+
+    # public electra-small model is actually small++ - don't scale down generator size
+    # apply generator size divisor based on optimal size listed in paper.
+    generator_config.hidden_size = int(discriminator_config.hidden_size / model_config["generator_size_divisor"])
+    generator_config.num_attention_heads = discriminator_config.num_attention_heads // model_config[
+        "generator_size_divisor"]
+    generator_config.intermediate_size = discriminator_config.intermediate_size // model_config[
+        "generator_size_divisor"]
+
+    electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
+
+    # create model components e.g. generator and discriminator
+    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{model_size}-generator')
+    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(
+        f'google/electra-{model_size}-discriminator')
+
+    discriminator.electra.embeddings = generator.electra.embeddings
+    generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
+
+    if get_config:
+        return generator, discriminator, electra_tokenizer, discriminator_config
+    return generator, discriminator, electra_tokenizer
+
+
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
 def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
                     scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
@@ -97,9 +128,10 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
 
-    sys.stderr.write("Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
+    sys.stderr.write(
+        "Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
     sys.stderr.write("Resuming training from epoch {} and step: {}\n"
-          .format(settings["current_epoch"], settings["steps_trained"]))
+                     .format(settings["current_epoch"], settings["steps_trained"]))
 
     # update the device as this may have changed since last checkpoint.
     settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
@@ -125,6 +157,9 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
     torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
     torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
     torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
+    torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
+
+    # model.discriminator.save_pretrained(save_dir)   # save the discriminator now
 
     with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
         pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
