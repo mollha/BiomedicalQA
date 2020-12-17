@@ -127,7 +127,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     print("\n---------- BEGIN TRAINING ----------")
-    print("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
+    sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
                      .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
                              settings["steps_trained"], settings["batch_size"], settings["update_steps"],
                              settings["max_length"]))
@@ -188,9 +188,6 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
             settings["steps_trained"] = training_step
             settings["global_step"] += 1
-
-            if settings["global_step"] % 3 == 0:
-                print('{} global step'.format(settings["global_step"]))
 
             # Log metrics
             if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
