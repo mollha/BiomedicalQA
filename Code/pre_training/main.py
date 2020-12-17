@@ -105,17 +105,17 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
         subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
-            sys.stderr.write("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
+            print("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
             valid_checkpoint = True
     elif checkpoint_name:
         path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
-            sys.stderr.write(
+            print(
                 "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
             # if the directory with the checkpoint name exists, we can retrieve the correct config from here
             valid_checkpoint = True
         else:
-            sys.stderr.write(
+            print(
                 "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
@@ -123,11 +123,11 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                                                                                    scheduler, settings["device"])
         settings = update_settings(settings, new_settings)
     else:
-        sys.stderr.write("Pre-training from scratch - no checkpoint provided.\n")
+        print("Pre-training from scratch - no checkpoint provided.\n")
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
-    sys.stderr.write("\n---------- BEGIN TRAINING ----------")
-    sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
+    print("\n---------- BEGIN TRAINING ----------")
+    print("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
                      .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
                              settings["steps_trained"], settings["batch_size"], settings["update_steps"],
                              settings["max_length"]))
@@ -161,7 +161,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             batch = next(iterable_dataset)
 
             if batch is None:
-                sys.stderr.write("Reached the end of the dataset")
+                print("Reached the end of the dataset")
                 break
 
             # If resuming training from a checkpoint, overlook previously trained steps.
@@ -194,7 +194,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                 # Only evaluate when single GPU otherwise metrics may not average well
                 # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
 
-                sys.stderr.write("{} steps trained in current epoch, {} steps trained overall."
+                print("{} steps trained in current epoch, {} steps trained overall."
                                  .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
@@ -210,7 +210,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
     # Log Process ID
-    sys.stderr.write(f"Process ID: {os.getpid()}\n")
+    print(f"Process ID: {os.getpid()}\n")
 
     # Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     # ------ PREPARE DATA FOR NETWORK CONSUMPTION ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
-    sys.stderr.write('\nLoading data from {} and initialising Pytorch Dataset.\n'.format(csv_data_dir))
+    print('\nLoading data from {} and initialising Pytorch Dataset.\n'.format(csv_data_dir))
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=data_pre_processor)
 
     # ------ START THE PRE-TRAINING LOOP ------

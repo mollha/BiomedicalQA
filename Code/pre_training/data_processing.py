@@ -86,11 +86,11 @@ class IterableCSVDataset(IterableDataset):
                     # there is no more data to explore
                     if self._dataset_size is None:
                         self._dataset_size = self._intermediate_dataset_size
-                        sys.stderr.write("Dataset size: {}".format(self._dataset_size))
+                        print("Dataset size: {}".format(self._dataset_size))
                     return None
 
     def build_iterator_from_csv(self, path_to_csv):
-        sys.stderr.write("\nReading CSV {}".format(str(path_to_csv)[-11:]))
+        print("\nReading CSV {}".format(str(path_to_csv)[-11:]))
 
         csv_dataset = MappedCSVDataset(path_to_csv)
         data_loader = DataLoader(csv_dataset, batch_size=self._batch_size, shuffle=True)
@@ -99,7 +99,7 @@ class IterableCSVDataset(IterableDataset):
     def resume_from_step(self, training_step):
         for i in range(training_step):
             next(self)
-        sys.stderr.write("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(
+        print("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(
             self._list_paths_to_csv[self._current_csv_idx])[-11:]))
 
 

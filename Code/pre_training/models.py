@@ -73,11 +73,11 @@ def build_electra_model(model_size: str, get_config=False):
 
     path_to_biotokenizer = os.path.join(base_path, f'bio_tokenizer/bio_electra_{model_size}_tokenizer')
     if os.path.exists(path_to_biotokenizer):
-        sys.stderr.write("Using biotokenizer from save file - {}".format(f'bio_electra_{model_size}_tokenizer'))
+        print("Using biotokenizer from save file - {}".format(f'bio_electra_{model_size}_tokenizer'))
         # get tokenizer from save file
         electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
     else:
-        sys.stderr.write("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
+        print("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
         electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
 
     # create model components e.g. generator and discriminator
@@ -136,9 +136,9 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
 
-    sys.stderr.write(
+    print(
         "Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
-    sys.stderr.write("Resuming training from epoch {} and step: {}\n"
+    print("Resuming training from epoch {} and step: {}\n"
                      .format(settings["current_epoch"], settings["steps_trained"]))
 
     # update the device as this may have changed since last checkpoint.
@@ -175,7 +175,7 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
     torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
     # the tokenizer state is saved with the model
 
-    sys.stderr.write("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
+    print("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
 
 
 # --------------------------------------------------------------------------------
