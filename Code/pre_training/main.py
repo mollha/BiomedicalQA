@@ -209,8 +209,6 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
-    torch.multiprocessing.set_start_method('forkserver')
-
     # Log Process ID
     sys.stderr.write(f"Process ID: {os.getpid()}\n")
 
