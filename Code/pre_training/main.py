@@ -189,6 +189,9 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
             settings["steps_trained"] = training_step
             settings["global_step"] += 1
 
+            if settings["global_step"] % 3 == 0:
+                print('{} global step'.format(settings["global_step"]))
+
             # Log metrics
             if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
                 # Only evaluate when single GPU otherwise metrics may not average well
