@@ -154,7 +154,7 @@ if __name__ == "__main__":
     zipped_files, xml_files = find_xml_files(raw_data_directory)
 
     # max_samples_per_file = int((max_dataset_size // (len(zipped_files) + len(xml_files))) + 1)
-    max_samples_per_file = 16000
+    max_samples_per_file = 8000
 
     xml_parser = ParseXMLFiles(str(processed_data_directory), max_dataset_size, max_samples_per_file)
 
