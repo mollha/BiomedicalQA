@@ -56,6 +56,7 @@ def get_model_config(model_size: str) -> dict:
 
 
 def build_electra_model(model_size: str, get_config=False):
+    base_path = Path(__file__).parent
 
     # define config for model, discriminator and generator
     model_config = get_model_config(model_size)
@@ -70,12 +71,21 @@ def build_electra_model(model_size: str, get_config=False):
     generator_config.intermediate_size = discriminator_config.intermediate_size // model_config[
         "generator_size_divisor"]
 
-    electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
+    path_to_biotokenizer = os.path.join(base_path, f'bio_tokenizer/bio_electra_{model_size}_tokenizer')
+    if os.path.exists(path_to_biotokenizer):
+        print("Using biotokenizer from save file - {}".format(f'bio_electra_{model_size}_tokenizer'))
+        # get tokenizer from save file
+        electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
+    else:
+        print("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
+        electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
+
+    # electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
 
     # create model components e.g. generator and discriminator
     generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{model_size}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(
-        f'google/electra-{model_size}-discriminator')
+    discriminator = ElectraForPreTraining(discriminator_config)\
+        .from_pretrained(f'google/electra-{model_size}-discriminator')
 
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
