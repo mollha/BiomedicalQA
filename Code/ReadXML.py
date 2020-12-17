@@ -62,12 +62,12 @@ class ParseXMLFiles:
         self.samples_in_file += 1
         self.articles_parsed += 1
 
-        joined_line = "".join(line_components)
-
         for idx in range(len(line_components)):
             component = line_components[idx]
             if "\n" in component:
                 line_components[idx] = component.replace("\n", " ")
+
+        joined_line = "".join(line_components)
 
         self.abstract_lengths[0] += len(joined_line)
         self.abstract_lengths[1] += 1
@@ -93,9 +93,8 @@ class ParseXMLFiles:
 
         for idx, article in enumerate(pubmed_articles):
             line_components = []
-            article_tag = article.find('MedlineCitation').find('Article')
 
-            # Get the article title
+            article_tag = article.find('MedlineCitation').find('Article')
             article_title_tag = article_tag.find('ArticleTitle')
             title = article_title_tag.text
 
@@ -107,7 +106,6 @@ class ParseXMLFiles:
                     # add full-stop if there isn't one
                     if title[-1] != ".":
                         title += "."
-
                 line_components.append(title)
 
             # Get the abstract text title
