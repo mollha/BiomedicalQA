@@ -20,7 +20,7 @@ config = {
     'generator_loss': [],
     'discriminator_loss': [],
     # 'batch_size': 128,  # override batch size as not enough memory
-    'size': 'base',  # electra small too small for QA
+    'size': 'small',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
