@@ -92,6 +92,9 @@ class ParseXMLFiles:
         self.total_articles += len(pubmed_articles)
 
         for idx, article in enumerate(pubmed_articles):
+            if self.articles_parsed >= self.max_dataset_size:
+                return False
+
             line_components = []
 
             article_tag = article.find('MedlineCitation').find('Article')
