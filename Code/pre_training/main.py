@@ -224,7 +224,6 @@ if __name__ == "__main__":
     generator, discriminator, electra_tokenizer = build_electra_model(config['size'])
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
-
     # Prepare optimizer and schedule (linear warm up and decay)
     # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
