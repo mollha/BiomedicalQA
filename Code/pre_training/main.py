@@ -19,7 +19,7 @@ config = {
     'adam_bias_correction': False,
     'generator_loss': [],
     'discriminator_loss': [],
-    'batch_size': 128,  # override batch size as not enough memory
+    'batch_size': 32,  # override batch size as not enough memory
     'size': 'base',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
