@@ -212,6 +212,9 @@ if __name__ == "__main__":
     # Log Process ID
     print(f"Process ID: {os.getpid()}\n")
 
+    if True:
+        raise ValueError()
+
     # Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**model_specific_config, **config}
