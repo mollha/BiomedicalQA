@@ -1,7 +1,10 @@
 from tokenizers import Tokenizer
-import pathlib
+from pathlib import Path
 from transformers import ElectraTokenizerFast, ElectraTokenizer
 from tokenizers.models import WordPiece
+from tokenizers import normalizers
+from tokenizers.normalizers import Lowercase, NFD, StripAccents
+from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.trainers import WordPieceTrainer
 
 """
@@ -14,7 +17,7 @@ tokens of the tokenizer are ['UNK'] i.e. unknown.
 Based on the HuggingFace tutorial at:
 https://huggingface.co/docs/tokenizers/python/latest/pipeline.html#all-together-a-bert-tokenizer-from-scratch
 """
-base_path = pathlib.Path(__file__).parent
+base_path = Path(__file__).parent
 
 
 def find_text_files(directory):
@@ -32,6 +35,9 @@ def train_bio_tokenizer_from_scratch(path_to_output: str):
     processed_data_directory = (base_path / '../datasets/PubMed/processed_data').resolve()
     text_files = find_text_files(processed_data_directory)
     bio_tokenizer = Tokenizer(WordPiece())
+
+    bio_tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
+    bio_tokenizer.pre_tokenizer = Whitespace()
     trainer = WordPieceTrainer(vocab_size=30522, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
     bio_tokenizer.train(trainer, text_files)
     bio_tokenizer.model.save(path_to_output, "electra-pubmed")
@@ -106,20 +112,20 @@ def create_tokenizers(additional_vocab_path, path_to_output: str):
 
 if __name__ == "__main__":
     path_to_output_dir = (base_path / "bio_tokenizer").resolve()
-    pathlib.Path(path_to_output_dir).mkdir(exist_ok=True, parents=True)
+    Path(path_to_output_dir).mkdir(exist_ok=True, parents=True)
 
-    path_to_electra_pubmed = pathlib.Path(path_to_output_dir / "electra-pubmed-vocab.txt").resolve()
-    path_to_general_vocab = pathlib.Path(path_to_output_dir / "general-vocab.txt").resolve()
-    path_to_combined_vocab = pathlib.Path(path_to_output_dir / "combined-vocab.txt").resolve()
+    path_to_electra_pubmed = Path(path_to_output_dir / "electra-pubmed-vocab.txt").resolve()
+    path_to_general_vocab = Path(path_to_output_dir / "general-vocab.txt").resolve()
+    path_to_combined_vocab = Path(path_to_output_dir / "combined-vocab.txt").resolve()
 
-    if not pathlib.Path.exists(path_to_electra_pubmed):
+    if not Path.exists(path_to_electra_pubmed):
         # create the electra-pubmed vocab
         train_bio_tokenizer_from_scratch(str(path_to_output_dir))
 
-    if not pathlib.Path.exists(path_to_general_vocab):
+    if not Path.exists(path_to_general_vocab):
         raise ValueError("Get electra-small-discriminator vocab first.")
 
-    if not pathlib.Path.exists(path_to_combined_vocab):
+    if not Path.exists(path_to_combined_vocab):
         merge_vocabularies(str(path_to_general_vocab), str(path_to_electra_pubmed), str(path_to_output_dir)),
 
     vocab_dict = {"pubmed_vocab": path_to_electra_pubmed, "general_vocab": path_to_general_vocab,
@@ -129,5 +135,5 @@ if __name__ == "__main__":
         vocab_path = vocab_dict[vocab_name]
         bio_tokenizer = ElectraTokenizer(vocab_file=vocab_path)
 
-        tokenizer_path = pathlib.Path(path_to_output_dir / "bio_electra_tokenizer_{}".format(vocab_name)).resolve()
+        tokenizer_path = Path(path_to_output_dir / "bio_electra_tokenizer_{}".format(vocab_name)).resolve()
         bio_tokenizer.save_pretrained(str(tokenizer_path))
