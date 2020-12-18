@@ -1,17 +1,8 @@
-from tokenizers import Tokenizer, BertWordPieceTokenizer
-from tokenizers.models import BPE
-
-from transformers import WordpieceTokenizer
+from tokenizers import Tokenizer
 import pathlib
 from transformers import ElectraTokenizerFast, ElectraTokenizer
 from tokenizers.models import WordPiece
-from tokenizers import normalizers
-from tokenizers.normalizers import Lowercase, NFD, StripAccents
-from tokenizers.pre_tokenizers import Whitespace
-from tokenizers.processors import TemplateProcessing
 from tokenizers.trainers import WordPieceTrainer
-
-
 
 """
 --- Code for training a Biomedical-domain tokenizer ----
@@ -40,53 +31,8 @@ def train_bio_tokenizer_from_scratch(path_to_output: str):
     """
     processed_data_directory = (base_path / '../datasets/PubMed/processed_data').resolve()
     text_files = find_text_files(processed_data_directory)
-
     bio_tokenizer = Tokenizer(WordPiece())
-    trainer = WordPieceTrainer(vocab_size=30522, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
-    bio_tokenizer.train(trainer, text_files)
-
-    # Initialize a tokenizer
-    # bio_tokenizer = BertWordPieceTokenizer()
-    # bio_tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
-    # bio_tokenizer.pre_tokenizer = Whitespace()
-    # bio_tokenizer.post_processor = TemplateProcessing(
-    #     single="[CLS] $A [SEP]",
-    #     pair="[CLS] $A [SEP] $B:1 [SEP]:1",
-    #     special_tokens=[
-    #         ("[CLS]", 1),
-    #         ("[SEP]", 2),
-    #     ],
-    # )
-
-    # Customize training
-    # bio_tokenizer.train(files=text_files, vocab_size=52_000, min_frequency=2, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
-
-    # bio_tokenizer.train(trainer, text_files)
-    # bio_tokenizer.save_model(path_to_output, "electra-pubmed")
-    bio_tokenizer.model.save(path_to_output, "electra-pubmed")
-    # bio_tokenizer.save_pretrained(path_to_output + '/bio_electra_tokenizer')
-
-
-def train_bio_tokenizer_from_pretrained(path_to_output: str):
-    processed_data_directory = (base_path / '../datasets/PubMed/processed_data').resolve()
-    text_files = find_text_files(processed_data_directory)
-
-    bio_tokenizer = Tokenizer(WordPiece())
-    bio_tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
-    bio_tokenizer.pre_tokenizer = Whitespace()
-    bio_tokenizer.post_processor = TemplateProcessing(
-        single="[CLS] $A [SEP]",
-        pair="[CLS] $A [SEP] $B:1 [SEP]:1",
-        special_tokens=[
-            ("[CLS]", 1),
-            ("[SEP]", 2),
-        ],
-    )
-
-    trainer = WordPieceTrainer(
-        vocab_size=30522, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"]
-    )
-
+    trainer = WordPieceTrainer(vocab_size=50000, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
     bio_tokenizer.train(trainer, text_files)
     bio_tokenizer.model.save(path_to_output, "electra-pubmed")
 
@@ -146,7 +92,6 @@ def create_tokenizers(additional_vocab_path, path_to_output: str):
     for idx in range(len(lines)):
         lines[idx] = lines[idx].strip()
 
-
     sizes = ["small", "base", "large"]
 
     for size in sizes:
@@ -186,18 +131,3 @@ if __name__ == "__main__":
 
         tokenizer_path = pathlib.Path(path_to_output_dir / "bio_electra_tokenizer_{}".format(vocab_name)).resolve()
         bio_tokenizer.save_pretrained(str(tokenizer_path))
-
-    # path_to_tokenizer = str(pathlib.Path(path_to_output_dir / "bio_electra_tokenizer").resolve())
-
-    # electra_tokenizer = ElectraTokenizerFast.from_pretrained(str(path_to_output_dir))
-
-
-    # path_to_vocab = (path_to_output_dir / "electra-pubmed-vocab.txt").resolve()
-    # vocab_exists = path_to_vocab.exists()
-    #
-    # print("Path to {} {}, {} vocab.".format(str(path_to_vocab), "exists" if vocab_exists else "does not exist",
-    #                                         "re-using" if vocab_exists else "creating"))
-    # if not vocab_exists:
-    #     train_bio_tokenizer(str(path_to_output_dir))
-    #
-    # create_tokenizers(path_to_vocab, str(path_to_output_dir))
