@@ -134,6 +134,9 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     total_training_loss, logging_loss = 0.0, 0.0
     model.zero_grad()
 
+    if True:
+        raise ValueError()
+
     # Added here for reproducibility
     set_seed(settings["seed"])
 
@@ -211,9 +214,6 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 if __name__ == "__main__":
     # Log Process ID
     print(f"Process ID: {os.getpid()}\n")
-
-    if True:
-        raise ValueError()
 
     # Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
