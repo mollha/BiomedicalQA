@@ -71,10 +71,9 @@ def build_electra_model(model_size: str, get_config=False):
     generator_config.intermediate_size = discriminator_config.intermediate_size // model_config[
         "generator_size_divisor"]
 
+    path_to_biotokenizer = os.path.join(base_path, f'bio_tokenizer/bio_electra_{model_size}_tokenizer')
     if True:
         raise ValueError("yee")
-
-    path_to_biotokenizer = os.path.join(base_path, f'bio_tokenizer/bio_electra_{model_size}_tokenizer')
     if os.path.exists(path_to_biotokenizer):
         sys.stderr.write("Using biotokenizer from save file - {}".format(f'bio_electra_{model_size}_tokenizer'))
         # get tokenizer from save file
