@@ -2,7 +2,7 @@ import pathlib
 from transformers import ElectraTokenizerFast
 
 
-def tokenize_dataset(vocab_names: list, tokenizer_list: list, list_path_to_csv_files: list):
+def tokenize_dataset(tokenizer_list: list, list_path_to_csv_files: list):
 
     avg_len = [[0, 0]] * len(tokenizer_list)
 
@@ -18,27 +18,17 @@ def tokenize_dataset(vocab_names: list, tokenizer_list: list, list_path_to_csv_f
                     first_line = False
                     continue
 
-                print(line)
-
                 # tokenize the line for every tokenizer
                 for idx in range(len(tokenizer_list)):
-                    tokenizer = tokenizer_list[idx]
-                    tokenized_line = tokenizer.tokenize(line)
-                    print(tokenized_line)
-
-                    len_of_tok_line = len(tokenized_line)
-                    avg_len[idx][0] += len_of_tok_line
-                    avg_len[idx][1] += 1
-
-                print(avg_len)
+                    tokenized_line = tokenizer_list[idx].tokenize(line)
+                    avg_len[idx] = [avg_len[idx][0] + len(tokenized_line), avg_len[idx][1] + 1]
 
     average_lengths = []
     for num_tokens, num_samples in avg_len:
-        print(num_tokens)
-        print(num_samples)
         avg_length = num_tokens / num_samples
         average_lengths.append(avg_length)
 
+    return average_lengths
 
 
 
@@ -67,6 +57,10 @@ if __name__ == "__main__":
         tokenizer = ElectraTokenizerFast.from_pretrained(tokenizer_path)
         tokenizer_list.append(tokenizer)
 
-    tokenize_dataset(vocab_names, tokenizer_list, text_files)
+    average_length_list = tokenize_dataset(tokenizer_list, text_files)
+
+    for idx in range(len(vocab_names)):
+        print("Vocab file '{}' has average length {}.".format(vocab_names[idx], average_length_list[idx]))
+
 
 

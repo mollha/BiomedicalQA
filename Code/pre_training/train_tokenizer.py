@@ -32,7 +32,7 @@ def train_bio_tokenizer_from_scratch(path_to_output: str):
     processed_data_directory = (base_path / '../datasets/PubMed/processed_data').resolve()
     text_files = find_text_files(processed_data_directory)
     bio_tokenizer = Tokenizer(WordPiece())
-    trainer = WordPieceTrainer(vocab_size=50000, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
+    trainer = WordPieceTrainer(vocab_size=30522, special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
     bio_tokenizer.train(trainer, text_files)
     bio_tokenizer.model.save(path_to_output, "electra-pubmed")
 
