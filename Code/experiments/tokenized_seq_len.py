@@ -3,7 +3,6 @@ from transformers import ElectraTokenizerFast
 
 
 def tokenize_dataset(tokenizer_list: list, list_path_to_csv_files: list):
-
     avg_len = [[0, 0]] * len(tokenizer_list)
 
     # iterate through every file
@@ -29,7 +28,6 @@ def tokenize_dataset(tokenizer_list: list, list_path_to_csv_files: list):
         average_lengths.append(avg_length)
 
     return average_lengths
-
 
 
 def find_text_files(directory):
@@ -63,4 +61,8 @@ if __name__ == "__main__":
         print("Vocab file '{}' has average length {}.".format(vocab_names[idx], average_length_list[idx]))
 
 
+# ---------- RESULTS ----------
+# AVG LENGTH FOR GENERAL VOCAB = 225.04
+# AVG LENGTH FOR PUBMED VOCAB = 192.78
+# AVG LENGTH FOR COMBINED VOCAB = 190.88
 
