@@ -1,7 +1,6 @@
 from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
-from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
 from hugdatafast import *
 import numpy as np
 import os
@@ -19,7 +18,6 @@ config = {
     'adam_bias_correction': False,
     'generator_loss': [],
     'discriminator_loss': [],
-    # 'batch_size': 32,  # override batch size as not enough memory
     'size': 'small',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
@@ -200,11 +198,8 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
+        loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
         save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
-        loss_function.update_statistics()
-
-    # ------------- SAVE FINE-TUNED MODEL ONCE MORE AT THE END OF TRAINING -------------
-    save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir)
 
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
