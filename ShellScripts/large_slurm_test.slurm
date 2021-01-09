@@ -8,7 +8,6 @@
 
 #SBATCH -N 1
 #SBATCH -c 8
-#SBATCH --gres=gpu
 #SBATCH --job-name=large_language
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=kgxj22-qos
