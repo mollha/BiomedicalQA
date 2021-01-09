@@ -105,7 +105,7 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
         subfolders = [x for x in Path(checkpoint_dir).iterdir() \
                       if x.is_dir() and settings["size"] in str(x)[str(x).rfind('/') + 1:]]
 
-        print("subfolders", subfolders)
+        print("Subfolders", subfolders)
 
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
