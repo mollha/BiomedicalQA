@@ -6,10 +6,16 @@
 # t - TIME
 
 
+#SBATCH -N 1
 #SBATCH -c 8
+#SBATCH --gres=gpu
+#SBATCH --job-name=large_language
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=kgxj22-qos
+#SBATCH -t 7-0:0:0
 #SBATCH --mem=110G
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user molly.hayward@durham.ac.uk
 
 # Source the bash profile (required to use the module command)
 source /etc/profile
