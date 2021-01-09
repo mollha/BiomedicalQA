@@ -18,7 +18,7 @@ config = {
     'adam_bias_correction': False,
     'generator_loss': [],
     'discriminator_loss': [],
-    'size': 'small',  # electra small too small for QA
+    'size': 'base',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
@@ -99,8 +99,14 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
     #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT OR FROM SCRATCH --------
     valid_checkpoint, path_to_checkpoint = False, None
+
     if checkpoint_name.lower() == "recent":
-        subfolders = [x for x in Path(checkpoint_dir).iterdir() if x.is_dir()]
+
+        subfolders = [x for x in Path(checkpoint_dir).iterdir() \
+                      if x.is_dir() and settings["size"] in str(x)[str(x).rfind('/') + 1:]]
+
+        print("subfolders", subfolders)
+
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint(checkpoint_dir, subfolders)
             print("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))

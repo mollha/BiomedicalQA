@@ -88,7 +88,7 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "small_0_108493"    # e.g. small_10_50
+    chckpt_name = "small_9_6565"    # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
