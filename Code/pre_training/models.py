@@ -23,10 +23,10 @@ small_config = {
 base_config = {
     "mask_prob": 0.15,
     "lr": 2e-4,
-    # "batch_size": 256,
-    "batch_size": 12,
+    "batch_size": 256,
+    # "batch_size": 12,
     "max_steps": 766 * 1000,
-    "max_length": 512,
+    "max_length": 256,
     "generator_size_divisor": 3
 }
 
