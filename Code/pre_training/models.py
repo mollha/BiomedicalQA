@@ -24,7 +24,7 @@ base_config = {
     "mask_prob": 0.15,
     "lr": 2e-4,
     # "batch_size": 256,
-    "batch_size": 48,
+    "batch_size": 40,
     "max_steps": 766 * 1000,
     "max_length": 512,
     "generator_size_divisor": 3
