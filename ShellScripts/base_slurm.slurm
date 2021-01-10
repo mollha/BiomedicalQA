@@ -9,7 +9,7 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH --job-name=language_model_mh
+#SBATCH --job-name=base_language
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=long-high-prio
 #SBATCH -t 7-0:0:0
