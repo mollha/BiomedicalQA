@@ -1,4 +1,4 @@
-from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
+from BiomedicalQA.Code.datasets.PubMed.processing_scripts.data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
 from hugdatafast import *
@@ -18,7 +18,7 @@ config = {
     'adam_bias_correction': False,
     'generator_loss': [],
     'discriminator_loss': [],
-    'size': 'base',  # electra small too small for QA
+    'size': 'small',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
