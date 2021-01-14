@@ -1,4 +1,4 @@
-from BiomedicalQA.Code.pre_training.data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
+from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
 from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
 from hugdatafast import *
