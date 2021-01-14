@@ -7,7 +7,6 @@ from transformers import MODEL_FOR_QUESTION_ANSWERING_MAPPING, AdamW, get_linear
 from transformers.data.metrics.squad_metrics import compute_predictions_logits
 from transformers.data.processors.squad import SquadResult
 from utils_qa import transform_n2b_factoid, eval_bioasq_standard, to_list
-from torch.utils.tensorboard import SummaryWriter
 
 
 """ Finetuning the library models for fine_tuning on SQuAD (DistilBERT, Bert, XLM, XLNet)."""
@@ -104,7 +103,6 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
     # Added here for reproducibility
     # TODO SET SEED HERE AGAIN
 
-    tb_writer = SummaryWriter()  # Create a SummaryWriter()
     for epoch_number in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
 
@@ -163,17 +161,12 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
                     # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
                     if settings["evaluate_all_checkpoints"]:
                         results = evaluate(model, tokenizer, "electra", save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
-                        for key, value in results.items():
-                            tb_writer.add_scalar("eval_{}".format(key), value, global_step)
-                    tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
-                    tb_writer.add_scalar("loss", (tr_loss - logging_loss) / settings["update_steps"], global_step)
+
                     logging_loss = tr_loss
 
                 # Save model checkpoint
                 if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
                     save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
-
-    tb_writer.close()
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)

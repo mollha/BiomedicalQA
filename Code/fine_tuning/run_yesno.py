@@ -155,6 +155,7 @@ class AutoModelForYesno(PreTrainedModel):
 
         return outputs
 
+
 def train(args, train_dataset, model, tokenizer):
     """ Train the model """
 

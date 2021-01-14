@@ -168,9 +168,6 @@ def fine_tune(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
     pass
 
 
-
-
-
 if __name__ == "__main__":
     base_path = Path(__file__).parent
 
