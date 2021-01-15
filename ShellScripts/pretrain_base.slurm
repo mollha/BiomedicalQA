@@ -5,11 +5,10 @@
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
 # t - TIME
 
-
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH --job-name=base_language
+#SBATCH --job-name=bs_language
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=long-high-prio
 #SBATCH -t 7-0:0:0
@@ -17,12 +16,28 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
 
-
 # Source the bash profile (required to use the module command)
 source /etc/profile
 
 # activate venv
 source ../../venv/bin/activate
 
+# parse arguments
+while [[ $# -gt 0 ]]
+do
+key="$1"
+SIZE="base"
+case $key in
+    -c|--checkpoint)
+    CHECKPOINT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+esac
+done
+
+echo "CHECKPOINT = ${CHECKPOINT}"
+echo "MODEL SIZE = ${SIZE}"
+
 # Run your program (replace this with your program)
-stdbuf -oL python3 ../Code/pre_training/main.py
+stdbuf -oL python3 ../Code/pre_training/main.py --checkpoint ${CHECKPOINT} --size ${SIZE}
