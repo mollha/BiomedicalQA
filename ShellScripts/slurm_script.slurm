@@ -1,26 +1,6 @@
 #!/bin/bash
 
-# parse arguments
-while [[ $# -gt 0 ]]
-do
-key="$1"
 
-case $key in
-    -c|--checkpoint)
-    CHECKPOINT="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -s|--size)
-    SIZE="$2"
-    shift # past argument
-    shift # past value
-    ;;
-esac
-done
-
-echo "CHECKPOINT = ${CHECKPOINT}"
-echo "MODEL SIZE = ${SIZE}"
 
 # X number of nodes with Y number of cores in each node.
 # p - Partition: cpu | res-gpu-small | res-gpu-large | ug-gpu-small
@@ -43,6 +23,28 @@ source /etc/profile
 
 # activate venv
 source ../../venv/bin/activate
+
+# parse arguments
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -c|--checkpoint)
+    CHECKPOINT="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -s|--size)
+    SIZE="$2"
+    shift # past argument
+    shift # past value
+    ;;
+esac
+done
+
+echo "CHECKPOINT = ${CHECKPOINT}"
+echo "MODEL SIZE = ${SIZE}"
 
 # Run your program (replace this with your program)
 stdbuf -oL python3 ../Code/pre_training/main.py --checkpoint ${checkpoint}
