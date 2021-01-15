@@ -1,5 +1,6 @@
 from pathlib import Path
 import xml.etree.ElementTree as et
+from tqdm import tqdm
 import requests
 import json
 
@@ -39,24 +40,6 @@ def download_data(api_key: str, snippet_list: list):
         article_id_tag = pubmed_article_tag.find('PubmedData').find('ArticleIdList').findall('ArticleId')
 
         pm_id = [x for x in article_id_tag if x.get("IdType") == "pubmed"].pop().text
-        # begin_section_list = [x["beginSection"] for x in snippet_list if x["pmid"] == pm_id]
-
-        # if len(begin_section_list) > 1:
-        #     raise Exception('Multiple snippets referencing the same document.')
-        #
-        # begin_section = begin_section_list.pop()
-        # print(begin_section)
-
-        # if begin_section not in ['title', "abstract"]:
-        #
-        #     # certain articles require the full article
-        #     fetch_full_page = requests.get(base_command + fetch_full_command.format(pm_id, api_key))
-        #     print("status code", fetch_full_page.status_code)
-        #     fetch_full_tree = et.ElementTree(et.fromstring(fetch_full_page.text))
-        #     fetch_full_root = fetch_tree.getroot()
-        #     print(fetch_full_page.text)
-        #     # pubmed_full_article_tags = fetch_full_root.findall('PubmedArticle')
-
         title = "" if article_tag is None else article_tag.find('ArticleTitle').text
 
         try:
@@ -99,11 +82,10 @@ if __name__ == "__main__":
     snippet_list = create_json_for_path(path_to_data_file)
     data_dict = {}
 
-    for snippet_number, snippet in enumerate(snippet_list):
+    for snippet_number, snippet in enumerate(tqdm(snippet_list)):
         print("Snippet group: {}".format(snippet_number))
         pm_data = download_data(api_key, snippet)
         data_dict = {**data_dict, **pm_data}
-        # break   # todo remove
 
     print(data_dict)
 

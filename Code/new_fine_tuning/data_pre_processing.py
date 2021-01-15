@@ -42,29 +42,48 @@ def convert_bioasq_to_squad(path_to_dataset: Path):
     squad_questions = squad_struct["data"][0]["paragraphs"]
 
     def process_question(question: dict):
-        print(question.keys())
         # create a new question for each snippet
         snippets = question["snippets"]
+        question_type = question["type"]
+        question_answer = question["type"]
+
+        question_template = {"qas": [{
+            "question": question["body"],
+            "id": question["id"],
+            "is_impossible": False,  # assume no impossible answers in BioASQ
+        }]}
+
+        if question_type == "list":
+            # treat this as a list question
+            question_template["qas"][0]["answers"] = [{
+                    "text": "epidermal growth factor",
+                    "answer_start": 4
+            }]
+
+        elif question_type == "factoid":
+            # treat this as a factoid question
+            question_template["qas"][0]["answers"] = [{
+                    "text": "",
+                    "answer_start": ""
+                }]
+
+        elif question_type == "yesno":
+            # treat this as a yes / no question
+            question_template["qas"][0]["answers"] = "yes"
+        else:
+            raise Exception("Question type {} not supported - only factoid, list and yesno.".format(question_type))
+
 
         for snippet in snippets:
-            snippet_text = snippet["text"]
-            snippet_start_idx = snippet["offsetInBeginSection"]
-            snippet_end_idx = snippet["offsetInEndSection"]
-            print(snippet.keys())
-            print(snippet_start_idx, snippet_end_idx)
-
-            formatted_question = {"qas": [{
-                "question": question["body"],
-                "id": question["id"],
-                "is_impossible": False,  # assume no impossible answers in BioASQ
-                "answers": [{
-                    "text": "", "answer_start": ""
-                }]
-            }],
-                "context": snippet
-            }
-
-            squad_questions.append(formatted_question)
+            # snippet_text = snippet["text"]
+            #
+            # snippet_start_idx = snippet["offsetInBeginSection"]
+            # snippet_end_idx = snippet["offsetInEndSection"]
+            #
+            # print(snippet.keys())
+            # print(snippet_start_idx, snippet_end_idx)
+            question_template["context"] = snippet["text"]
+            squad_questions.append(question_template)
 
         # "qas": [{
         #     "question": "", "id": "", "is_impossible": bool, "answers": [{
