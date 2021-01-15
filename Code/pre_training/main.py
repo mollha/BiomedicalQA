@@ -3,6 +3,7 @@ from loss_functions import ELECTRALoss
 from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
 from hugdatafast import *
 import numpy as np
+import argparse
 import os
 import torch
 from torch import nn
@@ -213,10 +214,34 @@ if __name__ == "__main__":
     # Log Process ID
     print(f"Process ID: {os.getpid()}\n")
 
+    # parse command line arguments
+    parser = argparse.ArgumentParser(description='Overwrite default settings.')
+    parser.add_argument(
+        "--size",
+        default=config['size'],
+        choices=['small', 'base', 'large'],
+        type=str,
+        help="The size of the electra model e.g. 'small', 'base' or 'large",
+    )
+
+    parser.add_argument(
+        "--checkpoint",
+        default="recent",
+        type=str,
+        help="The name of the checkpoint to use e.g. small_15_10230",
+    )
+    args = parser.parse_args()
+    config['size'] = args.size
+
+    if args.checkpoint != "recent" and args.size not in args.checkpoint:
+        raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
+                        "e.g. --checkpoint small_15_10230 --size small")
+
 
     # Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**model_specific_config, **config}
+
 
     # Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
@@ -240,4 +265,4 @@ if __name__ == "__main__":
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=data_pre_processor)
 
     # ------ START THE PRE-TRAINING LOOP ------
-    pre_train(dataset, electra_model, scheduler, optimizer, config)
+    pre_train(dataset, electra_model, scheduler, optimizer, config, checkpoint_name=args.checkpoint)

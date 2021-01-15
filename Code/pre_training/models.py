@@ -160,7 +160,7 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
 
     # ------------- save pre-trained optimizer, scheduler and model -------------
     save_dir = os.path.join(checkpoint_dir, checkpoint_name)
-    Path(save_dir).mkdir(exist_ok=True, parents=True)
+    Path(save_dir).mkdir(exist_ok=False, parents=True)
 
     # save training settings with trained model
     torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
