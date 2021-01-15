@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 # X number of nodes with Y number of cores in each node.
 # p - Partition: cpu | res-gpu-small | res-gpu-large | ug-gpu-small
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
@@ -10,7 +8,7 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH --job-name=language_model_mh
+#SBATCH --job-name=sm_language
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=long-high-prio
 #SBATCH -t 7-0:0:0
@@ -28,15 +26,10 @@ source ../../venv/bin/activate
 while [[ $# -gt 0 ]]
 do
 key="$1"
-
+SIZE="small"
 case $key in
     -c|--checkpoint)
     CHECKPOINT="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -s|--size)
-    SIZE="$2"
     shift # past argument
     shift # past value
     ;;
