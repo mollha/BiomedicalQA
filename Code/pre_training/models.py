@@ -160,23 +160,26 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
 
     # ------------- save pre-trained optimizer, scheduler and model -------------
     save_dir = os.path.join(checkpoint_dir, checkpoint_name)
-    Path(save_dir).mkdir(exist_ok=False, parents=True)
+    try:
+        Path(save_dir).mkdir(exist_ok=False, parents=True)
+        # save training settings with trained model
+        torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
+        torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
+        torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
+        torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
 
-    # save training settings with trained model
-    torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
-    torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
-    torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
-    torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
+        # model.discriminator.save_pretrained(save_dir)   # save the discriminator now
 
-    # model.discriminator.save_pretrained(save_dir)   # save the discriminator now
+        with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
+            pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
 
-    with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
-        pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
+        torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
+        # the tokenizer state is saved with the model
 
-    torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
-    # the tokenizer state is saved with the model
-
-    print("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
+        print("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
+    except FileExistsError as e:
+        print(e)
+        print("Checkpoint cannot be saved as it already exists - skipping this save.")
 
 
 # --------------------------------------------------------------------------------
