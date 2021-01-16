@@ -214,7 +214,7 @@ if __name__ == "__main__":
     # Log Process ID
     print(f"Process ID: {os.getpid()}\n")
 
-    # parse command line arguments
+    # -- Parse command line arguments (checkpoint name and model size)
     parser = argparse.ArgumentParser(description='Overwrite default settings.')
     parser.add_argument(
         "--size",
@@ -233,20 +233,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
 
+    print("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")
 
-
-    # Override general config with model specific config, for models of different sizes
+    # -- Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**model_specific_config, **config}
 
-
-    # Set torch backend and set seed
+    # -- Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
     set_seed(config["seed"])
-
     base_path = Path(__file__).parent
     generator, discriminator, electra_tokenizer = build_electra_model(config['size'])
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
