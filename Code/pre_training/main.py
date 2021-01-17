@@ -1,6 +1,6 @@
-from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
-from loss_functions import ELECTRALoss
-from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
+from .data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
+from .loss_functions import ELECTRALoss
+from .models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
 from hugdatafast import *
 import numpy as np
 import argparse
@@ -103,7 +103,7 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
 
     # -- Override general config with model specific config, for models of different sizes
     model_settings = get_model_config(model_size)
-    generator, discriminator, electra_tokenizer = build_electra_model(model_size)
+    generator, discriminator, electra_tokenizer, disc_config = build_electra_model(model_size, get_config=True)
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
     # Prepare optimizer and schedule (linear warm up and decay)
@@ -145,7 +145,7 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
     else:
         print("Pre-training from scratch - no checkpoint provided.\n")
 
-    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
+    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config, disc_config
 
 
 # ---------- DEFINE MAIN PRE-TRAINING LOOP ----------
@@ -278,7 +278,7 @@ if __name__ == "__main__":
     config = {**model_specific_config, **config}
 
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
-    config = build_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
+    config, disc_config = build_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])

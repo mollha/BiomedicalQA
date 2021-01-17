@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 from glob import glob
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
-from ..pre_training.main import build_from_checkpoint
-from run_factoid import train, evaluate
+from BiomedicalQA.Code.pre_training.main import build_from_checkpoint
+# from run_factoid import train, evaluate
 
 from transformers import (
     WEIGHTS_NAME,
@@ -62,6 +62,8 @@ def convert_pretrain_to_finetune():
     :return:
     """
 
+
+
     sys.stderr.write("Loading model checkpoint from {}\n".format(path_to_checkpoint))
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
     model_size = settings["size"]  # get the model size from the checkpoint
@@ -80,10 +82,6 @@ def convert_pretrain_to_finetune():
     disc_state_dict = torch.load(path_to_discriminator, map_location=torch.device(device))
     electra_for_qa = ElectraForQuestionAnswering.from_pretrained(state_dict=disc_state_dict, config=disc_config)
     return electra_for_qa, electra_tokenizer
-
-
-
-    pass
 
 
 def load_pretrained_model_tokenizer(model_path, uncased_model, device):
@@ -206,6 +204,8 @@ if __name__ == "__main__":
                         "e.g. --checkpoint small_15_10230 --size small")
 
 
+
+
     print(args.checkpoint, args.size)
     quit()
 
@@ -231,12 +231,14 @@ if __name__ == "__main__":
 
     # get pre-trained model from which to begin pre-training
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function, \
-    model_config = build_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
+    model_config, disc_config = build_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
 
     discriminator = electra_model.discriminator
     generator = electra_model.generator
 
+    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(state_dict=discriminator.state_dict(), config=disc_config)
 
+    quit()
 
 
     model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
