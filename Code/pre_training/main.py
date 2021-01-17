@@ -84,7 +84,7 @@ def get_recent_checkpoint_name(directory, subfolders: list):
     return max_file
 
 
-def build_from_checkpoint(model_size, device, checkpoint_name, config={}):
+def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, config={}):
     """
 
     Note: If we don't pass config and the checkpoint name is valid - config will be populated with
@@ -98,11 +98,11 @@ def build_from_checkpoint(model_size, device, checkpoint_name, config={}):
     :param config:
     :return:
     """
-
+    # create the checkpoint directory if it doesn't exist
+    Path(checkpoint_directory).mkdir(exist_ok=True, parents=True)
 
     # -- Override general config with model specific config, for models of different sizes
     model_settings = get_model_config(model_size)
-
     generator, discriminator, electra_tokenizer = build_electra_model(model_size)
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
@@ -119,15 +119,15 @@ def build_from_checkpoint(model_size, device, checkpoint_name, config={}):
 
     if checkpoint_name.lower() == "recent":
 
-        subfolders = [x for x in Path(checkpoint_dir).iterdir() \
+        subfolders = [x for x in Path(checkpoint_directory).iterdir() \
                       if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]]
 
         if len(subfolders) > 0:
-            path_to_checkpoint = get_recent_checkpoint_name(checkpoint_dir, subfolders)
+            path_to_checkpoint = get_recent_checkpoint_name(checkpoint_directory, subfolders)
             print("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
             valid_checkpoint = True
     elif checkpoint_name:
-        path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
+        path_to_checkpoint = os.path.join(checkpoint_directory, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
             print(
                 "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
@@ -268,18 +268,17 @@ if __name__ == "__main__":
     set_seed(config["seed"])
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # -- Find path to checkpoint directory - create the directory if it doesn't exist
+    # -- Find path to checkpoint directory
     base_path = Path(__file__).parent
     checkpoint_name = args.checkpoint
     checkpoint_dir = (base_path / '../checkpoints/pretrain').resolve()
-    Path(checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
     # -- Override general config with model specific config, for models of different sizes
     model_specific_config = get_model_config(config['size'])
     config = {**model_specific_config, **config}
 
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
-    config = build_from_checkpoint(config['size'], config['device'], checkpoint_name, config)
+    config = build_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])

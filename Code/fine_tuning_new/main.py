@@ -1,12 +1,13 @@
 import torch
 import random
+import argparse
 import os
 import sys
 from pathlib import Path
 import numpy as np
 from glob import glob
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
-from ..pre_training.models import build_electra_model
+from ..pre_training.main import build_from_checkpoint
 from run_factoid import train, evaluate
 
 from transformers import (
@@ -55,12 +56,17 @@ def set_seed(seed_value):
     torch.manual_seed(seed_value)
 
 
-def load_pretrained_checkpoint(path_to_checkpoint, device):
+def convert_pretrain_to_finetune():
+    """
+    Convert pretrained checkpoint to model suitable for fine-tuning.
+    :return:
+    """
+
     sys.stderr.write("Loading model checkpoint from {}\n".format(path_to_checkpoint))
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
     model_size = settings["size"]  # get the model size from the checkpoint
 
-    generator, discriminator, electra_tokenizer, disc_config = build_electra_model(model_size, get_config=True)
+    # generator, discriminator, electra_tokenizer, disc_config = build_electra_model(model_size, get_config=True)
 
     path_to_discriminator = os.path.join(path_to_checkpoint, "discriminator.pt")
     if os.path.isfile(path_to_discriminator):
@@ -74,6 +80,10 @@ def load_pretrained_checkpoint(path_to_checkpoint, device):
     disc_state_dict = torch.load(path_to_discriminator, map_location=torch.device(device))
     electra_for_qa = ElectraForQuestionAnswering.from_pretrained(state_dict=disc_state_dict, config=disc_config)
     return electra_for_qa, electra_tokenizer
+
+
+
+    pass
 
 
 def load_pretrained_model_tokenizer(model_path, uncased_model, device):
@@ -168,17 +178,64 @@ def fine_tune(dataset, model, scheduler, optimizer, settings, checkpoint_name="r
 
 
 if __name__ == "__main__":
+    # Log the process ID
+    print(f"Process ID: {os.getpid()}\n")
+
+    # -- Parse command line arguments (checkpoint name and model size)
+    parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
+    parser.add_argument(
+        "--size",
+        default="small",
+        choices=['small', 'base', 'large'],
+        type=str,
+        help="The size of the electra model e.g. 'small', 'base' or 'large",
+    )
+
+    parser.add_argument(
+        "--checkpoint",
+        default="recent",
+        type=str,
+        help="The name of the pre-training checkpoint to use e.g. small_15_10230",
+    )
+    args = parser.parse_args()
+    config['size'] = args.size
+
+    print("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
+    if args.checkpoint != "recent" and args.size not in args.checkpoint:
+        raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
+                        "e.g. --checkpoint small_15_10230 --size small")
+
+
+    print(args.checkpoint, args.size)
+    quit()
+
+    # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
+    checkpoint_name = args.checkpoint
+
+    base_checkpoint_dir = (base_path / '../checkpoints').resolve()
+    pretrain_checkpoint_dir = (base_checkpoint_dir / 'pretrain').resolve()
+    finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
+
+    # create the finetune directory if it doesn't exist already
+    Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)
+
+    # -- Set device
+    config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
     # output folder for model checkpoints and predictions
     save_dir = "./output"
-    pre_trained_checkpoint_dir = (base_path / '../pre_training/checkpoints/pretrain').resolve()
 
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
     train_model, evaluate_model = True, True
 
+    # get pre-trained model from which to begin pre-training
+    electra_model, optimizer, scheduler, electra_tokenizer, loss_function, \
+    model_config = build_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
 
-    # get model for pre-training
+    discriminator = electra_model.discriminator
+    generator = electra_model.generator
+
 
 
 
