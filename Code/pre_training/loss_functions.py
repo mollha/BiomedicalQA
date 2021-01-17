@@ -97,6 +97,8 @@ class ELECTRALoss:
         self.mid_epoch_stats["true_negatives"] += true_negatives
         self.mid_epoch_stats["false_negatives"] += false_negatives
 
+        print("avg gen loss: ", self.mid_epoch_stats["avg_gen_loss"])
+
         return generator_loss + discriminator_loss
 
     def update_statistics(self):
