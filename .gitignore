@@ -6,10 +6,13 @@ Code/qa_datasets/*
 # Ignore CSV files, except sample data which should be allowed to be used on NCC.
 Code/datasets/PubMed/processed_data/pm_*.csv
 Code/pre_training/bio_tokenizer
-Code/pre_training/checkpoints/pretrain/small_*
-!Code/pre_training/checkpoints/pretrain/small_53_20
+Code/checkpoints/pretrain/small_*
+!Code/checkpoints/pretrain/small_53_20
 Code/pre_training/runs/*
 ShellScripts/runs
 *.pyc
 *.out
 *.log
+
+.env
+*.json
