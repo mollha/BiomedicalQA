@@ -17,7 +17,8 @@ small_config = {
     "batch_size": 128,
     "max_steps": 10 ** 6,
     "max_length": 128,
-    "generator_size_divisor": 4
+    "generator_size_divisor": 4,
+    'adam_bias_correction': False
 }
 
 base_config = {
@@ -27,7 +28,8 @@ base_config = {
     # "batch_size": 12,
     "max_steps": 766 * 1000,
     "max_length": 256,
-    "generator_size_divisor": 3
+    "generator_size_divisor": 3,
+    'adam_bias_correction': False
 }
 
 large_config = {
@@ -36,7 +38,8 @@ large_config = {
     "batch_size": 2048,
     "max_steps": 400 * 1000,
     "max_length": 512,
-    "generator_size_divisor": 4
+    "generator_size_divisor": 4,
+    'adam_bias_correction': False
 }
 
 

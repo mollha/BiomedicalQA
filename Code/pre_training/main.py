@@ -14,12 +14,9 @@ import sys
 
 # ------------------ SPECIFY GENERAL MODEL CONFIG ------------------
 config = {
-    'device': "cuda" if torch.cuda.is_available() else "cpu",
     'seed': 0,
-    'adam_bias_correction': False,
     'generator_loss': [],
     'discriminator_loss': [],
-    'size': 'small',  # electra small too small for QA
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 9999,
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
@@ -87,14 +84,72 @@ def get_recent_checkpoint_name(directory, subfolders: list):
     return max_file
 
 
-def build_checkpoint(checkpoint_name="recent"):
+def build_from_checkpoint(model_size, device, checkpoint_name, config={}):
+    """
+
+    Note: If we don't pass config and the checkpoint name is valid - config will be populated with
+    model-specific config only. This is useful when build_from_checkpoint is called from fine-tuning,
+    but we don't need the pre-training configuration - only model configuration.
 
 
-    pass
+    :param model_size:
+    :param device:
+    :param checkpoint_name:
+    :param config:
+    :return:
+    """
+
+
+    # -- Override general config with model specific config, for models of different sizes
+    model_settings = get_model_config(model_size)
+
+    generator, discriminator, electra_tokenizer = build_electra_model(model_size)
+    electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
+
+    # Prepare optimizer and schedule (linear warm up and decay)
+    # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
+    optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=model_settings["lr"],
+                      correct_bias=model_settings["adam_bias_correction"])
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
+                                                num_training_steps=model_settings["max_steps"])
+
+    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT OR FROM SCRATCH --------
+    loss_function = ELECTRALoss()
+    valid_checkpoint, path_to_checkpoint = False, None
+
+    if checkpoint_name.lower() == "recent":
+
+        subfolders = [x for x in Path(checkpoint_dir).iterdir() \
+                      if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]]
+
+        if len(subfolders) > 0:
+            path_to_checkpoint = get_recent_checkpoint_name(checkpoint_dir, subfolders)
+            print("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
+            valid_checkpoint = True
+    elif checkpoint_name:
+        path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
+        if os.path.exists(path_to_checkpoint):
+            print(
+                "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+            # if the directory with the checkpoint name exists, we can retrieve the correct config from here
+            valid_checkpoint = True
+        else:
+            print(
+                "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
+
+    if valid_checkpoint:
+        electra_model, optimizer, scheduler, loss_function, new_config = load_checkpoint(path_to_checkpoint,
+                                                                                         electra_model, optimizer,
+                                                                                         scheduler, device)
+        config = update_settings(config, new_config)
+    else:
+        print("Pre-training from scratch - no checkpoint provided.\n")
+
+    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
 
 
 # ---------- DEFINE MAIN PRE-TRAINING LOOP ----------
-def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_dir):
+def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
     """ Train the model """
     # Specify which directory model checkpoints should be saved to.
     # Make the checkpoint directory if it does not exist already.
@@ -116,9 +171,9 @@ def pre_train(dataset, model, scheduler, optimizer, settings, checkpoint_dir):
     train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")
 
     # # 2. Masked language model objective
-    mlm = MaskedLM(mask_tok_id=electra_tokenizer.mask_token_id,
-                   special_tok_ids=electra_tokenizer.all_special_ids,
-                   vocab_size=electra_tokenizer.vocab_size,
+    mlm = MaskedLM(mask_tok_id=tokenizer.mask_token_id,
+                   special_tok_ids=tokenizer.all_special_ids,
+                   vocab_size=tokenizer.vocab_size,
                    mlm_probability=config["mask_prob"],
                    replace_prob=0.0,
                    original_prob=0.15)
@@ -188,7 +243,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Overwrite default settings.')
     parser.add_argument(
         "--size",
-        default=config['size'],
+        default="small",
         choices=['small', 'base', 'large'],
         type=str,
         help="The size of the electra model e.g. 'small', 'base' or 'large",
@@ -211,6 +266,7 @@ if __name__ == "__main__":
     # -- Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
     set_seed(config["seed"])
+    config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
 
     # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
@@ -222,46 +278,8 @@ if __name__ == "__main__":
     model_specific_config = get_model_config(config['size'])
     config = {**model_specific_config, **config}
 
-    generator, discriminator, electra_tokenizer = build_electra_model(config['size'])
-    electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
-
-    # Prepare optimizer and schedule (linear warm up and decay)
-    # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
-    optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=config["lr"],
-                      correct_bias=config["adam_bias_correction"])
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
-                                                num_training_steps=config["max_steps"])
-
-    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT OR FROM SCRATCH --------
-    loss_function = ELECTRALoss()
-    valid_checkpoint, path_to_checkpoint = False, None
-
-    if checkpoint_name.lower() == "recent":
-
-        subfolders = [x for x in Path(checkpoint_dir).iterdir() \
-                      if x.is_dir() and config["size"] in str(x)[str(x).rfind('/') + 1:]]
-
-        if len(subfolders) > 0:
-            path_to_checkpoint = get_recent_checkpoint_name(checkpoint_dir, subfolders)
-            print("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
-            valid_checkpoint = True
-    elif checkpoint_name:
-        path_to_checkpoint = os.path.join(checkpoint_dir, checkpoint_name)
-        if os.path.exists(path_to_checkpoint):
-            print(
-                "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
-            # if the directory with the checkpoint name exists, we can retrieve the correct config from here
-            valid_checkpoint = True
-        else:
-            print(
-                "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
-
-    if valid_checkpoint:
-        electra_model, optimizer, scheduler, loss_function, new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer,
-                                                                                   scheduler, config["device"])
-        config = update_settings(config, new_config)
-    else:
-        print("Pre-training from scratch - no checkpoint provided.\n")
+    electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
+    config = build_from_checkpoint(config['size'], config['device'], checkpoint_name, config)
 
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
@@ -270,4 +288,4 @@ if __name__ == "__main__":
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=data_pre_processor)
 
     # ------ START THE PRE-TRAINING LOOP ------
-    pre_train(dataset, electra_model, scheduler, optimizer, config, checkpoint_dir=checkpoint_dir)
+    pre_train(dataset, electra_model, scheduler, electra_tokenizer, optimizer, loss_function, config, checkpoint_dir)
