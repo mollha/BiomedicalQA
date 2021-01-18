@@ -50,34 +50,6 @@ def set_seed(seed_value):
     torch.manual_seed(seed_value)
 
 
-# def convert_pretrain_to_finetune():
-#     """
-#     Convert pretrained checkpoint to model suitable for fine-tuning.
-#     :return:
-#     """
-#
-#
-#
-#     sys.stderr.write("Loading model checkpoint from {}\n".format(path_to_checkpoint))
-#     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
-#     model_size = settings["size"]  # get the model size from the checkpoint
-#
-#     # generator, discriminator, electra_tokenizer, disc_config = build_electra_model(model_size, get_config=True)
-#
-#     path_to_discriminator = os.path.join(path_to_checkpoint, "discriminator.pt")
-#     if os.path.isfile(path_to_discriminator):
-#         discriminator.load_state_dict(torch.load(path_to_discriminator, map_location=torch.device(device)))
-#
-#     sys.stderr.write(
-#         "Electra model and tokenizer were saved on {} at {}.\n".format(settings["saved_on"], settings["saved_at"]))
-#     sys.stderr.write("Model was pre-trained for {} epoch(s) and {} step(s).\n"
-#                      .format(settings["current_epoch"], settings["steps_trained"]))
-#
-#     disc_state_dict = torch.load(path_to_discriminator, map_location=torch.device(device))
-#     electra_for_qa = ElectraForQuestionAnswering.from_pretrained(state_dict=disc_state_dict, config=disc_config)
-#     return electra_for_qa, electra_tokenizer
-
-
 def load_pretrained_model_tokenizer(model_path, uncased_model, device):
     # Load pre-trained model and tokenizer
     # pre-trained config name or path if not the same as model_name
