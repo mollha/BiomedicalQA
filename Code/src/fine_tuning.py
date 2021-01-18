@@ -226,6 +226,8 @@ if __name__ == "__main__":
                                                                  state_dict=discriminator.state_dict(),
                                                                  config=disc_config)
 
+
+
     quit()
 
     # output folder for model checkpoints and predictions

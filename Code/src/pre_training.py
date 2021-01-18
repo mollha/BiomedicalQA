@@ -207,6 +207,8 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 
             loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
+
+            print("avg gen loss: ", loss_function.mid_epoch_stats["avg_gen_loss"])
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
