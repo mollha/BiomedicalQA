@@ -22,25 +22,21 @@ from transformers import (
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
     "batch_size": 8,
-    "epochs": 1,
     "learning_rate": 8e-6,  # The initial learning rate for Adam.
     "decay": 0.0,  # Weight decay if we apply some.
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
     "max_grad_norm": 1.0,  # Max gradient norm.
-    "evaluate_all_checkpoints": False,
     "update_steps": 500,
-    "size": "small"
-}
-
-eval_settings = {
-    "eval_batch_size": 12,
-    "n_best_size": 20,  # The total number of n-best predictions to generate in the nbest_predictions.json output file.
-    "max_answer_length": 30,  # maximum length of a generated answer
-    "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
+    'seed': 0,
+    'loss': [],
+    'num_workers': 3 if torch.cuda.is_available() else 0,
+    "max_epochs": 9999,
+    "current_epoch": 0,  # track the current epoch in config for saving checkpoints
+    "steps_trained": 0,  # track the steps trained in config for saving checkpoints
+    "global_step": -1,  # total steps over all epochs
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
-
 datasets = {
     "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
                "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
