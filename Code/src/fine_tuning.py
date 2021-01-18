@@ -169,13 +169,28 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
 
 
 # ---------- DEFINE MAIN FINE-TUNING LOOP ----------
-def fine_tune(dataset, model, scheduler, optimizer, settings, checkpoint_name="recent"):
+# def fine_tune(dataset, model, scheduler, optimizer, settings, checkpoint_name="recent"):
+#     pass
+
+# def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
+
+def fine_tune(dataset, qa_model, tokenizer, checkpoint_dir):
+
+
+    qa_model.to(device)
+
+
+
+    # evaluate during training always.
+
+
+
     pass
 
 
 if __name__ == "__main__":
     # Log the process ID
-    print(f"Process ID: {os.getpid()}\n")
+    print(f"Process ID: {os.getpid()}")
 
     # -- Parse command line arguments (checkpoint name and model size)
     parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
@@ -214,6 +229,7 @@ if __name__ == "__main__":
 
     # -- Set device
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+    print("Device: {}\n".format(config["device"].upper()))
 
     # get pre-trained model from which to begin pre-training
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function, \
@@ -226,7 +242,13 @@ if __name__ == "__main__":
                                                                  state_dict=discriminator.state_dict(),
                                                                  config=disc_config)
 
+    # Load the dataset and prepare it in squad format
 
+
+    qa_dataset_squad_format = {}
+
+    # ------ START THE FINE-TUNING LOOP ------
+    fine_tune(qa_dataset_squad_format, electra_for_qa, electra_tokenizer, finetune_checkpoint_dir)
 
     quit()
 
@@ -241,12 +263,10 @@ if __name__ == "__main__":
     dataset_info = datasets["bioasq"]
 
     # device = device("cuda" if torch.cuda.is_available() else "cpu")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Device: {}".format(str(device).upper()))
 
     set_seed(0)  # fix seed for reproducibility
-    model, tokenizer = load_pretrained_model_tokenizer(f'google/electra-{config["size"]}-discriminator',
-                                                       uncased_model=False, device=device)
+    # model, tokenizer = load_pretrained_model_tokenizer(f'google/electra-{config["size"]}-discriminator',
+    #                                                    uncased_model=False, device=device)
 
     # Training
     if train_model:

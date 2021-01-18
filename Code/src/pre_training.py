@@ -1,5 +1,5 @@
-from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
-from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
+from data_processing import *
+from models import *
 from loss_functions import ELECTRALoss
 from hugdatafast import *
 import numpy as np
@@ -138,9 +138,8 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
                 "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        electra_model, optimizer, scheduler, loss_function, new_config = load_checkpoint(path_to_checkpoint,
-                                                                                         electra_model, optimizer,
-                                                                                         scheduler, device)
+        electra_model, optimizer, scheduler, loss_function,\
+        new_config = load_pretrain_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
         config = update_settings(config, new_config)
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")
@@ -230,10 +229,10 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                                  .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
-                save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+                save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
         loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
-        save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+        save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------

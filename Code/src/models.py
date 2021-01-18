@@ -98,8 +98,8 @@ def build_electra_model(model_size: str, get_config=False):
 
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
-def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
+def load_pretrain_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
+                             scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -150,7 +150,7 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     return model, optimizer, scheduler, loss_function, settings
 
 
-def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
+def save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
