@@ -1,6 +1,6 @@
-from .data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
-from .loss_functions import ELECTRALoss
-from .models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
+from data_processing import ELECTRADataProcessor, MaskedLM, IterableCSVDataset
+from models import ELECTRAModel, get_model_config, save_checkpoint, load_checkpoint, build_electra_model
+from loss_functions import ELECTRALoss
 from hugdatafast import *
 import numpy as np
 import argparse
@@ -124,7 +124,7 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
 
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint_name(checkpoint_directory, subfolders)
-            print("Pre-training from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
+            print("\nTraining from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
             valid_checkpoint = True
     elif checkpoint_name:
         path_to_checkpoint = os.path.join(checkpoint_directory, checkpoint_name)
@@ -143,7 +143,7 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
                                                                                          scheduler, device)
         config = update_settings(config, new_config)
     else:
-        print("Pre-training from scratch - no checkpoint provided.\n")
+        print("\nTraining from scratch - no checkpoint provided.\n")
 
     return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config, disc_config
 

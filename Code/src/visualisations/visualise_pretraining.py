@@ -5,7 +5,7 @@ from pathlib import Path
 import pickle
 
 base_path = Path(__file__).parent
-checkpoint_dir = (base_path / 'checkpoints/pretrain').resolve()
+checkpoint_dir = (base_path / '../checkpoints/pretrain').resolve()
 graphs_path = (base_path / 'pre_training_graphs').resolve()
 Path(graphs_path).mkdir(exist_ok=True, parents=True)
 
