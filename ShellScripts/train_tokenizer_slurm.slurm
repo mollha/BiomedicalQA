@@ -23,4 +23,4 @@ source /etc/profile
 source ../../venv/bin/activate
 
 # Run your program (replace this with your program)
-python3 ../Code/pre_training/train_tokenizer.py
+python3 ../Code/src/tokenization/train_tokenizer.py

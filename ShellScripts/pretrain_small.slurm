@@ -40,4 +40,4 @@ echo "CHECKPOINT = ${CHECKPOINT}"
 echo "MODEL SIZE = ${SIZE}"
 
 # Run your program (replace this with your program)
-stdbuf -oL python3 ../Code/pre_training/main.py --checkpoint ${CHECKPOINT} --size ${SIZE}
+stdbuf -oL python3 ../Code/src/pre_training.py --checkpoint ${CHECKPOINT} --size ${SIZE}
