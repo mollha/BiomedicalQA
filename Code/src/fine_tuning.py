@@ -222,7 +222,9 @@ if __name__ == "__main__":
     discriminator = electra_model.discriminator
     generator = electra_model.generator
 
-    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(state_dict=discriminator.state_dict(), config=disc_config)
+    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
+                                                                 state_dict=discriminator.state_dict(),
+                                                                 config=disc_config)
 
     quit()
 
