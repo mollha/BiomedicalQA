@@ -1,3 +1,5 @@
+import collections
+
 import torch
 import os
 from pathlib import Path
@@ -149,7 +151,7 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     print(
         "Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
     print("Resuming training from epoch {} and step: {}\n"
-                     .format(settings["current_epoch"], settings["steps_trained"]))
+          .format(settings["current_epoch"], settings["steps_trained"]))
 
     # update the device as this may have changed since last checkpoint.
     settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
@@ -191,10 +193,9 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
         print("Checkpoint cannot be saved as it already exists - skipping this save.")
 
 
-def get_layer_lrs(lr, decay_rate, num_hidden_layers):
-    # lr is the learning rate from config
+def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):
     """
-    Get the layer-wise learning rates.
+    Get the layer-wise learning rates. Layers closer to input have lower lr.
     :param lr:
     :param decay_rate:
     :param num_hidden_layers:
@@ -202,10 +203,47 @@ def get_layer_lrs(lr, decay_rate, num_hidden_layers):
     :return:
     """
 
-    lrs = [lr * (decay_rate ** depth) for depth in range(num_hidden_layers+2)]
+    def get_depth(layer_name):
+        numbers = [s for s in layer_name.split(".") if s.isdigit()]
+        if len(numbers) > 0:
+            return int(numbers.pop()) + 1
+        elif "embeddings" in layer_name:
+            return 0
+        else:
+            return num_hidden_layers
+
+    return {n: lr * (decay_rate ** get_depth(n)) for n, p in parameters}
+
+
+
+    lrs = [lr * (decay_rate ** (num_hidden_layers + 1 - depth)) for depth in range(num_hidden_layers + 1)]
     for i in range(1, len(lrs)):
         lrs[i] *= decay_rate
     return list(reversed(lrs))
+
+
+# def _get_layer_lrs(learning_rate, layer_decay, n_layers):
+#     """Have lower learning rates for layers closer to the input.
+#     https://github.com/google-research/electra/blob/79111328070e491b287c307906701ebc61091eb2/model/optimization.py#L188-L193
+#
+#     Following the issue opened here:
+#     https://github.com/google-research/electra/issues/51
+#
+#     I have decided to implement the fix instead by reducing the layers added to n_layers.
+#
+#     """
+#
+#     key_to_depths = collections.OrderedDict({
+#         "/embeddings/": 0,
+#         "/embeddings_project/": 0,
+#         "task_specific/": n_layers + 1,
+#     })
+#     for layer in range(n_layers):
+#         key_to_depths["encoder/layer_" + str(layer) + "/"] = layer + 1
+#     return {
+#         key: learning_rate * (layer_decay ** (n_layers + 1 - depth))
+#         for key, depth in key_to_depths.items()
+#     }
 
 
 # ------- HELPER FUNCTION FOR BUILDING THE ELECTRA MODEL FOR PRETRAINING --------

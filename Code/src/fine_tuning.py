@@ -247,7 +247,7 @@ if __name__ == "__main__":
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     print("Device: {}\n".format(config["device"].upper()))
 
-    # get pre-trained model from which to begin finetuning
+    # get pre-trained model from which to begin fine-tuning
     electra_model, _, _, electra_tokenizer, _, model_config, disc_config =\
         build_pretrained_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
 
@@ -261,28 +261,41 @@ if __name__ == "__main__":
     layerwise_learning_rates = get_layer_lrs(config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
 
     # Prepare optimizer and schedule (linear warm up and decay)
-    # no_decay = ["bias", "LayerNorm.weight"]
+    print('hidden layers', disc_config.num_hidden_layers)
 
-    # opt_params = [
-    #     {
-    #         "params": [p for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)],
-    #         "weight_decay": settings["decay"],
-    #     },
-    #     {"params": [p for n, p in electra_for_qa.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
-    # ]
+    opt_params_lrs = {p for n, p in electra_for_qa.named_parameters()}
+    no_decay = ["bias", "LayerNorm", "layer_norm"]
 
-    "lr": 3e-4,
-    "layerwise_lr_decay": 0.8,
-    "max_epochs": 2,  # this is the number of epochs typical for squad
-    "warmup": 0.1,
-    "batch_size": 32,
-    "attention_dropout": 0.1,
-    "dropout": 0.1,
-    "max_length": 128,
-    "decay": 0.0,  # Weight decay if we apply some.
-    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
 
-    optimizer = AdamW(layerwise_learning_rates, eps=config["epsilon"], weight_decay=config["decay"], lr=config["lr"],
+    print([n for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)])
+
+
+    adam_params = [
+        {
+            "params": [p for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)],
+            "weight_decay": config["decay"],
+            "lr": [n.split(".") for n, p in electra_for_qa.named_parameters()]
+        },
+        {
+            "params": [p for n, p in electra_for_qa.named_parameters() if any(nd in n for nd in no_decay)],
+            "weight_decay": 0.0,
+            "lr": config["lr"]
+        },
+    ]
+
+    #
+    # "lr": 3e-4,
+    # "layerwise_lr_decay": 0.8,
+    # "max_epochs": 2,  # this is the number of epochs typical for squad
+    # "warmup": 0.1,
+    # "batch_size": 32,
+    # "attention_dropout": 0.1,
+    # "dropout": 0.1,
+    # "max_length": 128,
+    # "decay": 0.0,  # Weight decay if we apply some.
+    # "epsilon": 1e-8,  # Epsilon for Adam optimizer.
+
+    optimizer = AdamW(adam_params, eps=config["epsilon"], lr=config["lr"],
                       correct_bias=False)
 
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
