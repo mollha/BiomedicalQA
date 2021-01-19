@@ -1,8 +1,8 @@
 from data_processing import *
+from utils import *
 from models import *
 from loss_functions import ELECTRALoss
 from hugdatafast import *
-import numpy as np
 import argparse
 import os
 import torch
@@ -26,65 +26,7 @@ config = {
 }
 
 
-# ----------------- HELPER FUNCTIONS --------------------
-def set_seed(seed_value: int) -> None:
-    """
-    Fix a seed for reproducability.
-    :param seed_value: seed to set
-    :return: None
-    """
-    random.seed(seed_value)
-    np.random.seed(seed_value)
-    torch.manual_seed(seed_value)
-
-
-def update_settings(settings: dict, update: dict) -> dict:
-    """
-    Override config in settings dict with config in update dict. This allows
-    model specific config to be merged with general training settings to create
-    a single dictionary containing configuration.
-    :param settings: dictionary containing general model settings
-    :param update: dictionary containing update settings.
-    :return: merged config dictionary
-    """
-    for key, value in update.items():
-        settings[key] = value
-
-    return settings
-
-
-def get_recent_checkpoint_name(directory, subfolders: list):
-    """
-    Find the name of the most advanced model checkpoint saved in the checkpoints directory.
-    This is the model checkpoint that has been trained the most, so it is the best candidate to
-    start from if no specific checkpoint name was provided to the pre-training loop.
-    :param directory: directory containing model checkpoints.
-    :param subfolders: list of checkpoint directories
-    :return:
-    """
-    directory = str(directory)
-
-    def parse_name(subdir: str):
-        config_str = str(subdir)[str(subdir).find(directory) + len(directory):]
-        first_undsc, second_undsc = config_str.find('_'), config_str.rfind('_')
-        return int(config_str[first_undsc + 1: second_undsc]), int(config_str[second_undsc + 1:])
-
-    max_file, max_epoch, max_step_in_epoch = None, None, None
-    for subdirectory in subfolders:
-        epoch, step = parse_name(subdirectory)
-
-        if max_epoch is None or epoch > max_epoch:
-            max_epoch = epoch
-            max_step_in_epoch = step
-            max_file = subdirectory
-        elif epoch == max_epoch:
-            if step > max_step_in_epoch:
-                max_step_in_epoch = step
-                max_file = subdirectory
-    return max_file
-
-
-def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, config={}):
+def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, config={}):
     """
 
     Note: If we don't pass config and the checkpoint name is valid - config will be populated with
@@ -139,7 +81,7 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
 
     if valid_checkpoint:
         electra_model, optimizer, scheduler, loss_function,\
-        new_config = load_pretrain_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
+        new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
         config = update_settings(config, new_config)
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")
@@ -150,12 +92,10 @@ def build_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_n
 # ---------- DEFINE MAIN PRE-TRAINING LOOP ----------
 def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
     """ Train the model """
-    # Specify which directory model checkpoints should be saved to.
-    # Make the checkpoint directory if it does not exist already.
     model.to(settings["device"])
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
-    print("\n---------- BEGIN TRAINING ----------")
+    print("\n---------- BEGIN PRE-TRAINING ----------")
     sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
                      .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
                              settings["steps_trained"], settings["batch_size"], settings["update_steps"],
@@ -186,6 +126,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
+
         for training_step in range(settings["max_steps"]):
             batch = next(iterable_dataset)
 
@@ -229,10 +170,10 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                                  .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
-                save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+                save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
         loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
-        save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+        save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
@@ -279,7 +220,7 @@ if __name__ == "__main__":
     config = {**model_specific_config, **config}
 
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
-    config, disc_config = build_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
+    config, disc_config = build_pretrained_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])

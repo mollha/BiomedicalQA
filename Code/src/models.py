@@ -8,10 +8,10 @@ import datetime
 import pickle
 import sys
 
-# ------------------ DEFINE CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
+# ------------------ DEFINE PRETRAIN CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
 # i.e. Vanilla ELECTRA Model settings are outlined in the paper: https://arxiv.org/abs/2003.10555
 
-small_config = {
+small_pretrain_config = {
     "mask_prob": 0.15,
     "lr": 5e-4,
     "batch_size": 128,
@@ -21,7 +21,7 @@ small_config = {
     'adam_bias_correction': False
 }
 
-base_config = {
+base_pretrain_config = {
     "mask_prob": 0.15,
     "lr": 2e-4,
     "batch_size": 32,
@@ -32,7 +32,7 @@ base_config = {
     'adam_bias_correction': False
 }
 
-large_config = {
+large_pretrain_config = {
     "mask_prob": 0.25,
     "lr": 2e-4,
     "batch_size": 2048,
@@ -42,8 +42,48 @@ large_config = {
     'adam_bias_correction': False
 }
 
+# ------------------ DEFINE FINETUNE CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
+small_finetune_config = {
+    "lr": 3e-4,
+    "layerwise_lr_decay": 0.8,
+    "max_epochs": 2,  # this is the number of epochs typical for squad
+    "warmup": 0.1,
+    "batch_size": 32,
+    "attention_dropout": 0.1,
+    "dropout": 0.1,
+    "max_length": 128,
+    "decay": 0.0,  # Weight decay if we apply some.
+    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
+}
 
-def get_model_config(model_size: str) -> dict:
+base_finetune_config = {
+    "lr": 2e-4,
+    "layerwise_lr_decay": 0.8,
+    "max_epochs": 2,  # this is the number of epochs typical for squad
+    "warmup": 0.1,
+    "batch_size": 32,
+    "attention_dropout": 0.1,
+    "dropout": 0.1,
+    "max_length": 256,
+    "decay": 0.0,  # Weight decay if we apply some.
+    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
+}
+
+large_finetune_config = {
+    "lr": 2e-4,
+    "layerwise_lr_decay": 0.9,
+    "max_epochs": 2,  # this is the number of epochs typical for squad
+    "warmup": 0.1,
+    "batch_size": 32,
+    "attention_dropout": 0.1,
+    "dropout": 0.1,
+    "max_length": 512,
+    "decay": 0.0,  # Weight decay if we apply some.
+    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
+}
+
+
+def get_model_config(model_size: str, pretrain=True) -> dict:
     """
     Given a model size (e.g. small, base or large), return a dictionary containing the vanilla
     ELECTRA settings for this model, as outlined in the ELECTRA paper.
@@ -56,50 +96,16 @@ def get_model_config(model_size: str) -> dict:
     assert (model_size in ["small", "base", "large"])
 
     index = ['small', 'base', 'large'].index(model_size)
-    return [small_config, base_config, large_config][index]
 
-
-def build_electra_model(model_size: str, get_config=False):
-    base_path = Path(__file__).parent
-
-    # define config for model, discriminator and generator
-    model_config = get_model_config(model_size)
-    discriminator_config = ElectraConfig.from_pretrained(f'google/electra-{model_size}-discriminator')
-    generator_config = ElectraConfig.from_pretrained(f'google/electra-{model_size}-generator')
-
-    # public electra-small model is actually small++ - don't scale down generator size
-    # apply generator size divisor based on optimal size listed in paper.
-    generator_config.hidden_size = int(discriminator_config.hidden_size / model_config["generator_size_divisor"])
-    generator_config.num_attention_heads = discriminator_config.num_attention_heads // model_config[
-        "generator_size_divisor"]
-    generator_config.intermediate_size = discriminator_config.intermediate_size // model_config[
-        "generator_size_divisor"]
-
-    path_to_biotokenizer = os.path.join(base_path, 'tokenization/bio_tokenizer/bio_electra_tokenizer_pubmed_vocab')
-    if os.path.exists(path_to_biotokenizer):
-        sys.stderr.write("Using biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
-        # get tokenizer from save file
-        electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
+    if pretrain:
+        return [small_pretrain_config, base_pretrain_config, large_pretrain_config][index]
     else:
-        sys.stderr.write("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
-        electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
-
-    # create model components e.g. generator and discriminator
-    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{model_size}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config)\
-        .from_pretrained(f'google/electra-{model_size}-discriminator')
-
-    discriminator.electra.embeddings = generator.electra.embeddings
-    generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
-
-    if get_config:
-        return generator, discriminator, electra_tokenizer, discriminator_config
-    return generator, discriminator, electra_tokenizer
+        return [small_finetune_config, base_finetune_config, large_finetune_config][index]
 
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
-def load_pretrain_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                             scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
+def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
+                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -111,7 +117,7 @@ def load_pretrain_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, op
                 ﹂scheduler.pt
                 ﹂train_settings.bin
 
-    :param loss_function: loss function containing training statistics
+    :param device: the device that is currently running the code (in case this differs from saved checkpoint)
     :param path_to_checkpoint: a string pointing to the location of the directory containing a model checkpoint
     :param model: model skeleton to be populated with saved (pre-trained) model state
     :param optimizer: optimizer skeleton to be populated with saved (pre-trained) optimizer state
@@ -150,7 +156,7 @@ def load_pretrain_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, op
     return model, optimizer, scheduler, loss_function, settings
 
 
-def save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
+def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
@@ -185,8 +191,73 @@ def save_pretrain_checkpoint(model, optimizer, scheduler, loss_function, setting
         print("Checkpoint cannot be saved as it already exists - skipping this save.")
 
 
-# --------------------------------------------------------------------------------
+def get_layer_lrs(lr, decay_rate, num_hidden_layers):
+    # lr is the learning rate from config
+    """
+    Get the layer-wise learning rates.
+    :param lr:
+    :param decay_rate:
+    :param num_hidden_layers:
+    :param config:
+    :return:
+    """
 
+    lrs = [lr * (decay_rate ** depth) for depth in range(num_hidden_layers+2)]
+    for i in range(1, len(lrs)):
+        lrs[i] *= decay_rate
+    return list(reversed(lrs))
+
+
+# ------- HELPER FUNCTION FOR BUILDING THE ELECTRA MODEL FOR PRETRAINING --------
+def build_electra_model(model_size: str, get_config=False):
+    """
+    Helper function for creating the base components of the electra model with default configuration.
+
+    :param model_size: e.g. small, base or large
+    :param get_config: whether or not the discriminator's config should be returned. Used for finetuning only.
+    :return: generator, discriminator, tokenizer and (sometimes) discriminator's config.
+    """
+    base_path = Path(__file__).parent
+
+    # define config for model, discriminator and generator
+    model_config = get_model_config(model_size)
+    discriminator_config = ElectraConfig.from_pretrained(f'google/electra-{model_size}-discriminator')
+    generator_config = ElectraConfig.from_pretrained(f'google/electra-{model_size}-generator')
+
+    # public electra-small model is actually small++ - don't scale down generator size
+    # apply generator size divisor based on optimal size listed in paper.
+    generator_config.hidden_size = int(discriminator_config.hidden_size / model_config["generator_size_divisor"])
+    generator_config.num_attention_heads = discriminator_config.num_attention_heads // model_config[
+        "generator_size_divisor"]
+    generator_config.intermediate_size = discriminator_config.intermediate_size // model_config[
+        "generator_size_divisor"]
+
+    path_to_biotokenizer = os.path.join(base_path, 'tokenization/bio_tokenizer/bio_electra_tokenizer_pubmed_vocab')
+    if os.path.exists(path_to_biotokenizer):
+        sys.stderr.write("Using biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
+        # get tokenizer from save file
+        electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
+    else:
+        sys.stderr.write("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
+        electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
+
+    # create model components e.g. generator and discriminator
+    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{model_size}-generator')
+    discriminator = ElectraForPreTraining(discriminator_config) \
+        .from_pretrained(f'google/electra-{model_size}-discriminator')
+
+    discriminator.electra.embeddings = generator.electra.embeddings
+    generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
+
+    if get_config:
+        return generator, discriminator, electra_tokenizer, discriminator_config
+    return generator, discriminator, electra_tokenizer
+
+
+# --------- CLASS DEFINING THE ELECTRA MODEL -----------
+# This implementation is adapted from the "PyTorch implementation of ELECTRA" implementation given at:
+# https://github.com/richarddwang/electra_pytorch/blob/master/pretrain.py#L261
+# All rights reserved by Richard Wang.
 
 class ELECTRAModel(nn.Module):
 

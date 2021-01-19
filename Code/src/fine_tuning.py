@@ -2,11 +2,16 @@ import torch
 import random
 import argparse
 import os
+import sys
 from pathlib import Path
+from tqdm import trange
+from models import get_model_config, get_layer_lrs
 import numpy as np
+from utils import *
 from glob import glob
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
-from pre_training import build_from_checkpoint
+from transformers import AdamW, get_linear_schedule_with_warmup
+from pre_training import build_pretrained_from_checkpoint
 # from run_factoid import train, evaluate
 
 from transformers import (
@@ -20,8 +25,9 @@ from transformers import (
 
 # Ensure that lowercase model is used for model_type
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
+# hyperparameters are mostly the same for large models as base models - except for a few
+
 config = {
-    "batch_size": 8,
     "learning_rate": 8e-6,  # The initial learning rate for Adam.
     "decay": 0.0,  # Weight decay if we apply some.
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
@@ -30,11 +36,22 @@ config = {
     'seed': 0,
     'loss': [],
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 9999,
+    "max_epochs": 2, # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
 }
+
+# Adam's beta 1 and 2 are set to 0.9, and 0.999. They are default values for Adam optimizer.
+finetune_qa_config = {
+    "lr": 2e-4,
+    "batch_size": 32,
+    "max_steps": 400 * 1000,
+    "max_length": 512,
+    "generator_size_divisor": 4,
+    'adam_bias_correction': False
+}
+
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
 datasets = {
@@ -142,18 +159,39 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
 
 # def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
 
-def fine_tune(dataset, qa_model, tokenizer, checkpoint_dir):
+def fine_tune(test_dataset, qa_model, tokenizer, settings, checkpoint_dir):
 
+    qa_model.to(settings["device"])
 
-    qa_model.to(device)
+    # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
+    print("\n---------- BEGIN FINE-TUNING ----------")
+    sys.stderr.write(
+        "\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
+        .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
+                settings["steps_trained"], settings["batch_size"], settings["update_steps"],
+                settings["max_length"]))
 
-
+    qa_model.zero_grad()
 
     # evaluate during training always.
 
+    # Resume training from the epoch we left off at earlier.
+    train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")
+
+    for epoch_number in train_iterator:
+        iterable_dataset = iter(dataset)
 
 
-    pass
+        for training_step in range(settings["max_steps"]):
+
+            # Log metrics
+            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
+                # Only evaluate when single GPU otherwise metrics may not average well
+                # Evaluate all
+
+                save_pretrained()
+
+
 
 
 if __name__ == "__main__":
@@ -184,6 +222,16 @@ if __name__ == "__main__":
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")
 
+    # -- Set torch backend and set seed
+    torch.backends.cudnn.benchmark = torch.cuda.is_available()
+    set_seed(config["seed"])  # set seed for reproducibility
+
+    # -- Override general config with model specific config, for models of different sizes
+    model_specific_config = get_model_config(config['size'], pretrain=False)
+    config = {**model_specific_config, **config}
+
+    print(config)
+
     # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
     checkpoint_name = args.checkpoint
@@ -199,9 +247,9 @@ if __name__ == "__main__":
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     print("Device: {}\n".format(config["device"].upper()))
 
-    # get pre-trained model from which to begin pre-training
-    electra_model, optimizer, scheduler, electra_tokenizer, loss_function, \
-    model_config, disc_config = build_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
+    # get pre-trained model from which to begin finetuning
+    electra_model, _, _, electra_tokenizer, _, model_config, disc_config =\
+        build_pretrained_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
 
     discriminator = electra_model.discriminator
     generator = electra_model.generator
@@ -209,6 +257,41 @@ if __name__ == "__main__":
     electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
                                                                  state_dict=discriminator.state_dict(),
                                                                  config=disc_config)
+
+    layerwise_learning_rates = get_layer_lrs(config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
+
+    # Prepare optimizer and schedule (linear warm up and decay)
+    # no_decay = ["bias", "LayerNorm.weight"]
+
+    # opt_params = [
+    #     {
+    #         "params": [p for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)],
+    #         "weight_decay": settings["decay"],
+    #     },
+    #     {"params": [p for n, p in electra_for_qa.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
+    # ]
+
+    "lr": 3e-4,
+    "layerwise_lr_decay": 0.8,
+    "max_epochs": 2,  # this is the number of epochs typical for squad
+    "warmup": 0.1,
+    "batch_size": 32,
+    "attention_dropout": 0.1,
+    "dropout": 0.1,
+    "max_length": 128,
+    "decay": 0.0,  # Weight decay if we apply some.
+    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
+
+    optimizer = AdamW(layerwise_learning_rates, eps=config["epsilon"], weight_decay=config["decay"], lr=config["lr"],
+                      correct_bias=False)
+
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
+                                                num_training_steps=model_settings["max_steps"])
+
+    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0,
+    #                                             num_training_steps=len(data_loader) // settings["epochs"])
+    #
+
 
     # Load the dataset and prepare it in squad format
 
@@ -230,11 +313,6 @@ if __name__ == "__main__":
     model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
     dataset_info = datasets["bioasq"]
 
-    # device = device("cuda" if torch.cuda.is_available() else "cpu")
-
-    set_seed(0)  # fix seed for reproducibility
-    # model, tokenizer = load_pretrained_model_tokenizer(f'google/electra-{config["size"]}-discriminator',
-    #                                                    uncased_model=False, device=device)
 
     # Training
     if train_model:
@@ -245,10 +323,6 @@ if __name__ == "__main__":
         train(training_set, model, tokenizer, model_info, device, save_dir, config, dataset_info)
 
     # --------------- LOAD FINE-TUNED MODEL AND VOCAB ---------------
-    model = AutoModelForQuestionAnswering.from_pretrained(save_dir)
-    tokenizer = AutoTokenizer.from_pretrained(save_dir, do_lower_case=model_info["uncased"])
-    model.to(device)
-
     # Evaluation - we can ask to evaluate all the checkpoints (sub-directories) in a directory
     if evaluate_model:
         if train_model:
