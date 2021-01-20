@@ -1,16 +1,15 @@
 import torch
-import random
 import argparse
 import os
 from read_data import dataset_to_fc
 import sys
-from datasets import load_dataset
 from pathlib import Path
 from tqdm import trange
 from models import get_model_config, get_layer_lrs
 import numpy as np
 from utils import *
 from glob import glob
+from data_processing import convert_examples_to_features
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pre_training import build_pretrained_from_checkpoint
@@ -366,8 +365,13 @@ if __name__ == "__main__":
         raise KeyError("The dataset '{}' is not contained in the dataset_to_fc map.".format(selected_dataset))
 
     dataset_file_path = (base_checkpoint_dir / '../datasets/{}/{}'.format(selected_dataset, dataset_file_name)).resolve()
-    read_raw_dataset = dataset_function(dataset_file_path)
 
+    print("Reading raw dataset: '{}'".format(dataset_file_name))
+    read_raw_dataset = dataset_function(dataset_file_path)
+    print("Converting raw text to features.".format(dataset_file_name))
+    convert_examples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
+
+    quit()
     print(read_raw_dataset)
 
 

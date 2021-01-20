@@ -11,7 +11,7 @@ def read_squad(path_to_file: Path):
     This function is adapted from the Huggingface squad tutorial at:
     https://huggingface.co/transformers/custom_datasets.html#qa-squad
     :param path_to_file: path to file containing squad data
-    :return:
+    :return: a list containing a dictionary for each context, question and answer triple.
     """
 
     def add_end_idx(answer, context):
@@ -47,6 +47,97 @@ def read_squad(path_to_file: Path):
     return dataset
 
 
+def read_bioasq(path_to_file: Path):
+
+    path = Path(path_to_file)
+    with open(path, 'rb') as f:
+        bioasq_dict = json.load(f)
+
+    def process_factoid(data):
+        sub_dataset = []
+        question = data["body"]
+        answer = data["exact_answer"]
+        snippets = data["snippets"]
+        print('type', data["type"])
+
+        for snippet in snippets:
+            context = snippet["text"]
+            sub_dataset.append({"context": context, "question": question, "answer": answer})
+
+        print(sub_dataset)
+        return sub_dataset
+
+    def process_list():
+        pass
+
+    def process_yesno():
+        pass
+
+    fc_map = {
+        "factoid": process_factoid,
+        "yesno": process_yesno,
+        # "list": process_list,
+    }
+
+    dataset = []
+
+    for data_point in bioasq_dict['questions']:
+        question_type = data_point["type"]
+
+        # todo remove
+        if question_type in ['list', 'yesno', 'summary']:
+            continue
+
+
+        try:
+            fc = fc_map[question_type]
+        except KeyError:
+            if question_type == "summary":  # summary questions not required
+                continue
+            raise KeyError("Question type {} is not in fc_map".format_map(question_type))
+
+        context_answer_pairs = fc(data_point)
+        dataset.extend(context_answer_pairs)
+        break
+
+        # for snippet in snippets:
+        #     print(snippet)
+        #     context = snippet["text"]
+        #     print(data_point["exact_answer"])
+        #     # answer = fc()
+        #     # dataset.append({"context": context, "question": question, "answer": answer})
+        #
+        # # for snippet in data_point["snippets"]:
+        # #     context =
+        #
+        # context = passage['context']
+        # for qa in passage['qas']:
+        #     question = qa['question']
+        #     for answer in qa['answers']:
+        #         add_end_idx(answer, context)
+        #         dataset.append({"context": context, "question": question, "answer": answer})
+        #
+        #
+        # print("body", data_point["body"])
+        # print("documents", data_point["documents"])
+        # print("ideal_answer", data_point["ideal_answer"])
+        # print("concepts", data_point["concepts"])
+        # print("type", data_point["type"])
+        # print("id", data_point["id"])
+
+
+    # snippets = question["snippets"]
+    # question_type = question["type"]
+    # question_answer = question["type"]
+
+    # print(bioasq_dict)
+    # print("Keys", bioasq_dict.keys())
+
+    # print(questions)
+
+
+
+
 def add_token_positions(encodings, answers):
     start_positions = []
     end_positions = []
@@ -65,22 +156,40 @@ def add_token_positions(encodings, answers):
 
 
 dataset_to_fc = {
-    "squad": read_squad
+    "squad": read_squad,
+    "bioasq": read_bioasq
 }
 
 
 if __name__ == "__main__":
     # todo delete this section after testing
+    # base_path = Path(__file__).parent
+    # squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
+    # data = read_squad(squad_dir)
+    # print("length of data", len(data))
+    #
+    # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+    # train_contexts = [d["context"] for d in data]
+    # train_questions = [d["question"] for d in data]
+    # train_answers = [d["answer"] for d in data]
+    #
+    # train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
+    # add_token_positions(train_encodings, train_answers)
+    # # print(train_encodings)
+
     base_path = Path(__file__).parent
-    squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
-    data = read_squad(squad_dir)
-    print("length of data", len(data))
+    data_dir = (base_path / '../datasets/bioasq/training8b.json').resolve()
+    data = read_bioasq(data_dir)
+    # print("length of data", len(data))
 
-    tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
-    train_contexts = [d["context"] for d in data]
-    train_questions = [d["question"] for d in data]
-    train_answers = [d["answer"] for d in data]
-
-    train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
-    add_token_positions(train_encodings, train_answers)
+    # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+    # train_contexts = [d["context"] for d in data]
+    # train_questions = [d["question"] for d in data]
+    # train_answers = [d["answer"] for d in data]
+    #
+    # train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
+    # add_token_positions(train_encodings, train_answers)
     # print(train_encodings)
+
+
+

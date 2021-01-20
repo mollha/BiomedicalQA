@@ -7,6 +7,45 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
 import random
 
+def convert_examples_to_features(examples, tokenizer, max_length):
+    # todo remove
+    maximum = 5
+    count = 0
+
+    for example_triple in examples:
+        print("\nExample triple", example_triple)
+        tokenized_context = tokenizer.tokenize(example_triple["context"])
+        print("Tokenized context", tokenized_context)
+        tokenized_question = tokenizer.tokenize(example_triple["question"])
+        print("Tokenized question", tokenized_question)
+
+        if len(tokenized_question) > max_length:
+            tokenized_question = tokenized_question[0:max_length]
+            print("Trimmed tokenized question", tokenized_question)
+
+        tok_to_orig_index = []
+        orig_to_tok_index = []
+        all_context_tokens = []
+
+        for i, token in enumerate(tokenized_context):
+            # print("i", i)
+            # print("token", token)
+            orig_to_tok_index.append(len(all_context_tokens))
+            sub_tokens = tokenizer.tokenize(token)
+
+            for sub_token in sub_tokens:
+                tok_to_orig_index.append(i)
+                all_context_tokens.append(sub_token)
+
+        if count > maximum:
+            break
+        count += 1
+
+
+
+
+
+
 
 # ------------ FINE-TUNING PYTORCH DATASETS ------------
 class SquadDataset(Dataset):
