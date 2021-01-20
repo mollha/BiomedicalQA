@@ -1,13 +1,13 @@
 import json
-import pathlib
+from pathlib import Path
 
 
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------
-def read_squad(path_to_file: pathlib.Path):
+def read_squad(path_to_file: Path):
     """
     Read the squad data into three categories of contexts, questions and answers
 
-    This function is taken from the Hugginface SQuAD tutorial at:
+    This function is adapted from the Huggingface SQuAD tutorial at:
     https://huggingface.co/transformers/custom_datasets.html#qa-squad
     :param path_to_file: path to file containing squad data
     :return:
@@ -28,7 +28,7 @@ def read_squad(path_to_file: pathlib.Path):
             answer['answer_start'] = start_idx - 2
             answer['answer_end'] = end_idx - 2  # When the gold label is off by two characters
 
-    path = pathlib.Path(path_to_file)
+    path = Path(path_to_file)
     with open(path, 'rb') as f:
         squad_dict = json.load(f)
 
@@ -45,5 +45,13 @@ def read_squad(path_to_file: pathlib.Path):
 
 
     return dataset
+
+
+if __name__ == "__main__":
+    # todo delete this section after testing
+    base_path = Path(__file__).parent
+    squad_dir = (base_path / '../datasets/SQuAD/dev-v2.0.json').resolve()
+    data = read_squad(squad_dir)
+    print("data", data)
 
 
