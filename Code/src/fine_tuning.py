@@ -3,6 +3,7 @@ import random
 import argparse
 import os
 import sys
+from datasets import load_dataset
 from pathlib import Path
 from tqdm import trange
 from models import get_model_config, get_layer_lrs
@@ -58,27 +59,11 @@ datasets = {
     "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
                "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
                "official_eval_dir": "./scripts/bioasq_eval"},
+    "squad": {
+dataset = load_dataset("squad_v2")
+
+    }
 }
-
-
-def set_seed(seed_value):
-    random.seed(seed_value)
-    np.random.seed(seed_value)
-    torch.manual_seed(seed_value)
-
-
-def load_pretrained_model_tokenizer(model_path, uncased_model, device):
-    # Load pre-trained model and tokenizer
-    # pre-trained config name or path if not the same as model_name
-    config = AutoConfig.from_pretrained(model_path)
-    # model_path same as tokenizer name
-    tokenizer = AutoTokenizer.from_pretrained(model_path, do_lower_case=uncased_model)
-    model = AutoModelForQuestionAnswering.from_pretrained(model_path, from_tf=bool(".ckpt" in model_path),
-                                                          config=config)
-
-    model.to(device)
-    return model, tokenizer
-
 
 def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, output_examples=False):
     overwrite_cached_features = True
@@ -191,6 +176,77 @@ def fine_tune(test_dataset, qa_model, tokenizer, settings, checkpoint_dir):
 
                 save_pretrained()
 
+    # start the training loop
+    for epoch_number in train_iterator:
+        epoch_iterator = tqdm(data_loader, desc="Iteration")
+
+        for step, batch in enumerate(epoch_iterator):
+            print(type(batch))
+            print("batch size", len(batch))
+
+            # Skip past any already trained steps if resuming training
+            if steps_trained_in_current_epoch > 0:
+                steps_trained_in_current_epoch -= 1
+                continue
+
+            # train model one step
+            model.train()
+            batch = tuple(t.to(device) for t in batch)
+
+            inputs = {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "token_type_ids": batch[2],
+                "start_positions": batch[3],
+                "end_positions": batch[4],
+            }
+
+            if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
+                del inputs["token_type_ids"]
+
+            if "electra" in ["xlnet", "xlm"]:
+                inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
+                if version_2_with_negative:
+                    inputs.update({"is_impossible": batch[7]})
+                if hasattr(model, "config") and hasattr(model.config, "lang2id"):
+                    inputs.update(
+                        {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
+                    )
+
+            outputs = model(**inputs)
+
+            # model outputs are always tuple in transformers (see doc)
+            loss = outputs[0]
+            loss.backward()
+
+            tr_loss += loss.item()
+
+            if (step + 1) % 1 == 0:
+                nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
+                global_step += 1
+
+                optimizer.step()
+                scheduler.step()  # Update learning rate schedule
+                model.zero_grad()
+
+                # Log metrics
+                if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
+                    # Only evaluate when single GPU otherwise metrics may not average well
+                    # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
+                    if settings["evaluate_all_checkpoints"]:
+                        results = evaluate(model, tokenizer, "electra", save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
+
+                    logging_loss = tr_loss
+
+                # Save model checkpoint
+                if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
+                    save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
+
+    # ------------- SAVE FINE-TUNED MODEL -------------
+    save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
+
+
+
 
 
 
@@ -271,34 +327,8 @@ if __name__ == "__main__":
         lr = layerwise_learning_rates[n]
         layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
 
-    # adam_params = [
-    #     {
-    #         "params": [p for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)],
-    #         "weight_decay": config["decay"],
-    #         "lr": [n.split(".") for n, p in electra_for_qa.named_parameters()]
-    #     },
-    #     {
-    #         "params": [p for n, p in electra_for_qa.named_parameters() if any(nd in n for nd in no_decay)],
-    #         "weight_decay": 0.0,
-    #         "lr": config["lr"]
-    #     },
-    # ]
-
-    #
-    # "lr": 3e-4,
-    # "layerwise_lr_decay": 0.8,
-    # "max_epochs": 2,  # this is the number of epochs typical for squad
-    # "warmup": 0.1,
-    # "batch_size": 32,
-    # "attention_dropout": 0.1,
-    # "dropout": 0.1,
-    # "max_length": 128,
-    # "decay": 0.0,  # Weight decay if we apply some.
-    # "epsilon": 1e-8,  # Epsilon for Adam optimizer.
-
-    # total_training_steps = len(data_loader) // config["max_epochs"]
+    # todo total_training_steps = len(data_loader) // config["max_epochs"]
     total_training_steps = 4000 # todo remove this made up num
-
 
     optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
@@ -306,16 +336,9 @@ if __name__ == "__main__":
                                                 num_training_steps=-1)
     # todo check if num_training_steps should not be -1
 
-    # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0,
-    #                                             num_training_steps=len(data_loader) // settings["epochs"])
-    #
-
 
     # Load the dataset and prepare it in squad format
-
-
     qa_dataset_squad_format = {}
-    print("Got quite far.")
 
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(qa_dataset_squad_format, electra_for_qa, electra_tokenizer, finetune_checkpoint_dir)
