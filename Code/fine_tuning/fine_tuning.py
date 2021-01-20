@@ -37,7 +37,7 @@ eval_settings = {
     "eval_batch_size": 12,
     "n_best_size": 20,  # The total number of n-best predictions to generate in the nbest_predictions.json output file.
     "max_answer_length": 30,  # maximum length of a generated answer
-    "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
+    "version_2_with_negative": False,  # If true, the squad examples contain some that do not have an answer.
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
@@ -133,7 +133,7 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
                 raise ImportError("If not data_dir is specified, tensorflow_datasets needs to be installed.")
 
             if version_2_with_negative:
-                print("tensorflow_datasets does not handle version 2 of SQuAD.")
+                print("tensorflow_datasets does not handle version 2 of squad.")
 
             tfds_examples = tfds.load("squad")
             examples = SquadV1Processor().get_examples_from_dataset(tfds_examples, evaluate=evaluate)

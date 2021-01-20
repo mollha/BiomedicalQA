@@ -2,6 +2,7 @@ import torch
 import random
 import argparse
 import os
+from read_data import dataset_to_fc
 import sys
 from datasets import load_dataset
 from pathlib import Path
@@ -55,15 +56,26 @@ finetune_qa_config = {
 
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
-datasets = {
-    "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-               "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
-               "official_eval_dir": "./scripts/bioasq_eval"},
-    "squad": {
-dataset = load_dataset("squad_v2")
+# datasets = {
+#     "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+#                "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
+#                "official_eval_dir": "./scripts/bioasq_eval"},
+#     "squad": {
+# dataset = load_dataset("squad_v2")
+#
+#     }
+# }
 
+datasets = {
+    # "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
+    #            "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
+    #            "official_eval_dir": "./scripts/bioasq_eval"},
+    "squad": {
+        "train": "train-v2.0.json",
+        "test": "dev-v2.0.json",
     }
 }
+
 
 def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, output_examples=False):
     overwrite_cached_features = True
@@ -109,7 +121,7 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
                 raise ImportError("If not data_dir is specified, tensorflow_datasets needs to be installed.")
 
             if version_2_with_negative:
-                print("tensorflow_datasets does not handle version 2 of SQuAD.")
+                print("tensorflow_datasets does not handle version 2 of squad.")
 
             tfds_examples = tfds.load("squad")
             examples = SquadV1Processor().get_examples_from_dataset(tfds_examples, evaluate=evaluate)
@@ -252,7 +264,7 @@ def fine_tune(test_dataset, qa_model, tokenizer, settings, checkpoint_dir):
 
 if __name__ == "__main__":
     # Log the process ID
-    print(f"Process ID: {os.getpid()}")
+    print(f"Process ID: {os.getpid()}\n")
 
     # -- Parse command line arguments (checkpoint name and model size)
     parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
@@ -263,12 +275,18 @@ if __name__ == "__main__":
         type=str,
         help="The size of the electra model e.g. 'small', 'base' or 'large",
     )
-
     parser.add_argument(
         "--checkpoint",
         default="recent",
         type=str,
         help="The name of the pre-training checkpoint to use e.g. small_15_10230",
+    )
+    parser.add_argument(
+        "--dataset",
+        default="squad",
+        choices=['squad'],
+        type=str,
+        help="The name of the dataset to use in training e.g. squad",
     )
     args = parser.parse_args()
     config['size'] = args.size
@@ -286,15 +304,15 @@ if __name__ == "__main__":
     model_specific_config = get_model_config(config['size'], pretrain=False)
     config = {**model_specific_config, **config}
 
-    print(config)
-
     # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
     checkpoint_name = args.checkpoint
+    selected_dataset = args.dataset.lower()
 
     base_checkpoint_dir = (base_path / '../checkpoints').resolve()
     pretrain_checkpoint_dir = (base_checkpoint_dir / 'pretrain').resolve()
     finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
+    dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
 
     # create the finetune directory if it doesn't exist already
     Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)
@@ -336,8 +354,25 @@ if __name__ == "__main__":
                                                 num_training_steps=-1)
     # todo check if num_training_steps should not be -1
 
+    # -- Load the data and prepare it in squad format
+    try:
+        dataset_file_name = datasets[selected_dataset]["train"]
+    except KeyError:
+        raise KeyError("The dataset '{}' in {} does not contain a 'train' key.".format(selected_dataset, datasets))
 
-    # Load the dataset and prepare it in squad format
+    try:
+        dataset_function = dataset_to_fc[selected_dataset]
+    except KeyError:
+        raise KeyError("The dataset '{}' is not contained in the dataset_to_fc map.".format(selected_dataset))
+
+    dataset_file_path = (base_checkpoint_dir / '../datasets/{}/{}'.format(selected_dataset, dataset_file_name)).resolve()
+    read_raw_dataset = dataset_function(dataset_file_path)
+
+    print(read_raw_dataset)
+
+
+
+
     qa_dataset_squad_format = {}
 
     # ------ START THE FINE-TUNING LOOP ------

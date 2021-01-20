@@ -6,7 +6,7 @@ config = {
     "eval_batch_size": 12,
     "n_best_size": 20,  # The total number of n-best predictions to generate in the nbest_predictions.json output file.
     "max_answer_length": 30,  # maximum length of a generated answer
-    "version_2_with_negative": False,  # If true, the SQuAD examples contain some that do not have an answer.
+    "version_2_with_negative": False,  # If true, the squad examples contain some that do not have an answer.
 }
 
 def evaluate(finetuned_model, test_dataset):

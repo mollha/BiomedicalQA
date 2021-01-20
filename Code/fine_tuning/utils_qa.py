@@ -198,7 +198,7 @@ def eval_bioasq_standard(task_num, outfile, golden, cwd):
     return result
 
 def read_squad_examples(input_file, is_training):
-    """Read a SQuAD json file into a list of SquadExample."""
+    """Read a squad json file into a list of SquadExample."""
     is_bioasq=True # for BioASQ
 
     with open(input_file, "r") as reader:

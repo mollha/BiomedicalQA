@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from transformers import DistilBertTokenizerFast
 
 
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------
@@ -7,7 +8,7 @@ def read_squad(path_to_file: Path):
     """
     Read the squad data into three categories of contexts, questions and answers
 
-    This function is adapted from the Huggingface SQuAD tutorial at:
+    This function is adapted from the Huggingface squad tutorial at:
     https://huggingface.co/transformers/custom_datasets.html#qa-squad
     :param path_to_file: path to file containing squad data
     :return:
@@ -43,15 +44,43 @@ def read_squad(path_to_file: Path):
                     add_end_idx(answer, context)
                     dataset.append({"context": context, "question": question, "answer": answer})
 
-
     return dataset
+
+
+def add_token_positions(encodings, answers):
+    start_positions = []
+    end_positions = []
+    for i in range(len(answers)):
+        start_positions.append(encodings.char_to_token(i, answers[i]['answer_start']))
+        end_positions.append(encodings.char_to_token(i, answers[i]['answer_end']))
+
+        # if start position is None, the answer passage has been truncated
+        if start_positions[-1] is None:
+            start_positions[-1] = tokenizer.model_max_length
+
+        # if end position is None, the 'char_to_token' function points to the space before the correct token - > add + 1
+        if end_positions[-1] is None:
+            end_positions[-1] = encodings.char_to_token(i, answers[i]['answer_end'] + 1)
+    encodings.update({'start_positions': start_positions, 'end_positions': end_positions})
+
+
+dataset_to_fc = {
+    "squad": read_squad
+}
 
 
 if __name__ == "__main__":
     # todo delete this section after testing
     base_path = Path(__file__).parent
-    squad_dir = (base_path / '../datasets/SQuAD/dev-v2.0.json').resolve()
+    squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
     data = read_squad(squad_dir)
-    print("data", data)
+    print("length of data", len(data))
 
+    tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+    train_contexts = [d["context"] for d in data]
+    train_questions = [d["question"] for d in data]
+    train_answers = [d["answer"] for d in data]
 
+    train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
+    add_token_positions(train_encodings, train_answers)
+    # print(train_encodings)

@@ -54,7 +54,7 @@ def to_list(tensor):
 
 class YesNoResult(object):
     """
-    Constructs a SquadResult which can be used to evaluate a model's output on the SQuAD dataset.
+    Constructs a SquadResult which can be used to evaluate a model's output on the squad dataset.
     Args:
         unique_id: The unique identifier corresponding to that example.
         logits: yes/no logit
@@ -432,13 +432,13 @@ def main():
         "--train_file",
         default=None,
         type=str,
-        help="SQuAD json for training. E.g., train-v1.1.json"
+        help="squad json for training. E.g., train-v1.1.json"
     )
     parser.add_argument(
         "--predict_file",
         default=None,
         type=str,
-        help="SQuAD json for predictions. E.g., dev-v1.1.json or test-v1.1.json"
+        help="squad json for predictions. E.g., dev-v1.1.json or test-v1.1.json"
     )
     parser.add_argument(
         "--do_lower_case",
