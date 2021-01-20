@@ -49,7 +49,7 @@ small_finetune_config = {
     "lr": 3e-4,
     "layerwise_lr_decay": 0.8,
     "max_epochs": 2,  # this is the number of epochs typical for squad
-    "warmup": 0.1,
+    "warmup_fraction": 0.1,
     "batch_size": 32,
     "attention_dropout": 0.1,
     "dropout": 0.1,
@@ -62,7 +62,7 @@ base_finetune_config = {
     "lr": 2e-4,
     "layerwise_lr_decay": 0.8,
     "max_epochs": 2,  # this is the number of epochs typical for squad
-    "warmup": 0.1,
+    "warmup_fraction": 0.1,
     "batch_size": 32,
     "attention_dropout": 0.1,
     "dropout": 0.1,
@@ -75,7 +75,7 @@ large_finetune_config = {
     "lr": 2e-4,
     "layerwise_lr_decay": 0.9,
     "max_epochs": 2,  # this is the number of epochs typical for squad
-    "warmup": 0.1,
+    "warmup_fraction": 0.1,
     "batch_size": 32,
     "attention_dropout": 0.1,
     "dropout": 0.1,
@@ -215,11 +215,6 @@ def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):
     return {n: lr * (decay_rate ** get_depth(n)) for n, p in parameters}
 
 
-
-    lrs = [lr * (decay_rate ** (num_hidden_layers + 1 - depth)) for depth in range(num_hidden_layers + 1)]
-    for i in range(1, len(lrs)):
-        lrs[i] *= decay_rate
-    return list(reversed(lrs))
 
 
 # def _get_layer_lrs(learning_rate, layer_decay, n_layers):

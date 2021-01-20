@@ -258,30 +258,31 @@ if __name__ == "__main__":
                                                                  state_dict=discriminator.state_dict(),
                                                                  config=disc_config)
 
-    layerwise_learning_rates = get_layer_lrs(config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
+    layerwise_learning_rates = get_layer_lrs(electra_for_qa.named_parameters(),
+                                             config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
 
     # Prepare optimizer and schedule (linear warm up and decay)
-    print('hidden layers', disc_config.num_hidden_layers)
-
-    opt_params_lrs = {p for n, p in electra_for_qa.named_parameters()}
     no_decay = ["bias", "LayerNorm", "layer_norm"]
 
+    # todo check if lr should be dependent on non-zero wd
+    layerwise_params = []
+    for n, p in electra_for_qa.named_parameters():
+        wd = config["decay"] if not any(nd in n for nd in no_decay) else 0
+        lr = layerwise_learning_rates[n]
+        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
 
-    print([n for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)])
-
-
-    adam_params = [
-        {
-            "params": [p for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": config["decay"],
-            "lr": [n.split(".") for n, p in electra_for_qa.named_parameters()]
-        },
-        {
-            "params": [p for n, p in electra_for_qa.named_parameters() if any(nd in n for nd in no_decay)],
-            "weight_decay": 0.0,
-            "lr": config["lr"]
-        },
-    ]
+    # adam_params = [
+    #     {
+    #         "params": [p for n, p in electra_for_qa.named_parameters() if not any(nd in n for nd in no_decay)],
+    #         "weight_decay": config["decay"],
+    #         "lr": [n.split(".") for n, p in electra_for_qa.named_parameters()]
+    #     },
+    #     {
+    #         "params": [p for n, p in electra_for_qa.named_parameters() if any(nd in n for nd in no_decay)],
+    #         "weight_decay": 0.0,
+    #         "lr": config["lr"]
+    #     },
+    # ]
 
     #
     # "lr": 3e-4,
@@ -295,11 +296,15 @@ if __name__ == "__main__":
     # "decay": 0.0,  # Weight decay if we apply some.
     # "epsilon": 1e-8,  # Epsilon for Adam optimizer.
 
-    optimizer = AdamW(adam_params, eps=config["epsilon"], lr=config["lr"],
-                      correct_bias=False)
+    # total_training_steps = len(data_loader) // config["max_epochs"]
+    total_training_steps = 4000 # todo remove this made up num
 
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
-                                                num_training_steps=model_settings["max_steps"])
+
+    optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
+    scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                num_warmup_steps=int(total_training_steps * config["warmup_fraction"]),
+                                                num_training_steps=-1)
+    # todo check if num_training_steps should not be -1
 
     # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0,
     #                                             num_training_steps=len(data_loader) // settings["epochs"])
@@ -310,6 +315,7 @@ if __name__ == "__main__":
 
 
     qa_dataset_squad_format = {}
+    print("Got quite far.")
 
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(qa_dataset_squad_format, electra_for_qa, electra_tokenizer, finetune_checkpoint_dir)
