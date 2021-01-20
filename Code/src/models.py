@@ -51,8 +51,8 @@ small_finetune_config = {
     "max_epochs": 2,  # this is the number of epochs typical for squad
     "warmup_fraction": 0.1,
     "batch_size": 32,
-    "attention_dropout": 0.1,
-    "dropout": 0.1,
+    "attention_dropout": 0.1,  # default value is this, so it's not really necessary
+    "dropout": 0.1,  # default value is this, so it's not really necessary
     "max_length": 128,
     "decay": 0.0,  # Weight decay if we apply some.
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
@@ -64,8 +64,8 @@ base_finetune_config = {
     "max_epochs": 2,  # this is the number of epochs typical for squad
     "warmup_fraction": 0.1,
     "batch_size": 32,
-    "attention_dropout": 0.1,
-    "dropout": 0.1,
+    "attention_dropout": 0.1,  # default value is this, so it's not really necessary
+    "dropout": 0.1,  # default value is this, so it's not really necessary
     "max_length": 256,
     "decay": 0.0,  # Weight decay if we apply some.
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
@@ -77,8 +77,8 @@ large_finetune_config = {
     "max_epochs": 2,  # this is the number of epochs typical for squad
     "warmup_fraction": 0.1,
     "batch_size": 32,
-    "attention_dropout": 0.1,
-    "dropout": 0.1,
+    "attention_dropout": 0.1,  # default value is this, so it's not really necessary
+    "dropout": 0.1,  # default value is this, so it's not really necessary
     "max_length": 512,
     "decay": 0.0,  # Weight decay if we apply some.
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
