@@ -48,21 +48,89 @@ def read_squad(path_to_file: Path):
 
 
 def read_bioasq(path_to_file: Path):
+    """
+    Read the bioasq data into three categories of contexts, questions and answers.
+    BioASQ contexts are different than SQuAD, as they are a combination of articles and snippets.
 
-    path = Path(path_to_file)
-    with open(path, 'rb') as f:
+    Need to create question-passage pairs
+    {
+        "id": ,
+        "question": ,
+        "context": ,
+        "answer": ,
+    }
+
+    :param path_to_file: path to file containing squad data
+    :return: a list containing a dictionary for each context, question and answer triple.
+    """
+
+    with open(path_to_file, 'rb') as f:
         bioasq_dict = json.load(f)
 
+    articles_file_name = "pubmed_{}".format(str(path_to_file).split('/').pop())
+    articles_file_path = Path(path_to_file / '../{}'.format(articles_file_name)).resolve()
+
+    with open(articles_file_path, 'rb') as f:
+        articles_dict = json.load(f)
+
+
     def process_factoid(data):
-        sub_dataset = []
+        question_id = data["id"]
         question = data["body"]
         answer = data["exact_answer"]
         snippets = data["snippets"]
+
+        print("id", question_id)
         print('type', data["type"])
 
         for snippet in snippets:
+            article_id = snippet["document"].split('/').pop()
+            section = snippet["beginSection"] if snippet["beginSection"] != "sections.0" else "abstract"
+
+            if snippet["beginSection"] != snippet["endSection"]:
+                raise Exception('{} is not {}'.format(snippet["beginSection"], snippet["endSection"]))
+
+
+            try:
+                article = articles_dict[article_id]
+                # todo is it ok that some articles aren't here?
+            except KeyError:
+                continue
+
+            print(article)
+            print("section name", section)
+            paragraph = article[section]
+            print(paragraph)
+
+            beginOffset, endOffset = int(snippet["offsetInBeginSection"]), int(snippet["offsetInEndSection"])
+            print('\nclipped section:', paragraph[beginOffset:endOffset])
+
+            print('exact answer:', answer)
+            print("begin", snippet["beginSection"])
+            print("end", snippet["endSection"])
+
+
+
+            # print('offsetInEnd', snippet["offsetInEndSection"])
+            # print('offsetInBegin', snippet["offsetInBeginSection"])
+            # print('snippet', snippet["text"])
+            # print('length of text', len(snippet["text"]))
+            print('keys', snippet.keys())
+            print(article_id)
+            print("docs", snippet["document"])
+
+
+
+
+        sub_dataset = []
+
+
+        for snippet in snippets:
             context = snippet["text"]
-            sub_dataset.append({"context": context, "question": question, "answer": answer})
+            sub_dataset.append({"id": question_id,
+                                "context": context,
+                                "question": question,
+                                "answer": answer})
 
         print(sub_dataset)
         return sub_dataset
@@ -98,7 +166,7 @@ def read_bioasq(path_to_file: Path):
 
         context_answer_pairs = fc(data_point)
         dataset.extend(context_answer_pairs)
-        break
+
 
         # for snippet in snippets:
         #     print(snippet)

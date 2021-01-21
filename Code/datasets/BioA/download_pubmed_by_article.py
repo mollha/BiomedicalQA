@@ -20,6 +20,10 @@ def download_data(api_key: str, snippet_list: list):
     list_of_ids = [x["pmid"] for x in snippet_list]
     id_string = ",".join(list_of_ids)
 
+    #todo remove
+    if "27822311" not in list_of_ids:
+        return {}
+
     # post
     post_page = requests.get(base_command + post_command.format(id_string, api_key))
     post_tree = et.ElementTree(et.fromstring(post_page.text))
@@ -32,14 +36,35 @@ def download_data(api_key: str, snippet_list: list):
     fetch_tree = et.ElementTree(et.fromstring(fetch_page.text))
     fetch_root = fetch_tree.getroot()
     pubmed_article_tags = fetch_root.findall('PubmedArticle')
+    print(pubmed_article_tags[0])
 
     article_map = {}
 
     for pubmed_article_tag in pubmed_article_tags:
+
+        # print(pubmed_article_tag.getchildren())
+        article_ids = pubmed_article_tag.find('PubmedData').find('ArticleIdList').findall('ArticleId')
+        pm_id = [a_id.text for a_id in article_ids][0]
+        # print([a_id.text for a_id in article_ids][0])
+
+        # if "27822311" != pm_id:
+        #     continue
+
+        medline_citation = pubmed_article_tag.find('MedlineCitation')
+        article = medline_citation.find('Article')
+        # abstract =
+        article_title = ''.join(article.find('ArticleTitle').itertext())
+
+        print("title", article_title)
+
+
+
         article_tag = pubmed_article_tag.find('MedlineCitation').find('Article')
         article_id_tag = pubmed_article_tag.find('PubmedData').find('ArticleIdList').findall('ArticleId')
 
-        pm_id = [x for x in article_id_tag if x.get("IdType") == "pubmed"].pop().text
+        # pm_id = [x for x in article_id_tag if x.get("IdType") == "pubmed"].pop().text
+
+
         title = "" if article_tag is None else article_tag.find('ArticleTitle').text
 
         try:
@@ -48,7 +73,7 @@ def download_data(api_key: str, snippet_list: list):
             print('No abstract present - replacing this abstract with " "')
             abstract = ""
 
-        article_map[pm_id] = {"abstract": abstract, "title": title}
+        article_map[pm_id] = {"abstract": abstract, "title": article_title}
     return article_map
 
 
@@ -87,7 +112,7 @@ if __name__ == "__main__":
         pm_data = download_data(api_key, snippet)
         data_dict = {**data_dict, **pm_data}
 
-    print(data_dict)
+    # print(data_dict)
 
     with open((path_to_data / ("pubmed_" + json_file)).resolve(), 'w') as outfile:
         json.dump(data_dict, outfile)
