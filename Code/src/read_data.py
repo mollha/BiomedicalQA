@@ -93,7 +93,7 @@ def read_bioasq(path_to_file: Path):
 
             try:
                 article = articles_dict[article_id]
-                # todo is it ok that some articles aren't here?
+                # todo is it ok that some articles aren't here? probably not - let's try and find them.
             except KeyError:
                 continue
 
