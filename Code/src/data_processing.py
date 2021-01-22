@@ -33,7 +33,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             start = -1
             end = -1
         elif is_training and not is_impossible: # only during training
-
+            pass
 
 
 

@@ -1,6 +1,31 @@
 import json
 from pathlib import Path
+import re
 from transformers import DistilBertTokenizerFast
+from spacy.lang.en import English
+import spacy
+import string
+from spacy.matcher import PhraseMatcher, Matcher
+from spacy.lang.en.stop_words import STOP_WORDS
+
+nlp = spacy.load('en_core_web_sm')
+
+
+class SQuADExample:
+    def __init__(self, question_id, question, short_context, full_context, answer, answer_start, answer_end,
+                 is_impossible):
+        self._question_id = question_id
+        self._question = question
+        self._short_context = short_context
+        self._full_context = full_context
+        self._answer = answer
+        self._answer_start = answer_start
+        self._answer_end = answer_end
+        self._is_impossible = is_impossible
+
+    def write(self):
+        pass
+
 
 
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------
@@ -13,6 +38,23 @@ def read_squad(path_to_file: Path):
     :param path_to_file: path to file containing squad data
     :return: a list containing a dictionary for each context, question and answer triple.
     """
+
+    def find_sentence(token_pos: int, sentence_lengths: list) -> int:
+        """
+        This function assumes that the whole token is in a single sentence.
+        :param token_pos: int
+        :param sentence_lengths: list of sentences lengths (e.g. [166, 207, 195, 171])
+        :return: int
+        """
+        if token_pos > sum(sentence_lengths) + len(sentence_lengths) - 1:
+            raise Exception('Token position provided cannot exist in any of these sentences (too large)')
+
+        total_length = 0
+        for idx, length in enumerate(sentence_lengths):
+            total_length += length + 1
+
+            if token_pos < total_length:
+                return idx
 
     def add_end_idx(answer, context):
         gold_text = answer['text']
@@ -37,12 +79,31 @@ def read_squad(path_to_file: Path):
 
     for group in squad_dict['data']:
         for passage in group['paragraphs']:
-            context = passage['context']
+            full_context = passage['context']
+            context_sentences = [sent.string.strip() for sent in nlp(full_context).sents]
+            context_sent_lengths = [len(sent) for sent in context_sentences]
+
             for qa in passage['qas']:
                 question = qa['question']
+                question_id = qa['id']
+                is_impossible = qa['is_impossible']
+
                 for answer in qa['answers']:
-                    add_end_idx(answer, context)
-                    dataset.append({"context": context, "question": question, "answer": answer})
+                    add_end_idx(answer, full_context)
+                    answer_text = answer['text']
+                    answer_start = answer['answer_start']
+                    answer_end = answer['answer_end']
+
+                    sentence_number = find_sentence(answer_start, context_sent_lengths)
+                    short_context = context_sentences[sentence_number]
+                    #
+                    # print('\nquestion', question)
+                    # print("short", short_context)
+                    # print("full", full_context)
+                    # print("answer", answer_text)
+
+                    dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, answer_start, answer_end, is_impossible))
+                    # dataset.append({"context": context, "question": question, "answer": answer})
 
     return dataset
 
@@ -73,15 +134,37 @@ def read_bioasq(path_to_file: Path):
     with open(articles_file_path, 'rb') as f:
         articles_dict = json.load(f)
 
+    def match_answer_to_passage(answer: str, passage: str) -> list:
+        # remove punctuation
+
+        answer = answer.lower()
+        passage = passage.lower()
+
+        def remove_punctuation(text: str) -> tuple:
+            position_list = []
+
+            for char_position, char in enumerate(text):
+                # this character needs to be removed if in punctuation, but we should preserve its position
+                if char not in string.punctuation:
+                    position_list.append(char_position)
+
+            return "".join([c for idx, c in enumerate(text) if idx in position_list]), position_list
+
+        p_answer, answer_positions = remove_punctuation(answer)
+        p_passage, passage_positions = remove_punctuation(passage)
+
+        if p_answer in p_passage:
+            match_cleaned_starts = [m.start() for m in re.finditer(p_answer, p_passage)]
+            match_raw_starts = [passage_positions[m] for m in match_cleaned_starts]
+            match_raw_ends = [passage_positions[m + len(p_answer) - 1] for m in match_cleaned_starts]
+
+            return [[start, end] for start, end in zip(match_raw_starts, match_raw_ends)]
 
     def process_factoid(data):
         question_id = data["id"]
         question = data["body"]
         answer = data["exact_answer"]
         snippets = data["snippets"]
-
-        print("id", question_id)
-        print('type', data["type"])
 
         for snippet in snippets:
             article_id = snippet["document"].split('/').pop()
@@ -90,34 +173,33 @@ def read_bioasq(path_to_file: Path):
             if snippet["beginSection"] != snippet["endSection"]:
                 raise Exception('{} is not {}'.format(snippet["beginSection"], snippet["endSection"]))
 
-
             try:
                 article = articles_dict[article_id]
+                # if the corresponding article is not here - we need to skip it.
                 # todo is it ok that some articles aren't here? probably not - let's try and find them.
             except KeyError:
                 continue
 
-            print(article)
-            print("section name", section)
             paragraph = article[section]
-            print(paragraph)
+            # print("\nquestion:", question)
+            # print("paragraph:", paragraph)
+
+            # parsed_answer = [remove_stopwords_and_stem(sub_answer) for sub_answer in answer]
+
+            matches = match_answer_to_passage("".join(answer), snippet['text'])
+
+            # if matches is not None:
+            #     print([snippet['text'][pair[0]:pair[1]+1] for pair in matches])
 
             beginOffset, endOffset = int(snippet["offsetInBeginSection"]), int(snippet["offsetInEndSection"])
-            print('\nclipped section:', paragraph[beginOffset:endOffset])
+            # print('clipped section:', paragraph[beginOffset:endOffset])
+            # print('snippet text:', snippet['text'])
+            # print('exact answer:', answer)
+            # print('type', data["type"])
+            # print("begin", snippet["beginSection"])
+            # print("end", snippet["endSection"])
 
-            print('exact answer:', answer)
-            print("begin", snippet["beginSection"])
-            print("end", snippet["endSection"])
 
-
-
-            # print('offsetInEnd', snippet["offsetInEndSection"])
-            # print('offsetInBegin', snippet["offsetInBeginSection"])
-            # print('snippet', snippet["text"])
-            # print('length of text', len(snippet["text"]))
-            print('keys', snippet.keys())
-            print(article_id)
-            print("docs", snippet["document"])
 
 
 
@@ -231,11 +313,11 @@ dataset_to_fc = {
 
 if __name__ == "__main__":
     # todo delete this section after testing
-    # base_path = Path(__file__).parent
-    # squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
-    # data = read_squad(squad_dir)
-    # print("length of data", len(data))
-    #
+    base_path = Path(__file__).parent
+    squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
+    data = read_squad(squad_dir)
+    print("length of data", len(data))
+
     # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
     # train_contexts = [d["context"] for d in data]
     # train_questions = [d["question"] for d in data]
@@ -245,9 +327,9 @@ if __name__ == "__main__":
     # add_token_positions(train_encodings, train_answers)
     # # print(train_encodings)
 
-    base_path = Path(__file__).parent
-    data_dir = (base_path / '../datasets/bioasq/training8b.json').resolve()
-    data = read_bioasq(data_dir)
+    # base_path = Path(__file__).parent
+    # data_dir = (base_path / '../datasets/bioasq/training8b.json').resolve()
+    # data = read_bioasq(data_dir)
     # print("length of data", len(data))
 
     # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')

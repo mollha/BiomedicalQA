@@ -20,10 +20,6 @@ def download_data(api_key: str, snippet_list: list):
     list_of_ids = [x["pmid"] for x in snippet_list]
     id_string = ",".join(list_of_ids)
 
-    # #todo remove
-    # if "27822311" not in list_of_ids:
-    #     return {}
-
     # post
     post_page = requests.get(base_command + post_command.format(id_string, api_key))
     post_tree = et.ElementTree(et.fromstring(post_page.text))
