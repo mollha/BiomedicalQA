@@ -21,56 +21,41 @@ def tokenize_with_start_end_pos(tokenizer, text: str, start: int, end: int) -> t
     for word in words_by_whitespace:
         # tokenize each word individually
         tokens_in_words = tokenizer.tokenize(word)
+        num_unknowns = tokens_in_words.count(tokenizer.unk_token)
+        print('num unknowns', num_unknowns)
 
-        # get the number of hashes occurring naturally in the word
-        num_hashes_in_word = word.count("#")
+        unknown_val = 0
 
+        if num_unknowns > 0:
+            unknown_val = len(word) - (sum([len(tok) - tok.count("#") for tok in tokens_in_words if tok != tokenizer.unk_token]) * num_unknowns)
+            print('unknown val', unknown_val)
         for token_in_word in tokens_in_words:
-            num_tokens += 1
+
             # get the num of non-hash characters
             tokenized_text.append(token_in_word)
-            num_non_hashes = len(token_in_word) - token_in_word.count("#") - num_hashes_in_word
+            num_non_hashes = len(token_in_word) - token_in_word.count("#")
 
-            new_char_count = char_count + num_non_hashes
+            if token_in_word == tokenizer.unk_token:
+                new_char_count = char_count + unknown_val
+            else:
+                new_char_count = char_count + num_non_hashes
 
             if char_count <= start < new_char_count:
                 new_start = num_tokens
-            elif char_count <= end < new_char_count:
+
+            if end == new_char_count:
                 new_end = num_tokens
 
-            if new_start is not None and new_end is not None:
-                return new_start, new_end
-
             char_count = new_char_count
+            num_tokens += 1
+
+        char_count += 1  # account for whitespace
+
+    return new_start, new_end + 1, tokenized_text
 
 
 def convert_samples_to_features(samples, tokenizer, max_length):
 
-    def map_answer_position(raw_context, tokens, answer_start, answer_end) -> tuple:
-        """
-        Map the answer's position in the raw text to its tokenized position.
-        :return:
-        """
-        print(tokens)
-        num_spaces_to_start = raw_context[:answer_start].count(" ")
-        num_spaces_to_end = raw_context[:answer_end].count(" ")
-
-        current_raw_char = 0
-        new_start, new_end = None, None
-
-        for idx, token in enumerate(tokens):
-            # not inclusive of answer end
-            if current_raw_char == answer_start - num_spaces_to_start:
-                new_start = idx
-            elif current_raw_char == answer_end - num_spaces_to_end:
-                new_end = idx
-
-            if new_start is not None and new_end is not None:
-                return new_start, new_end
-
-            for char in token:
-                if char != "#":
-                    current_raw_char += 1
 
     for squad_example in samples:
         squad_example.print_info()
@@ -78,14 +63,16 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         start_pos = squad_example._answer_start
         end_pos = squad_example._answer_end
 
-        tokenize_with_start_end_pos(tokenizer, short_context, start_pos, end_pos)
 
 
         answer_tokens = tokenizer(squad_example._answer)
         short_context_tokens = tokenizer.tokenize(squad_example._short_context)
         short_context_positions = tokenizer(squad_example._short_context)["input_ids"]
 
-        new_start, new_end = map_answer_position(squad_example._short_context, short_context_tokens, squad_example._answer_start, squad_example._answer_end)
+
+        new_start, new_end, short_context_tokens = tokenize_with_start_end_pos(tokenizer, short_context, start_pos, end_pos)
+        print(short_context_tokens)
+
         print(short_context_tokens[new_start:new_end])
         print(squad_example._short_context[squad_example._answer_start:squad_example._answer_end])
 
