@@ -9,6 +9,33 @@ import random
 
 
 def tokenize_with_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
+
+    def handle_unk(raw_word: str, tokenized_word: str, unk_idx: int) -> int:
+        # given an unk token, we need to find what character's it represents
+        last_token_idx = len(tokenized_word) - 1
+        char_in_raw = 0
+
+        for tok_idx, tok_word in enumerate(tokenized_word):
+
+            if tok_idx == unk_idx:
+                # found right unk token (there could be multiple)
+                # can't take it's length at face val
+                if unk_idx == last_token_idx:
+                    return len(raw_word[char_in_raw:])
+
+                # need to find the start position of the first char of next token
+                print('char_in_raw', char_in_raw)
+
+                print('next token', tokenized_word[tok_idx + 1])
+                for next_tok_char in tokenized_word[tok_idx + 1]:
+                    if next_tok_char != "#":
+                        # this is the next char to look for
+                        start_idx_next = raw_word[char_in_raw:].find(next_tok_char)
+                        return start_idx_next
+
+            num_non_hash_chars = len(tok_word) - tok_word.count('#')
+            char_in_raw += num_non_hash_chars
+
     # iterate through each of the words (i.e. split by whitespace)
     words_by_whitespace = text.split(" ")
 
@@ -21,41 +48,33 @@ def tokenize_with_start_end_pos(tokenizer, text: str, start: int, end: int) -> t
     for word in words_by_whitespace:
         # tokenize each word individually
         tokens_in_words = tokenizer.tokenize(word)
-        num_unknowns = tokens_in_words.count(tokenizer.unk_token)
-        print('num unknowns', num_unknowns)
 
-        unknown_val = 0
-
-        if num_unknowns > 0:
-            unknown_val = len(word) - (sum([len(tok) - tok.count("#") for tok in tokens_in_words if tok != tokenizer.unk_token]) * num_unknowns)
-            print('unknown val', unknown_val)
-        for token_in_word in tokens_in_words:
+        for token_idx, token_in_word in enumerate(tokens_in_words):
 
             # get the num of non-hash characters
             tokenized_text.append(token_in_word)
             num_non_hashes = len(token_in_word) - token_in_word.count("#")
 
             if token_in_word == tokenizer.unk_token:
-                new_char_count = char_count + unknown_val
+                new_char_count = char_count + handle_unk(word, tokens_in_words, token_idx)
             else:
                 new_char_count = char_count + num_non_hashes
 
             if char_count <= start < new_char_count:
                 new_start = num_tokens
 
-            if end == new_char_count:
+            if end >= new_char_count:
                 new_end = num_tokens
 
             char_count = new_char_count
             num_tokens += 1
 
-        char_count += 1  # account for whitespace
+        char_count += 1  # account for whitespace between words
 
-    return new_start, new_end + 1, tokenized_text
+    return new_start, new_end + 1, tokenized_text      # +1 means we don't cut off too early
 
 
 def convert_samples_to_features(samples, tokenizer, max_length):
-
 
     for squad_example in samples:
         squad_example.print_info()
@@ -63,53 +82,26 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         start_pos = squad_example._answer_start
         end_pos = squad_example._answer_end
 
-
-
         answer_tokens = tokenizer(squad_example._answer)
-        short_context_tokens = tokenizer.tokenize(squad_example._short_context)
+        short_context_tokens_1 = tokenizer.tokenize(squad_example._short_context)
         short_context_positions = tokenizer(squad_example._short_context)["input_ids"]
 
+        # start and end now refers to tokens, not characters
+        new_start, new_end, short_context_tokens = tokenize_with_start_end_pos(tokenizer, short_context, start_pos,
+                                                                               end_pos)
 
-        new_start, new_end, short_context_tokens = tokenize_with_start_end_pos(tokenizer, short_context, start_pos, end_pos)
-        print(short_context_tokens)
+        if short_context_tokens != short_context_tokens_1:
+            print('short_context_tokens', short_context_tokens)
+            print('short_context_tokens_1', short_context_tokens_1)
+            raise Exception('This never happens and should not.')
+
+
+
 
         print(short_context_tokens[new_start:new_end])
         print(squad_example._short_context[squad_example._answer_start:squad_example._answer_end])
 
         print("new start: {}, new end: {}".format(new_start, new_end))
-
-
-    pass
-
-    # for example in examples:
-    #     is_impossible = example["is_impossible"]
-    #     is_training = True
-    #
-    #     print("\nExample triple", example)
-    #     tokenized_context = tokenizer.tokenize(example["context"])
-    #     print("Tokenized context", tokenized_context)
-    #     tokenized_question = tokenizer.tokenize(example["question"])
-    #     print("Tokenized question", tokenized_question)
-    #
-    #     if len(tokenized_question) > max_length:
-    #         tokenized_question = tokenized_question[0:max_length]
-    #         print("Trimmed tokenized question", tokenized_question)
-    #
-    #
-    #
-    #     if is_training and is_impossible:   # only do this during training
-    #         start = -1
-    #         end = -1
-    #     elif is_training and not is_impossible: # only during training
-    #         pass
-
-
-
-
-
-
-
-
 
 
 # ------------ FINE-TUNING PYTORCH DATASETS ------------
