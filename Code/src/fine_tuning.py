@@ -9,7 +9,7 @@ from models import get_model_config, get_layer_lrs
 import numpy as np
 from utils import *
 from glob import glob
-from data_processing import convert_examples_to_features
+from data_processing import convert_samples_to_features
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pre_training import build_pretrained_from_checkpoint
@@ -366,10 +366,11 @@ if __name__ == "__main__":
 
     dataset_file_path = (base_checkpoint_dir / '../datasets/{}/{}'.format(selected_dataset, dataset_file_name)).resolve()
 
-    print("Reading raw dataset: '{}'".format(dataset_file_name))
+    print("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
     read_raw_dataset = dataset_function(dataset_file_path)
+
     print("Converting raw text to features.".format(dataset_file_name))
-    convert_examples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
+    convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
 
     quit()
     print(read_raw_dataset)

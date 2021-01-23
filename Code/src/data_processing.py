@@ -8,39 +8,116 @@ from functools import partial
 import random
 
 
-def convert_examples_to_features(examples, tokenizer, max_length):
-    # todo remove
-    maximum = 1
-    count = 0
+def tokenize_with_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
+    # iterate through each of the words (i.e. split by whitespace)
+    words_by_whitespace = text.split(" ")
 
-    for example in examples:
-        is_impossible = example["is_impossible"]
-        is_training = True
+    # keep a count of the num of characters looked at
+    char_count = 0
+    num_tokens = 0
+    tokenized_text = []
+    new_start, new_end = None, None
 
-        print("\nExample triple", example)
-        tokenized_context = tokenizer.tokenize(example["context"])
-        print("Tokenized context", tokenized_context)
-        tokenized_question = tokenizer.tokenize(example["question"])
-        print("Tokenized question", tokenized_question)
+    for word in words_by_whitespace:
+        # tokenize each word individually
+        tokens_in_words = tokenizer.tokenize(word)
 
-        if len(tokenized_question) > max_length:
-            tokenized_question = tokenized_question[0:max_length]
-            print("Trimmed tokenized question", tokenized_question)
+        # get the number of hashes occurring naturally in the word
+        num_hashes_in_word = word.count("#")
+
+        for token_in_word in tokens_in_words:
+            num_tokens += 1
+            # get the num of non-hash characters
+            tokenized_text.append(token_in_word)
+            num_non_hashes = len(token_in_word) - token_in_word.count("#") - num_hashes_in_word
+
+            new_char_count = char_count + num_non_hashes
+
+            if char_count <= start < new_char_count:
+                new_start = num_tokens
+            elif char_count <= end < new_char_count:
+                new_end = num_tokens
+
+            if new_start is not None and new_end is not None:
+                return new_start, new_end
+
+            char_count = new_char_count
+
+
+def convert_samples_to_features(samples, tokenizer, max_length):
+
+    def map_answer_position(raw_context, tokens, answer_start, answer_end) -> tuple:
+        """
+        Map the answer's position in the raw text to its tokenized position.
+        :return:
+        """
+        print(tokens)
+        num_spaces_to_start = raw_context[:answer_start].count(" ")
+        num_spaces_to_end = raw_context[:answer_end].count(" ")
+
+        current_raw_char = 0
+        new_start, new_end = None, None
+
+        for idx, token in enumerate(tokens):
+            # not inclusive of answer end
+            if current_raw_char == answer_start - num_spaces_to_start:
+                new_start = idx
+            elif current_raw_char == answer_end - num_spaces_to_end:
+                new_end = idx
+
+            if new_start is not None and new_end is not None:
+                return new_start, new_end
+
+            for char in token:
+                if char != "#":
+                    current_raw_char += 1
+
+    for squad_example in samples:
+        squad_example.print_info()
+        short_context = squad_example._short_context
+        start_pos = squad_example._answer_start
+        end_pos = squad_example._answer_end
+
+        tokenize_with_start_end_pos(tokenizer, short_context, start_pos, end_pos)
+
+
+        answer_tokens = tokenizer(squad_example._answer)
+        short_context_tokens = tokenizer.tokenize(squad_example._short_context)
+        short_context_positions = tokenizer(squad_example._short_context)["input_ids"]
+
+        new_start, new_end = map_answer_position(squad_example._short_context, short_context_tokens, squad_example._answer_start, squad_example._answer_end)
+        print(short_context_tokens[new_start:new_end])
+        print(squad_example._short_context[squad_example._answer_start:squad_example._answer_end])
+
+        print("new start: {}, new end: {}".format(new_start, new_end))
+
+
+    pass
+
+    # for example in examples:
+    #     is_impossible = example["is_impossible"]
+    #     is_training = True
+    #
+    #     print("\nExample triple", example)
+    #     tokenized_context = tokenizer.tokenize(example["context"])
+    #     print("Tokenized context", tokenized_context)
+    #     tokenized_question = tokenizer.tokenize(example["question"])
+    #     print("Tokenized question", tokenized_question)
+    #
+    #     if len(tokenized_question) > max_length:
+    #         tokenized_question = tokenized_question[0:max_length]
+    #         print("Trimmed tokenized question", tokenized_question)
+    #
+    #
+    #
+    #     if is_training and is_impossible:   # only do this during training
+    #         start = -1
+    #         end = -1
+    #     elif is_training and not is_impossible: # only during training
+    #         pass
 
 
 
-        if is_training and is_impossible:   # only do this during training
-            start = -1
-            end = -1
-        elif is_training and not is_impossible: # only during training
-            pass
-
-
-
-
-        if count > maximum:
-            break
-        count += 1
 
 
 
@@ -58,6 +135,7 @@ class SquadDataset(Dataset):
 
     def __len__(self):
         return len(self.encodings.input_ids)
+
 
 # ------------ CUSTOM PYTORCH DATASET IMPLEMENTATIONS ------------
 class MappedCSVDataset(Dataset):

@@ -5,10 +5,13 @@ from transformers import DistilBertTokenizerFast
 from spacy.lang.en import English
 import spacy
 import string
+from tqdm import tqdm
+
 from spacy.matcher import PhraseMatcher, Matcher
 from spacy.lang.en.stop_words import STOP_WORDS
 
 nlp = spacy.load('en_core_web_sm')
+
 
 
 class SQuADExample:
@@ -25,6 +28,17 @@ class SQuADExample:
 
     def write(self):
         pass
+
+    def print_info(self):
+        print("\nSQuAD Example\n--------------")
+        print("Question ID:", self._question_id)
+        print("Question:", self._question)
+        print("Short Context:", self._short_context)
+        print("Full Context:", self._full_context)
+        print("Answer:", self._answer)
+        print("Answer Start:", self._answer_start)
+        print("Answer End:", self._answer_end)
+        print("Is Impossible:", self._is_impossible)
 
 
 
@@ -77,7 +91,7 @@ def read_squad(path_to_file: Path):
 
     dataset = []
 
-    for group in squad_dict['data']:
+    for group in tqdm(squad_dict['data']):
         for passage in group['paragraphs']:
             full_context = passage['context']
             context_sentences = [sent.string.strip() for sent in nlp(full_context).sents]
@@ -91,20 +105,15 @@ def read_squad(path_to_file: Path):
                 for answer in qa['answers']:
                     add_end_idx(answer, full_context)
                     answer_text = answer['text']
-                    answer_start = answer['answer_start']
-                    answer_end = answer['answer_end']
 
-                    sentence_number = find_sentence(answer_start, context_sent_lengths)
+                    sentence_number = find_sentence(answer['answer_start'], context_sent_lengths)
+                    normalised_answer_start = answer['answer_start'] - sum(context_sent_lengths[:sentence_number]) - sentence_number
+                    normalised_answer_end = normalised_answer_start + answer['answer_end'] - answer['answer_start']
+
                     short_context = context_sentences[sentence_number]
-                    #
-                    # print('\nquestion', question)
-                    # print("short", short_context)
-                    # print("full", full_context)
-                    # print("answer", answer_text)
+                    dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
 
-                    dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, answer_start, answer_end, is_impossible))
-                    # dataset.append({"context": context, "question": question, "answer": answer})
-
+            break   # todo remove
     return dataset
 
 
