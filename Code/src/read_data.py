@@ -4,6 +4,7 @@ import re
 from transformers import DistilBertTokenizerFast
 from spacy.lang.en import English
 import spacy
+from nltk.tokenize import sent_tokenize
 import string
 from tqdm import tqdm
 
@@ -60,12 +61,12 @@ def read_squad(path_to_file: Path):
         :param sentence_lengths: list of sentences lengths (e.g. [166, 207, 195, 171])
         :return: int
         """
-        if token_pos > sum(sentence_lengths) + len(sentence_lengths) - 1:
+        if token_pos > sum(sentence_lengths) - 1:
             raise Exception('Token position provided cannot exist in any of these sentences (too large)')
 
         total_length = 0
         for idx, length in enumerate(sentence_lengths):
-            total_length += length + 1
+            total_length += length
 
             if token_pos < total_length:
                 return idx
@@ -93,9 +94,30 @@ def read_squad(path_to_file: Path):
 
     for group in tqdm(squad_dict['data']):
         for passage in group['paragraphs']:
-            full_context = passage['context']
-            context_sentences = [sent.string.strip() for sent in nlp(full_context).sents]
+            full_context = passage['context'].rstrip()      # remove trailing whitespace
+
+            context_sentences = [sent for sent in sent_tokenize(full_context)]
+            start_sentences = [(full_context.find(sent), len(sent)) for sent in context_sentences]
+
+            # correct the context sentences to include appropriate whitespaces - this protects start and end pos.
+            last_total = (0,0)
+            for i, (s, l) in enumerate(start_sentences):
+                # add whitespaces
+                # print("adding {} whitespaces to {}".format(s - (last_total[0] + last_total[1]), context_sentences[i-1]))
+                context_sentences[i-1] = context_sentences[i-1] + (" " * (s - (last_total[0] + last_total[1])))
+                last_total = (s, l)
+
+            # context_sentences = [sent.string.strip() for sent in nlp(full_context).sents]
             context_sent_lengths = [len(sent) for sent in context_sentences]
+
+            if sum(context_sent_lengths) != len(full_context):
+                print('len full context', len(full_context))
+                print('full context', (full_context))
+                print('sum(context_sent_lengths)', sum(context_sent_lengths))
+
+                print(context_sentences)
+
+                raise Exception('length no match')
 
             for qa in passage['qas']:
                 question = qa['question']
@@ -104,10 +126,11 @@ def read_squad(path_to_file: Path):
 
                 for answer in qa['answers']:
                     add_end_idx(answer, full_context)
+                    print(sum(context_sent_lengths))
                     answer_text = answer['text']
 
                     sentence_number = find_sentence(answer['answer_start'], context_sent_lengths)
-                    normalised_answer_start = answer['answer_start'] - sum(context_sent_lengths[:sentence_number]) - sentence_number
+                    normalised_answer_start = answer['answer_start'] - sum(context_sent_lengths[:sentence_number])
                     normalised_answer_end = normalised_answer_start + answer['answer_end'] - answer['answer_start']
 
                     short_context = context_sentences[sentence_number]

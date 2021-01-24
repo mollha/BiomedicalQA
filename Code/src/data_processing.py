@@ -2,6 +2,7 @@ from random import randint, random
 import pandas as pd
 import pathlib
 import torch
+import unidecode
 import numpy as np
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
@@ -22,33 +23,82 @@ class SQuADFeature:
 
 def convert_samples_to_features(samples, tokenizer, max_length):
 
-    def tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
+    def verify_tokens_match_answer(tokens, answer):
+        # if we have an unknown token, we can't really check
 
-        def handle_unk(raw_word: str, tokenized_word: str, unk_idx: int) -> int:
+        # remove spaces from answer
+        characters_in_tokens = "".join([char for token in tokens for char in token if char != "#"])
+        characters_in_answer = answer.replace(" ", "").lower()
+        unaccented_characters_in_answer = unidecode.unidecode(characters_in_answer)
+        unaccented_characters_in_tokens = unidecode.unidecode(characters_in_tokens)
+
+        return unaccented_characters_in_answer == unaccented_characters_in_tokens
+
+    def correct_for_unaccounted(tokens, answer, start, end):
+        # sometimes answers are off by a character or two – fix this
+        for step_left in range(-3, 3):
+
+            for step_right in range(-3, 3):
+
+                if verify_tokens_match_answer(tokens[start + step_left:end + step_right], answer):
+                    return start + step_left, end + step_right  # When the gold label is off by n characters
+
+        raise Exception("Even after correction, the answer will not align.")
+
+    def tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
+        print("start", start)
+        print("end", end)
+        """
+        The tokenizer removes some characters from text when creating tokens e.g.  ̃
+        We need to correct for it being out by 1 or 2 characters
+        :param tokenizer:
+        :param text:
+        :param start:
+        :param end:
+        :return:
+        """
+
+        def handle_unk(raw_word: str, tokenized_word: list, unk_idx: int, char_in_raw: int) -> tuple:
             # given an unk token, we need to find what character's it represents
             last_token_idx = len(tokenized_word) - 1
-            char_in_raw = 0
+            tokens_handled = 1
+
+            print("unk_idx", unk_idx)
+            print("all tokens in word", tokenized_word)
 
             for tok_idx, tok_word in enumerate(tokenized_word):
+                if tok_idx < unk_idx:
+                    continue
 
-                if tok_idx == unk_idx:
+                print("tok_word", tok_word)
+                print("tok_idx", tok_idx)
+                print("char_in_raw", char_in_raw)
+
+                if tok_word == tokenizer.unk_token:
                     # found right unk token (there could be multiple)
                     # can't take it's length at face val
-                    if unk_idx == last_token_idx:
-                        return len(raw_word[char_in_raw:])
+                    if tok_idx == last_token_idx:
+                        print('skipping this many ->', len(raw_word[char_in_raw:]))
+                        return len(raw_word[char_in_raw:]), tokens_handled
+
+                    if tokenized_word[tok_idx + 1] == tokenizer.unk_token:
+                        # defer for this round by moving to next token, but increment tokens_handled
+                        tokens_handled += 1
+                        continue
 
                     # need to find the start position of the first char of next token
-                    print('char_in_raw', char_in_raw)
-
-                    print('next token', tokenized_word[tok_idx + 1])
                     for next_tok_char in tokenized_word[tok_idx + 1]:
                         if next_tok_char != "#":
                             # this is the next char to look for
-                            start_idx_next = raw_word[char_in_raw:].find(next_tok_char)
-                            return start_idx_next
+                            print("looking for {} in {}".format(next_tok_char, raw_word[char_in_raw:]))
+                            start_idx_next = raw_word[char_in_raw:].index(next_tok_char)
 
-                num_non_hash_chars = len(tok_word) - tok_word.count('#')
-                char_in_raw += num_non_hash_chars
+                            print('skipping', start_idx_next)
+                            return start_idx_next, tokens_handled
+
+                else:
+                    num_non_hash_chars = len(tok_word) - tok_word.count('#')
+                    char_in_raw += num_non_hash_chars
 
         # iterate through each of the words (i.e. split by whitespace)
         words_by_whitespace = text.split(" ")
@@ -56,36 +106,66 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         # keep a count of the num of characters looked at
         char_count = 0
         num_tokens = 0
-        tokenized_text = []
-        new_start, new_end = None, None
+        new_s, new_e = None, None
 
         for word in words_by_whitespace:
             # tokenize each word individually
             tokens_in_words = tokenizer.tokenize(word)
+            word_char_count = 0
+            skip_tokens = 0
 
             for token_idx, token_in_word in enumerate(tokens_in_words):
-
-                # get the num of non-hash characters
-                tokenized_text.append(token_in_word)
-                num_non_hashes = len(token_in_word) - token_in_word.count("#")
+                if skip_tokens > 0:
+                    skip_tokens -= 1
+                    continue
 
                 if token_in_word == tokenizer.unk_token:
-                    new_char_count = char_count + handle_unk(word, tokens_in_words, token_idx)
+                    num_chars, tokens_handled = handle_unk(word, tokens_in_words, token_idx, word_char_count)
+                    skip_tokens += tokens_handled - 1
+                    new_char_count = char_count + num_chars
+                    word_char_count += num_chars
                 else:
+                    # get the num of non-hash characters
+                    num_non_hashes = len(token_in_word) - token_in_word.count("#")
                     new_char_count = char_count + num_non_hashes
+                    word_char_count += num_non_hashes
 
-                if char_count <= start < new_char_count:
-                    new_start = num_tokens
+                # print("char count {}, n_char count {}, char {}, tok {}".format(char_count, new_char_count, text[char_count], token_in_word))
 
-                if end >= new_char_count:
-                    new_end = num_tokens
+                if char_count <= start <= new_char_count and new_s is None:
+                    new_s = num_tokens
+                    print('SETTING START AS {}'.format(num_tokens))
+
+                # if end >= new_char_count:
+                # todo handle mid token ends
+                if char_count <= end <= new_char_count and new_e is None:
+                    new_e = num_tokens
+                    print('SETTING END AS {}'.format(num_tokens))
+
+                    # # break token down further until we find the ACTUAL end
+                    # sub_tokens = tokenizer.tokenize(token_in_word[token_in_word.count("#"):])
+                    # cumulative_char_count = char_count
+                    #
+                    # for sub_char in sub_tokens:
+                    #     nnh = len(token_in_word) - token_in_word.count("#")
+                    #     cumulative_char_count += nnh
+                    #
+                    #     if cumulative_char_count == end:
+                    #         pass
+                    #     elif cumulative_char_count < end:
+                    #         continue
+                    #
+                    #     pass
+
+                if new_e is not None and new_s is not None:
+                    break
+
 
                 char_count = new_char_count
                 num_tokens += 1
 
             char_count += 1  # account for whitespace between words
-
-        return new_start, new_end + 1  # +1 means we don't cut off too early
+        return new_s, new_e + 1  # +1 means we don't cut off too early
 
     feature_list = []
 
@@ -93,6 +173,7 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         # squad_example.print_info()
 
         short_context = squad_example._short_context
+        full_context = squad_example._full_context
         question = squad_example._question
         start_pos = squad_example._answer_start
         end_pos = squad_example._answer_end
@@ -100,20 +181,25 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
         # tokenizer(question, short_context)
         tokenized_input = tokenizer(question, short_context)
-
+        tokenized_context = tokenizer.tokenize(short_context)
         input_ids, attention_mask, token_type_ids = tokenized_input["input_ids"], tokenized_input["attention_mask"], tokenized_input["token_type_ids"]
-
-
-        # short_context_tokens_1 = tokenizer.tokenize(squad_example._short_context)
-        # short_context_positions = tokenizer(squad_example._short_context)["input_ids"]
-        #
-        # print('len short', len(short_context_tokens_1))
 
         # start and end now refers to tokens, not characters
         # however, they only include characters in short context.
         new_start, new_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
+        print(full_context)
 
-        # add on 1 for the newly-appended [CLS] token
+        print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[new_start: new_end]))
+        print("Clipped Answer: {}".format(short_context[start_pos: end_pos]))
+
+        if tokenizer.unk_token not in tokenized_context:
+            new_start, new_end = correct_for_unaccounted(tokenized_context, squad_example._answer, new_start, new_end)
+
+            m = verify_tokens_match_answer(tokenized_context[new_start: new_end], squad_example._answer)
+            if not m:
+                raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[new_start: new_end], squad_example._answer))
+
+            # add on 1 for the newly-appended [CLS] token
         new_start = new_start + 1
         new_end = new_end + 1
 

@@ -370,8 +370,8 @@ if __name__ == "__main__":
     read_raw_dataset = dataset_function(dataset_file_path)
 
     print("Converting raw text to features.".format(dataset_file_name))
-    convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
-
+    features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
+    print(features)
     quit()
     print(read_raw_dataset)
 
