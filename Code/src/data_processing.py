@@ -8,6 +8,37 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
 import random
 
+# Question with mid-token answers not supported yet
+# Sometimes, the answer span is not correct or does not make sense
+# Sometimes, the way we split sentences has a detrimental affect on separating answers.
+# The answer gets split over multiple sentences - todo fix this.
+skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06',
+                           "571a94b810f8ca140030517a", "57262473271a42140099d4ed",
+                           "5726bd56708984140094cfd1", '572822da3acd2414000df55f',
+                           "573189d6e6313a140071d066", "5730115eb2c2fd14005687e3",
+                           "573084818ab72b1400f9c544", "56bf7e603aeaaa14008c9681",
+                           "56cf609aaab44d1400b89187", "56cbdea66d243a140015edae",
+                           "56d20a6ae7d4791d0090261a", "56cf63b4aab44d1400b891c1",
+                           "56d22055e7d4791d00902687", "56cf67c74df3c31400b0d72f",
+                           "56d313b559d6e41400146211", "56cf6af94df3c31400b0d763",
+                           "56cbeb396d243a140015edec", "56cf69144df3c31400b0d749",
+                           "56cfdb3e234ae51400d9bf7d", "56cc100b6d243a140015ee8a",
+                           "56cc15956d243a140015eea8", "56cfe1d7234ae51400d9bff9",
+                           "56d3ac8e2ccc5a1400d82e1b", "56cf5284aab44d1400b88fcb",
+                           "56cfeb52234ae51400d9c0c2", "56d38c2b59d6e41400146707",
+                           "56cfef3c234ae51400d9c10f", "56cff2e0234ae51400d9c14b",
+                           "56d39cea59d6e41400146812", "56d39ed559d6e41400146827",
+                           "56cffba5234ae51400d9c1f1", "56cffcf3234ae51400d9c20e",
+                           "56d3a74159d6e414001468a3", "56ccde7862d2951400fa64d9",
+                           "56cd682162d2951400fa658e", '56cc57466d243a140015ef24',
+                           "56ce750daab44d1400b887b4", "56cd73af62d2951400fa65c4",
+                           "56cd8ffa62d2951400fa6723", "56cfe987234ae51400d9c09b",
+                           "56d11a1217492d1400aab957", "56d1056017492d1400aab755",
+                           "56cf884a234ae51400d9be0a", "56d137b1e7d4791d0090202d",
+                           "56d1c2d2e7d4791d00902121", "56d23cc4b329da140004ec43",
+                           "56d24a6fb329da140004ed00", "56d383b159d6e414001465e7",
+                           "56d3883859d6e41400146678", "56d5fc2a1c85041400946ea0"]
+
 
 class SQuADFeature:
     def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
@@ -22,6 +53,8 @@ class SQuADFeature:
 
 
 def convert_samples_to_features(samples, tokenizer, max_length):
+
+    unhandled_questions = 0
 
     def verify_tokens_match_answer(tokens, answer):
         # if we have an unknown token, we can't really check
@@ -43,11 +76,13 @@ def convert_samples_to_features(samples, tokenizer, max_length):
                 if verify_tokens_match_answer(tokens[start + step_left:end + step_right], answer):
                     return start + step_left, end + step_right  # When the gold label is off by n characters
 
-        raise Exception("Even after correction, the answer will not align.")
+#        raise Exception("Even after correction, the answer will not align.")
 
     def tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
-        print("start", start)
-        print("end", end)
+        # print("\nstart", start)
+        # print("end", end)
+        # print('text', text)
+
         """
         The tokenizer removes some characters from text when creating tokens e.g.  ̃
         We need to correct for it being out by 1 or 2 characters
@@ -63,22 +98,22 @@ def convert_samples_to_features(samples, tokenizer, max_length):
             last_token_idx = len(tokenized_word) - 1
             tokens_handled = 1
 
-            print("unk_idx", unk_idx)
-            print("all tokens in word", tokenized_word)
+            # print("unk_idx", unk_idx)
+            # print("all tokens in word", tokenized_word)
 
             for tok_idx, tok_word in enumerate(tokenized_word):
                 if tok_idx < unk_idx:
                     continue
-
-                print("tok_word", tok_word)
-                print("tok_idx", tok_idx)
-                print("char_in_raw", char_in_raw)
+                #
+                # print("tok_word", tok_word)
+                # print("tok_idx", tok_idx)
+                # print("char_in_raw", char_in_raw)
 
                 if tok_word == tokenizer.unk_token:
                     # found right unk token (there could be multiple)
                     # can't take it's length at face val
                     if tok_idx == last_token_idx:
-                        print('skipping this many ->', len(raw_word[char_in_raw:]))
+                        # print('skipping this many ->', len(raw_word[char_in_raw:]))
                         return len(raw_word[char_in_raw:]), tokens_handled
 
                     if tokenized_word[tok_idx + 1] == tokenizer.unk_token:
@@ -136,7 +171,7 @@ def convert_samples_to_features(samples, tokenizer, max_length):
                     new_s = num_tokens
                     print('SETTING START AS {}'.format(num_tokens))
 
-                # if end >= new_char_count:
+                # if end >= new_char_count and new_e is None:
                 # todo handle mid token ends
                 if char_count <= end <= new_char_count and new_e is None:
                     new_e = num_tokens
@@ -157,10 +192,6 @@ def convert_samples_to_features(samples, tokenizer, max_length):
                     #
                     #     pass
 
-                if new_e is not None and new_s is not None:
-                    break
-
-
                 char_count = new_char_count
                 num_tokens += 1
 
@@ -169,8 +200,14 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
     feature_list = []
 
-    for squad_example in samples:
+    for example_number, squad_example in enumerate(samples):
         # squad_example.print_info()
+        if squad_example._question_id in skip_squad_question_ids:
+            # raise Exception("Skipping question with answer {}".format(squad_example._answer))
+            unhandled_questions += 1
+            continue
+
+        print("\nexample number", example_number)
 
         short_context = squad_example._short_context
         full_context = squad_example._full_context
@@ -184,24 +221,41 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         tokenized_context = tokenizer.tokenize(short_context)
         input_ids, attention_mask, token_type_ids = tokenized_input["input_ids"], tokenized_input["attention_mask"], tokenized_input["token_type_ids"]
 
+        print('id', squad_example._question_id)
+        print("short context: {}".format(short_context))
+        print("Question: {}".format(squad_example._question))
+        print("Clipped Answer: {}".format(short_context[start_pos: end_pos]))
+        print("Official Answer: {}".format(squad_example._answer))
+        print("Is impossible: {}".format(squad_example._is_impossible))
+
+
         # start and end now refers to tokens, not characters
         # however, they only include characters in short context.
-        new_start, new_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
-        print(full_context)
+        tok_start, tok_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
 
-        print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[new_start: new_end]))
-        print("Clipped Answer: {}".format(short_context[start_pos: end_pos]))
+        print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[tok_start: tok_end]))
+
 
         if tokenizer.unk_token not in tokenized_context:
-            new_start, new_end = correct_for_unaccounted(tokenized_context, squad_example._answer, new_start, new_end)
+            corr_start, corr_end = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)
 
-            m = verify_tokens_match_answer(tokenized_context[new_start: new_end], squad_example._answer)
+            if corr_start is None or corr_end is None:
+                # need to split into subtokens to handle these questions
+                unhandled_questions += 1
+                continue
+
+            m = verify_tokens_match_answer(tokenized_context[corr_start: corr_end], squad_example._answer)
             if not m:
-                raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[new_start: new_end], squad_example._answer))
+                unhandled_questions += 1
+                # answer has probably been cut from the context :(
+                continue
+                # raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[tok_start: tok_end], squad_example._answer))
 
-            # add on 1 for the newly-appended [CLS] token
-        new_start = new_start + 1
-        new_end = new_end + 1
+            tok_start, tok_end = corr_start, corr_end
+
+        # add on 1 for the newly-appended [CLS] token
+        new_start = tok_start + 1
+        new_end = tok_end + 1
 
         # answer_start, answer_end, is_impossible
         feature = SQuADFeature(squad_example._question_id, input_ids, attention_mask, token_type_ids, new_start,

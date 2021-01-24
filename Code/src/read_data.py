@@ -64,12 +64,10 @@ def read_squad(path_to_file: Path):
         if token_pos > sum(sentence_lengths) - 1:
             raise Exception('Token position provided cannot exist in any of these sentences (too large)')
 
-        total_length = 0
         for idx, length in enumerate(sentence_lengths):
-            total_length += length
-
-            if token_pos < total_length:
+            if token_pos < length:
                 return idx
+            token_pos -= length
 
     def add_end_idx(answer, context):
         gold_text = answer['text']
@@ -97,18 +95,68 @@ def read_squad(path_to_file: Path):
             full_context = passage['context'].rstrip()      # remove trailing whitespace
 
             context_sentences = [sent for sent in sent_tokenize(full_context)]
-            start_sentences = [(full_context.find(sent), len(sent)) for sent in context_sentences]
 
-            # correct the context sentences to include appropriate whitespaces - this protects start and end pos.
-            last_total = (0,0)
-            for i, (s, l) in enumerate(start_sentences):
-                # add whitespaces
-                # print("adding {} whitespaces to {}".format(s - (last_total[0] + last_total[1]), context_sentences[i-1]))
-                context_sentences[i-1] = context_sentences[i-1] + (" " * (s - (last_total[0] + last_total[1])))
-                last_total = (s, l)
+            # combine sentences when they are suspiciously short
+            # the nltk sentence tokenizer is not very advanced - it interprets almost
+            # every full-stop as the end of a sentence which sometimes cuts an answer in half
+            #
+            # combined_context_sentences = []
+            # for context_sentences_idx in range(len(context_sentences)):
+            #     if context_sentences_idx > 0:
+            #         if len(context_sentences[context_sentences_idx]) < 10:
+            #             # combine with previous sentence
+            #             context_sentences[context_sentences_idx]
 
             # context_sentences = [sent.string.strip() for sent in nlp(full_context).sents]
+            # start_sentences = [(full_context.find(sent), len(sent)) for sent in context_sentences]
+
+            last_sentence = (0, 0)
+            cumulative_length = 0
+            for sent_idx in range(len(context_sentences)):
+                sent = context_sentences[sent_idx]
+                sentence_length = len(sent)
+
+                # skip first sentence
+                if sent_idx == 0:
+                    cumulative_length += sentence_length
+                    last_sentence = (0, sentence_length)
+                    continue
+
+                start_position_of_sent_in_context = full_context.find(sent, cumulative_length)
+
+                print("start_position_of_sent_in_context {}".format(start_position_of_sent_in_context))
+                print("cumulativee length {}".format(cumulative_length))
+                print("last sentence", last_sentence)
+                num_whitespaces_to_add = start_position_of_sent_in_context - (last_sentence[0] + last_sentence[1])
+
+                print("adding {} whitespaces to {}".format(num_whitespaces_to_add, context_sentences[sent_idx - 1]))
+                context_sentences[sent_idx - 1] = context_sentences[sent_idx - 1] + (" " * num_whitespaces_to_add)
+
+                cumulative_length += sentence_length + num_whitespaces_to_add
+                last_sentence = (start_position_of_sent_in_context, sentence_length)
+
+
+            #
+            #
+            # start_sentences = []
+            # cumulative_length = 0
+            # for sent in context_sentences:
+            #     sentence_length = len(sent)
+            #     start_sentences.append((full_context.find(sent, cumulative_length), sentence_length))
+            #     cumulative_length += sentence_length
+            #
+            #
+            # # correct the context sentences to include appropriate whitespaces - this protects start and end pos.
+            # last_total = (0, 0)
+            # for i, (s, l) in enumerate(start_sentences):
+            #     print(s, l)
+            #     # add whitespaces
+            #     print("adding {} whitespaces to {}".format(s - (last_total[0] + last_total[1]), context_sentences[i-1]))
+            #     context_sentences[i-1] = context_sentences[i-1] + (" " * (s - (last_total[0] + last_total[1])))
+            #     last_total = (s, l)
+
             context_sent_lengths = [len(sent) for sent in context_sentences]
+            print(context_sent_lengths)
 
             if sum(context_sent_lengths) != len(full_context):
                 print('len full context', len(full_context))
@@ -136,7 +184,7 @@ def read_squad(path_to_file: Path):
                     short_context = context_sentences[sentence_number]
                     dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
 
-            break   # todo remove
+            # break   # todo remove
     return dataset
 
 
