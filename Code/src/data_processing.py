@@ -37,7 +37,8 @@ skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06
                            "56cf884a234ae51400d9be0a", "56d137b1e7d4791d0090202d",
                            "56d1c2d2e7d4791d00902121", "56d23cc4b329da140004ec43",
                            "56d24a6fb329da140004ed00", "56d383b159d6e414001465e7",
-                           "56d3883859d6e41400146678", "56d5fc2a1c85041400946ea0"]
+                           "56d3883859d6e41400146678", "56d5fc2a1c85041400946ea0",
+                           ""]
 
 
 class SQuADFeature:
@@ -126,7 +127,7 @@ def convert_samples_to_features(samples, tokenizer, max_length):
                         if next_tok_char != "#":
                             # this is the next char to look for
                             print("looking for {} in {}".format(next_tok_char, raw_word[char_in_raw:]))
-                            start_idx_next = raw_word[char_in_raw:].index(next_tok_char)
+                            start_idx_next = raw_word[char_in_raw:].lower().index(next_tok_char)
 
                             print('skipping', start_idx_next)
                             return start_idx_next, tokens_handled
@@ -196,6 +197,9 @@ def convert_samples_to_features(samples, tokenizer, max_length):
                 num_tokens += 1
 
             char_count += 1  # account for whitespace between words
+
+        if new_e is None:
+            new_e = num_tokens  # last token if not set
         return new_s, new_e + 1  # +1 means we don't cut off too early
 
     feature_list = []
@@ -237,12 +241,14 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
 
         if tokenizer.unk_token not in tokenized_context:
-            corr_start, corr_end = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)
+            corrected_positions = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)
 
-            if corr_start is None or corr_end is None:
+            if corrected_positions is None:
                 # need to split into subtokens to handle these questions
                 unhandled_questions += 1
                 continue
+
+            corr_start, corr_end = corrected_positions
 
             m = verify_tokens_match_answer(tokenized_context[corr_start: corr_end], squad_example._answer)
             if not m:
