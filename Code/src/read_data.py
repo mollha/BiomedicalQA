@@ -123,13 +123,13 @@ def read_squad(path_to_file: Path):
                     continue
 
                 start_position_of_sent_in_context = full_context.find(sent, cumulative_length)
-
-                print("start_position_of_sent_in_context {}".format(start_position_of_sent_in_context))
-                print("cumulativee length {}".format(cumulative_length))
-                print("last sentence", last_sentence)
+                #
+                # print("start_position_of_sent_in_context {}".format(start_position_of_sent_in_context))
+                # print("cumulativee length {}".format(cumulative_length))
+                # print("last sentence", last_sentence)
                 num_whitespaces_to_add = start_position_of_sent_in_context - (last_sentence[0] + last_sentence[1])
 
-                print("adding {} whitespaces to {}".format(num_whitespaces_to_add, context_sentences[sent_idx - 1]))
+                # print("adding {} whitespaces to {}".format(num_whitespaces_to_add, context_sentences[sent_idx - 1]))
                 context_sentences[sent_idx - 1] = context_sentences[sent_idx - 1] + (" " * num_whitespaces_to_add)
 
                 cumulative_length += sentence_length + num_whitespaces_to_add
@@ -156,14 +156,13 @@ def read_squad(path_to_file: Path):
             #     last_total = (s, l)
 
             context_sent_lengths = [len(sent) for sent in context_sentences]
-            print(context_sent_lengths)
 
             if sum(context_sent_lengths) != len(full_context):
-                print('len full context', len(full_context))
-                print('full context', (full_context))
-                print('sum(context_sent_lengths)', sum(context_sent_lengths))
-
-                print(context_sentences)
+                # print('len full context', len(full_context))
+                # print('full context', (full_context))
+                # print('sum(context_sent_lengths)', sum(context_sent_lengths))
+                #
+                # print(context_sentences)
 
                 raise Exception('length no match')
 
@@ -174,7 +173,6 @@ def read_squad(path_to_file: Path):
 
                 for answer in qa['answers']:
                     add_end_idx(answer, full_context)
-                    print(sum(context_sent_lengths))
                     answer_text = answer['text']
 
                     sentence_number = find_sentence(answer['answer_start'], context_sent_lengths)
@@ -184,7 +182,7 @@ def read_squad(path_to_file: Path):
                     short_context = context_sentences[sentence_number]
                     dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
 
-            # break   # todo remove
+            break   # todo remove
     return dataset
 
 

@@ -127,17 +127,17 @@ def train(train_dataset, model, tokenizer, model_info, device, save_dir, setting
                 "end_positions": batch[4],
             }
 
-            if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
-                del inputs["token_type_ids"]
-
-            if "electra" in ["xlnet", "xlm"]:
-                inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
-                if version_2_with_negative:
-                    inputs.update({"is_impossible": batch[7]})
-                if hasattr(model, "config") and hasattr(model.config, "lang2id"):
-                    inputs.update(
-                        {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
-                    )
+            # if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
+            #     del inputs["token_type_ids"]
+            #
+            # if "electra" in ["xlnet", "xlm"]:
+            #     inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
+            #     if version_2_with_negative:
+            #         inputs.update({"is_impossible": batch[7]})
+            #     if hasattr(model, "config") and hasattr(model.config, "lang2id"):
+            #         inputs.update(
+            #             {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
+            #         )
 
             outputs = model(**inputs)
 

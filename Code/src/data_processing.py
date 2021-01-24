@@ -126,10 +126,10 @@ def convert_samples_to_features(samples, tokenizer, max_length):
                     for next_tok_char in tokenized_word[tok_idx + 1]:
                         if next_tok_char != "#":
                             # this is the next char to look for
-                            print("looking for {} in {}".format(next_tok_char, raw_word[char_in_raw:]))
+                            # print("looking for {} in {}".format(next_tok_char, raw_word[char_in_raw:]))
                             start_idx_next = raw_word[char_in_raw:].lower().index(next_tok_char)
 
-                            print('skipping', start_idx_next)
+                            # print('skipping', start_idx_next)
                             return start_idx_next, tokens_handled
 
                 else:
@@ -170,13 +170,13 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
                 if char_count <= start <= new_char_count and new_s is None:
                     new_s = num_tokens
-                    print('SETTING START AS {}'.format(num_tokens))
+                    # print('SETTING START AS {}'.format(num_tokens))
 
                 # if end >= new_char_count and new_e is None:
                 # todo handle mid token ends
                 if char_count <= end <= new_char_count and new_e is None:
                     new_e = num_tokens
-                    print('SETTING END AS {}'.format(num_tokens))
+                    # print('SETTING END AS {}'.format(num_tokens))
 
                     # # break token down further until we find the ACTUAL end
                     # sub_tokens = tokenizer.tokenize(token_in_word[token_in_word.count("#"):])
@@ -205,63 +205,67 @@ def convert_samples_to_features(samples, tokenizer, max_length):
     feature_list = []
 
     for example_number, squad_example in enumerate(samples):
-        # squad_example.print_info()
+        # print("\nexample number", example_number)
+
         if squad_example._question_id in skip_squad_question_ids:
             # raise Exception("Skipping question with answer {}".format(squad_example._answer))
             unhandled_questions += 1
             continue
 
-        print("\nexample number", example_number)
-
         short_context = squad_example._short_context
-        full_context = squad_example._full_context
+        # full_context = squad_example._full_context
         question = squad_example._question
         start_pos = squad_example._answer_start
         end_pos = squad_example._answer_end
 
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
-        # tokenizer(question, short_context)
-        tokenized_input = tokenizer(question, short_context)
+        tokenized_input = tokenizer(question, short_context, padding=True, max_length=max_length)
         tokenized_context = tokenizer.tokenize(short_context)
-        input_ids, attention_mask, token_type_ids = tokenized_input["input_ids"], tokenized_input["attention_mask"], tokenized_input["token_type_ids"]
+        input_ids, attention_mask, token_type_ids = tokenized_input["input_ids"], tokenized_input["attention_mask"], \
+                                                    tokenized_input["token_type_ids"]
 
-        print('id', squad_example._question_id)
-        print("short context: {}".format(short_context))
-        print("Question: {}".format(squad_example._question))
-        print("Clipped Answer: {}".format(short_context[start_pos: end_pos]))
-        print("Official Answer: {}".format(squad_example._answer))
-        print("Is impossible: {}".format(squad_example._is_impossible))
+        if squad_example._is_impossible:
+            new_start, new_end = -1, -1
+        else:
+            # squad_example.print_info()
+            # tokenizer(question, short_context)
+
+            # print('id', squad_example._question_id)
+            # print("short context: {}".format(short_context))
+            # print("Question: {}".format(squad_example._question))
+            # print("Clipped Answer: {}".format(short_context[start_pos: end_pos]))
+            # print("Official Answer: {}".format(squad_example._answer))
+            # print("Is impossible: {}".format(squad_example._is_impossible))
+
+            # start and end now refers to tokens, not characters
+            # however, they only include characters in short context.
+            tok_start, tok_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
+
+            # print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[tok_start: tok_end]))
 
 
-        # start and end now refers to tokens, not characters
-        # however, they only include characters in short context.
-        tok_start, tok_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
+            if tokenizer.unk_token not in tokenized_context:
+                corrected_positions = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)
 
-        print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[tok_start: tok_end]))
+                if corrected_positions is None:
+                    # need to split into subtokens to handle these questions
+                    unhandled_questions += 1
+                    continue
 
+                corr_start, corr_end = corrected_positions
 
-        if tokenizer.unk_token not in tokenized_context:
-            corrected_positions = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)
+                m = verify_tokens_match_answer(tokenized_context[corr_start: corr_end], squad_example._answer)
+                if not m:
+                    unhandled_questions += 1
+                    # answer has probably been cut from the context :(
+                    continue
+                    # raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[tok_start: tok_end], squad_example._answer))
 
-            if corrected_positions is None:
-                # need to split into subtokens to handle these questions
-                unhandled_questions += 1
-                continue
+                tok_start, tok_end = corr_start, corr_end
 
-            corr_start, corr_end = corrected_positions
-
-            m = verify_tokens_match_answer(tokenized_context[corr_start: corr_end], squad_example._answer)
-            if not m:
-                unhandled_questions += 1
-                # answer has probably been cut from the context :(
-                continue
-                # raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[tok_start: tok_end], squad_example._answer))
-
-            tok_start, tok_end = corr_start, corr_end
-
-        # add on 1 for the newly-appended [CLS] token
-        new_start = tok_start + 1
-        new_end = tok_end + 1
+            # add on 1 for the newly-appended [CLS] token
+            new_start = tok_start + 1
+            new_end = tok_end + 1
 
         # answer_start, answer_end, is_impossible
         feature = SQuADFeature(squad_example._question_id, input_ids, attention_mask, token_type_ids, new_start,

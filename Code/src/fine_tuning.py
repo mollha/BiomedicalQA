@@ -13,6 +13,7 @@ from data_processing import convert_samples_to_features
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pre_training import build_pretrained_from_checkpoint
+from torch.utils.data import DataLoader, RandomSampler
 # from run_factoid import train, evaluate
 
 from transformers import (
@@ -37,7 +38,7 @@ config = {
     'seed': 0,
     'loss': [],
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 2, # can override the val in config
+    "max_epochs": 2,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
@@ -52,7 +53,6 @@ finetune_qa_config = {
     "generator_size_divisor": 4,
     'adam_bias_correction': False
 }
-
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
 # datasets = {
@@ -155,110 +155,179 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
 
 # def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
 
-def fine_tune(test_dataset, qa_model, tokenizer, settings, checkpoint_dir):
-
+def fine_tune(train_dataset, qa_model, scheduler, tokenizer, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     print("\n---------- BEGIN FINE-TUNING ----------")
-    sys.stderr.write(
-        "\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
+    print(
+        "Device = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
         .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
                 settings["steps_trained"], settings["batch_size"], settings["update_steps"],
                 settings["max_length"]))
 
+    total_training_loss, logging_loss = 0.0, 0.0
     qa_model.zero_grad()
+    # Added here for reproducibility
+    set_seed(settings["seed"])
 
+    # Random Sampler used during training.
+    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=settings["batch_size"])
     # evaluate during training always.
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")
 
-    for epoch_number in train_iterator:
-        iterable_dataset = iter(dataset)
+    # resume training
+    steps_trained = settings["steps_trained"]
 
+    from tqdm import tqdm
+    from torch import nn
 
-        for training_step in range(settings["max_steps"]):
-
-            # Log metrics
-            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings["update_steps"] == 0:
-                # Only evaluate when single GPU otherwise metrics may not average well
-                # Evaluate all
-
-                save_pretrained()
-
-    # start the training loop
     for epoch_number in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
 
-        for step, batch in enumerate(epoch_iterator):
-            print(type(batch))
-            print("batch size", len(batch))
+        # update the current epoch
+        settings["current_epoch"] = epoch_number  # update the number of epochs
 
-            # Skip past any already trained steps if resuming training
-            if steps_trained_in_current_epoch > 0:
-                steps_trained_in_current_epoch -= 1
-                continue
+        for training_step, batch in enumerate(epoch_iterator):
 
-            # train model one step
-            model.train()
-            batch = tuple(t.to(device) for t in batch)
+            # If resuming training from a checkpoint, overlook previously trained steps.
+            if steps_trained > 0:
+                steps_trained -= 1
+                continue  # skip this step
 
-            inputs = {
-                "input_ids": batch[0],
-                "attention_mask": batch[1],
-                "token_type_ids": batch[2],
-                "start_positions": batch[3],
-                "end_positions": batch[4],
-            }
+            batch = batch.to(settings["device"])  # project batch to correct device
+            qa_model.train()  # train model one step
 
-            if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
-                del inputs["token_type_ids"]
+            #         inputs = {
+            #             "input_ids": batch[0],
+            #             "attention_mask": batch[1],
+            #             "token_type_ids": batch[2],
+            #             "start_positions": batch[3],
+            #             "end_positions": batch[4],
+            #         }
 
-            if "electra" in ["xlnet", "xlm"]:
-                inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
-                if version_2_with_negative:
-                    inputs.update({"is_impossible": batch[7]})
-                if hasattr(model, "config") and hasattr(model.config, "lang2id"):
-                    inputs.update(
-                        {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
-                    )
+            outputs = qa_model(**inputs)  # inputs = (masked_inputs, is_mlm_applied, labels)
 
-            outputs = model(**inputs)
-
-            # model outputs are always tuple in transformers (see doc)
+            # model outputs are always tuples in transformers
             loss = outputs[0]
             loss.backward()
 
-            tr_loss += loss.item()
+            total_training_loss += loss.item()
 
-            if (step + 1) % 1 == 0:
-                nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
-                global_step += 1
+            nn.utils.clip_grad_norm_(qa_model.parameters(), 1.)
 
-                optimizer.step()
-                scheduler.step()  # Update learning rate schedule
-                model.zero_grad()
+            # perform steps
+            optimizer.step()
+            scheduler.step()  # Update learning rate schedule
+            qa_model.zero_grad()
 
-                # Log metrics
-                if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
-                    # Only evaluate when single GPU otherwise metrics may not average well
-                    # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
-                    if settings["evaluate_all_checkpoints"]:
-                        results = evaluate(model, tokenizer, "electra", save_dir, device, settings["evaluate_all_checkpoints"], dataset_info)
+            settings["steps_trained"] = training_step
+            settings["global_step"] += 1
 
-                    logging_loss = tr_loss
+            # Log metrics
+            if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
+                "update_steps"] == 0:
+                # Only evaluate when single GPU otherwise metrics may not average well
+                # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
+
+                print("{} steps trained in current epoch, {} steps trained overall."
+                      .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
-                if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
-                    save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
+                save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+
+
+
+
+
+    # todo update loss function statistics
+
+
+    # for epoch_number in train_iterator:
+    #     iterable_dataset = iter(dataset)
+    #
+    #     for training_step in range(settings["max_steps"]):
+    #
+    #         # Log metrics
+    #         if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
+    #             "update_steps"] == 0:
+    #             # Only evaluate when single GPU otherwise metrics may not average well
+    #             # Evaluate all
+    #
+    #             save_pretrained()
+    #
+    # # start the training loop
+    # for epoch_number in train_iterator:
+    #     epoch_iterator = tqdm(data_loader, desc="Iteration")
+    #
+    #     for step, batch in enumerate(epoch_iterator):
+    #         print(type(batch))
+    #         print("batch size", len(batch))
+    #
+    #         # Skip past any already trained steps if resuming training
+    #         if steps_trained_in_current_epoch > 0:
+    #             steps_trained_in_current_epoch -= 1
+    #             continue
+    #
+    #         # train model one step
+    #         model.train()
+    #         batch = tuple(t.to(device) for t in batch)
+    #
+    #         inputs = {
+    #             "input_ids": batch[0],
+    #             "attention_mask": batch[1],
+    #             "token_type_ids": batch[2],
+    #             "start_positions": batch[3],
+    #             "end_positions": batch[4],
+    #         }
+    #
+    #         if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
+    #             del inputs["token_type_ids"]
+    #
+    #         if "electra" in ["xlnet", "xlm"]:
+    #             inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
+    #             if version_2_with_negative:
+    #                 inputs.update({"is_impossible": batch[7]})
+    #             if hasattr(model, "config") and hasattr(model.config, "lang2id"):
+    #                 inputs.update(
+    #                     {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
+    #                 )
+    #
+    #         outputs = model(**inputs)
+    #
+    #         # model outputs are always tuple in transformers (see doc)
+    #         loss = outputs[0]
+    #         loss.backward()
+    #
+    #         tr_loss += loss.item()
+    #
+    #         if (step + 1) % 1 == 0:
+    #             nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
+    #             global_step += 1
+    #
+    #             optimizer.step()
+    #             scheduler.step()  # Update learning rate schedule
+    #             model.zero_grad()
+    #
+    #             # Log metrics
+    #             if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
+    #                 # Only evaluate when single GPU otherwise metrics may not average well
+    #                 # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
+    #                 if settings["evaluate_all_checkpoints"]:
+    #                     results = evaluate(model, tokenizer, "electra", save_dir, device,
+    #                                        settings["evaluate_all_checkpoints"], dataset_info)
+    #
+    #                 logging_loss = tr_loss
+    #
+    #             # Save model checkpoint
+    #             if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
+    #                 save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step,
+    #                            save_dir)
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -321,7 +390,7 @@ if __name__ == "__main__":
     print("Device: {}\n".format(config["device"].upper()))
 
     # get pre-trained model from which to begin fine-tuning
-    electra_model, _, _, electra_tokenizer, _, model_config, disc_config =\
+    electra_model, _, _, electra_tokenizer, _, model_config, disc_config = \
         build_pretrained_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
 
     discriminator = electra_model.discriminator
@@ -345,7 +414,7 @@ if __name__ == "__main__":
         layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
 
     # todo total_training_steps = len(data_loader) // config["max_epochs"]
-    total_training_steps = 4000 # todo remove this made up num
+    total_training_steps = 4000  # todo remove this made up num
 
     optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
@@ -364,24 +433,22 @@ if __name__ == "__main__":
     except KeyError:
         raise KeyError("The dataset '{}' is not contained in the dataset_to_fc map.".format(selected_dataset))
 
-    dataset_file_path = (base_checkpoint_dir / '../datasets/{}/{}'.format(selected_dataset, dataset_file_name)).resolve()
+    dataset_file_path = (
+                base_checkpoint_dir / '../datasets/{}/{}'.format(selected_dataset, dataset_file_name)).resolve()
 
     print("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
     read_raw_dataset = dataset_function(dataset_file_path)
 
     print("Converting raw text to features.".format(dataset_file_name))
+    # todo use max length
     features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
-    print(features)
-    quit()
-    print(read_raw_dataset)
 
+    print("Created {} features of length {}.".format(len(features), config["max_length"]))
 
-
-
-    qa_dataset_squad_format = {}
+    qa_dataset_squad_format = features
 
     # ------ START THE FINE-TUNING LOOP ------
-    fine_tune(qa_dataset_squad_format, electra_for_qa, electra_tokenizer, finetune_checkpoint_dir)
+    fine_tune(qa_dataset_squad_format, electra_for_qa, scheduler, electra_tokenizer, optimizer, config, finetune_checkpoint_dir)
 
     quit()
 
@@ -391,10 +458,8 @@ if __name__ == "__main__":
     # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
     train_model, evaluate_model = True, True
 
-
     model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
     dataset_info = datasets["bioasq"]
-
 
     # Training
     if train_model:
