@@ -363,44 +363,11 @@ if __name__ == "__main__":
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(qa_dataset_squad_format, electra_for_qa, scheduler, optimizer, config, finetune_checkpoint_dir)
 
-    quit()
-
-    # output folder for model checkpoints and predictions
-    save_dir = "./output"
-
-    # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
-    train_model, evaluate_model = True, True
-
-    model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
-    dataset_info = datasets["bioasq"]
-
-    # --------------- LOAD FINE-TUNED MODEL AND VOCAB ---------------
-    # Evaluation - we can ask to evaluate all the checkpoints (sub-directories) in a directory
-    if evaluate_model:
-        if train_model:
-            print("Loading checkpoints saved during training for evaluation")
-            checkpoints = [save_dir]
-
-            if config["evaluate_all_checkpoints"]:
-                checkpoints = list(
-                    os.path.dirname(c)
-                    for c in sorted(glob(save_dir + "/**/" + WEIGHTS_NAME, recursive=True))
-                )
-        else:
-            print("Loading checkpoint {} for evaluation".format(model_info["model_path"]))
-            checkpoints = [model_info["model_path"]]
-
-        print("Evaluate the following checkpoints: {}".format(checkpoints))
-
-        for checkpoint in checkpoints:
-            # Reload the model
-            global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
-            model = AutoModelForQuestionAnswering.from_pretrained(checkpoint)  # , force_download=True)
-            model.to(device)
-
-            dataset, examples, features = load_and_cache_examples(tokenizer, save_dir, dataset_info["train_file"],
-                                                                  evaluate=True, output_examples=True)
-
-            # Evaluate
-            evaluate(model, tokenizer, save_dir, device, dataset, examples, features,
-                     dataset_info, eval_settings, prefix=global_step)
+    # # output folder for model checkpoints and predictions
+    # save_dir = "./output"
+    #
+    # # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
+    # train_model, evaluate_model = True, True
+    #
+    # model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
+    # dataset_info = datasets["bioasq"]
