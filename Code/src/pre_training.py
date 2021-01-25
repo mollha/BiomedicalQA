@@ -99,6 +99,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 
     print("ELECTRA CONTAINED STATISTICS before loop...")
     print(loss_function.mid_epoch_stats)
+    raise Exception('force stop')
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     print("\n---------- BEGIN PRE-TRAINING ----------")
@@ -160,8 +161,6 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 
             loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
-
-
 
             print("avg gen loss: ", loss_function.mid_epoch_stats["avg_gen_loss"])
             total_training_loss += loss.item()
