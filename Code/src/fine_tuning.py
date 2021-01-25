@@ -5,7 +5,9 @@ from read_data import dataset_to_fc
 import sys
 from pathlib import Path
 from tqdm import trange
-from models import get_model_config, get_layer_lrs
+from tqdm import tqdm
+from torch import nn
+from models import *
 import numpy as np
 from utils import *
 from glob import glob
@@ -149,13 +151,11 @@ def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, o
     return dataset
 
 
+def loss_function():
+    return ""
+
 # ---------- DEFINE MAIN FINE-TUNING LOOP ----------
-# def fine_tune(dataset, model, scheduler, optimizer, settings, checkpoint_name="recent"):
-#     pass
-
-# def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
-
-def fine_tune(train_dataset, qa_model, scheduler, tokenizer, optimizer, settings, checkpoint_dir):
+def fine_tune(train_dataset, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
@@ -181,9 +181,6 @@ def fine_tune(train_dataset, qa_model, scheduler, tokenizer, optimizer, settings
     # resume training
     steps_trained = settings["steps_trained"]
 
-    from tqdm import tqdm
-    from torch import nn
-
     for epoch_number in train_iterator:
         epoch_iterator = tqdm(data_loader, desc="Iteration")
 
@@ -200,18 +197,20 @@ def fine_tune(train_dataset, qa_model, scheduler, tokenizer, optimizer, settings
             batch = batch.to(settings["device"])  # project batch to correct device
             qa_model.train()  # train model one step
 
-            #         inputs = {
-            #             "input_ids": batch[0],
-            #             "attention_mask": batch[1],
-            #             "token_type_ids": batch[2],
-            #             "start_positions": batch[3],
-            #             "end_positions": batch[4],
-            #         }
+            print('Batch: ', batch)
 
-            outputs = qa_model(**inputs)  # inputs = (masked_inputs, is_mlm_applied, labels)
+            inputs = {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "token_type_ids": batch[2],
+                "start_positions": batch[3],
+                "end_positions": batch[4],
+            }
+
+            outputs = qa_model(**inputs)
 
             # model outputs are always tuples in transformers
-            loss = outputs[0]
+            loss = outputs.loss
             loss.backward()
 
             total_training_loss += loss.item()
@@ -236,98 +235,12 @@ def fine_tune(train_dataset, qa_model, scheduler, tokenizer, optimizer, settings
                       .format(settings["steps_trained"], settings["global_step"]))
 
                 # Save model checkpoint
+                # putting loss here is probably wrong.
                 save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
-
-
-
-
     # todo update loss function statistics
-
-
-    # for epoch_number in train_iterator:
-    #     iterable_dataset = iter(dataset)
-    #
-    #     for training_step in range(settings["max_steps"]):
-    #
-    #         # Log metrics
-    #         if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
-    #             "update_steps"] == 0:
-    #             # Only evaluate when single GPU otherwise metrics may not average well
-    #             # Evaluate all
-    #
-    #             save_pretrained()
-    #
-    # # start the training loop
-    # for epoch_number in train_iterator:
-    #     epoch_iterator = tqdm(data_loader, desc="Iteration")
-    #
-    #     for step, batch in enumerate(epoch_iterator):
-    #         print(type(batch))
-    #         print("batch size", len(batch))
-    #
-    #         # Skip past any already trained steps if resuming training
-    #         if steps_trained_in_current_epoch > 0:
-    #             steps_trained_in_current_epoch -= 1
-    #             continue
-    #
-    #         # train model one step
-    #         model.train()
-    #         batch = tuple(t.to(device) for t in batch)
-    #
-    #         inputs = {
-    #             "input_ids": batch[0],
-    #             "attention_mask": batch[1],
-    #             "token_type_ids": batch[2],
-    #             "start_positions": batch[3],
-    #             "end_positions": batch[4],
-    #         }
-    #
-    #         if "electra" in ["xlm", "roberta", "distilbert", "camembert"]:
-    #             del inputs["token_type_ids"]
-    #
-    #         if "electra" in ["xlnet", "xlm"]:
-    #             inputs.update({"cls_index": batch[5], "p_mask": batch[6]})
-    #             if version_2_with_negative:
-    #                 inputs.update({"is_impossible": batch[7]})
-    #             if hasattr(model, "config") and hasattr(model.config, "lang2id"):
-    #                 inputs.update(
-    #                     {"langs": (ones(batch[0].shape, dtype=int64) * 0).to(device)}
-    #                 )
-    #
-    #         outputs = model(**inputs)
-    #
-    #         # model outputs are always tuple in transformers (see doc)
-    #         loss = outputs[0]
-    #         loss.backward()
-    #
-    #         tr_loss += loss.item()
-    #
-    #         if (step + 1) % 1 == 0:
-    #             nn.utils.clip_grad_norm_(model.parameters(), settings["max_grad_norm"])
-    #             global_step += 1
-    #
-    #             optimizer.step()
-    #             scheduler.step()  # Update learning rate schedule
-    #             model.zero_grad()
-    #
-    #             # Log metrics
-    #             if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
-    #                 # Only evaluate when single GPU otherwise metrics may not average well
-    #                 # Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number"
-    #                 if settings["evaluate_all_checkpoints"]:
-    #                     results = evaluate(model, tokenizer, "electra", save_dir, device,
-    #                                        settings["evaluate_all_checkpoints"], dataset_info)
-    #
-    #                 logging_loss = tr_loss
-    #
-    #             # Save model checkpoint
-    #             if settings["update_steps"] > 0 and global_step % settings["update_steps"] == 0:
-    #                 save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step,
-    #                            save_dir)
-
     # ------------- SAVE FINE-TUNED MODEL -------------
-    save_model(model, tokenizer, optimizer, scheduler, settings, global_step, tr_loss / global_step, save_dir)
+    save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
 
 if __name__ == "__main__":
@@ -448,7 +361,7 @@ if __name__ == "__main__":
     qa_dataset_squad_format = features
 
     # ------ START THE FINE-TUNING LOOP ------
-    fine_tune(qa_dataset_squad_format, electra_for_qa, scheduler, electra_tokenizer, optimizer, config, finetune_checkpoint_dir)
+    fine_tune(qa_dataset_squad_format, electra_for_qa, scheduler, optimizer, config, finetune_checkpoint_dir)
 
     quit()
 
@@ -460,14 +373,6 @@ if __name__ == "__main__":
 
     model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
     dataset_info = datasets["bioasq"]
-
-    # Training
-    if train_model:
-        training_set = load_and_cache_examples(tokenizer, f'google/electra-{config["size"]}-discriminator',
-                                               dataset_info["train_file"],
-                                               evaluate=False, output_examples=False)
-
-        train(training_set, model, tokenizer, model_info, device, save_dir, config, dataset_info)
 
     # --------------- LOAD FINE-TUNED MODEL AND VOCAB ---------------
     # Evaluation - we can ask to evaluate all the checkpoints (sub-directories) in a directory
