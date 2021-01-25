@@ -149,11 +149,10 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     print("\n---------- BEGIN FINE-TUNING ----------")
-    print(
-        "Device = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
-        .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
-                settings["steps_trained"], settings["batch_size"], settings["update_steps"],
-                settings["max_length"]))
+    sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
+                     .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
+                             settings["steps_trained"], settings["batch_size"], settings["update_steps"],
+                             settings["max_length"]))
 
     total_training_loss, logging_loss = 0.0, 0.0
     qa_model.zero_grad()
