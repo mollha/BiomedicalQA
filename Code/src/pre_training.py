@@ -82,6 +82,9 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     if valid_checkpoint:
         electra_model, optimizer, scheduler, loss_function,\
         new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
+        print("ELECTRA CONTAINED STATISTICS...")
+        print(loss_function.mid_epoch_stats)
+
         config = update_settings(config, new_config)
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")

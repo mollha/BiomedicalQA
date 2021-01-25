@@ -11,7 +11,7 @@ from models import *
 import numpy as np
 from utils import *
 from glob import glob
-from data_processing import convert_samples_to_features
+from data_processing import convert_samples_to_features, SQuADDataset
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pre_training import build_pretrained_from_checkpoint
@@ -57,16 +57,6 @@ finetune_qa_config = {
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
-# datasets = {
-#     "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-#                "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
-#                "official_eval_dir": "./scripts/bioasq_eval"},
-#     "squad": {
-# dataset = load_dataset("squad_v2")
-#
-#     }
-# }
-
 datasets = {
     # "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
     #            "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
@@ -76,7 +66,6 @@ datasets = {
         "test": "dev-v2.0.json",
     }
 }
-
 
 def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, output_examples=False):
     overwrite_cached_features = True
@@ -155,7 +144,7 @@ def loss_function():
     return ""
 
 # ---------- DEFINE MAIN FINE-TUNING LOOP ----------
-def fine_tune(train_dataset, qa_model, scheduler, optimizer, settings, checkpoint_dir):
+def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
@@ -171,8 +160,6 @@ def fine_tune(train_dataset, qa_model, scheduler, optimizer, settings, checkpoin
     # Added here for reproducibility
     set_seed(settings["seed"])
 
-    # Random Sampler used during training.
-    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=settings["batch_size"])
     # evaluate during training always.
 
     # Resume training from the epoch we left off at earlier.
@@ -188,6 +175,8 @@ def fine_tune(train_dataset, qa_model, scheduler, optimizer, settings, checkpoin
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
         for training_step, batch in enumerate(epoch_iterator):
+
+            print("Batch: ", batch)
 
             # If resuming training from a checkpoint, overlook previously trained steps.
             if steps_trained > 0:
@@ -313,28 +302,6 @@ if __name__ == "__main__":
                                                                  state_dict=discriminator.state_dict(),
                                                                  config=disc_config)
 
-    layerwise_learning_rates = get_layer_lrs(electra_for_qa.named_parameters(),
-                                             config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
-
-    # Prepare optimizer and schedule (linear warm up and decay)
-    no_decay = ["bias", "LayerNorm", "layer_norm"]
-
-    # todo check if lr should be dependent on non-zero wd
-    layerwise_params = []
-    for n, p in electra_for_qa.named_parameters():
-        wd = config["decay"] if not any(nd in n for nd in no_decay) else 0
-        lr = layerwise_learning_rates[n]
-        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
-
-    # todo total_training_steps = len(data_loader) // config["max_epochs"]
-    total_training_steps = 4000  # todo remove this made up num
-
-    optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
-    scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=int(total_training_steps * config["warmup_fraction"]),
-                                                num_training_steps=-1)
-    # todo check if num_training_steps should not be -1
-
     # -- Load the data and prepare it in squad format
     try:
         dataset_file_name = datasets[selected_dataset]["train"]
@@ -353,15 +320,38 @@ if __name__ == "__main__":
     read_raw_dataset = dataset_function(dataset_file_path)
 
     print("Converting raw text to features.".format(dataset_file_name))
-    # todo use max length
     features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
 
     print("Created {} features of length {}.".format(len(features), config["max_length"]))
 
-    qa_dataset_squad_format = features
+    train_dataset = SQuADDataset(features)  # not valid - todo change this
+
+    # Random Sampler used during training.
+    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=1) # batch_size=config["batch_size"])
+
+    layerwise_learning_rates = get_layer_lrs(electra_for_qa.named_parameters(),
+                                             config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
+
+    # Prepare optimizer and schedule (linear warm up and decay)
+    no_decay = ["bias", "LayerNorm", "layer_norm"]
+
+    # todo check if lr should be dependent on non-zero wd
+    layerwise_params = []
+    for n, p in electra_for_qa.named_parameters():
+        wd = config["decay"] if not any(nd in n for nd in no_decay) else 0
+        lr = layerwise_learning_rates[n]
+        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
+
+    # Create the optimizer and scheduler
+    optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
+    scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                num_warmup_steps=(len(data_loader) // config["max_epochs"]) * config["warmup_fraction"],
+                                                num_training_steps=-1)
+    # todo check whether num_training_steps should be -1
+
 
     # ------ START THE FINE-TUNING LOOP ------
-    fine_tune(qa_dataset_squad_format, electra_for_qa, scheduler, optimizer, config, finetune_checkpoint_dir)
+    fine_tune(data_loader, electra_for_qa, scheduler, optimizer, config, finetune_checkpoint_dir)
 
     # # output folder for model checkpoints and predictions
     # save_dir = "./output"

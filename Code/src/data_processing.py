@@ -52,6 +52,17 @@ class SQuADFeature:
         self._answer_end = answer_end
         self._is_impossible = is_impossible
 
+    def get_properties(self):
+        return {
+            "question_id": self._question_id,
+            "input_ids": self._input_ids,
+            "attention_mask": self._attention_mask,
+            "token_type_ids": self._token_type_ids,
+            "answer_start": self._answer_start,
+            "answer_end": self._answer_end,
+            "is_impossible": self._is_impossible,
+        }
+
 
 def convert_samples_to_features(samples, tokenizer, max_length):
 
@@ -277,15 +288,19 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
 
 # ------------ FINE-TUNING PYTORCH DATASETS ------------
-class SquadDataset(Dataset):
-    def __init__(self, encodings):
-        self.encodings = encodings
+class SQuADDataset(Dataset):
+    def __init__(self, squad_examples):
+        self.squad_examples = squad_examples
 
     def __getitem__(self, idx):
-        return {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        selected_example = self.squad_examples[idx]
+        return selected_example.get_properties()
 
     def __len__(self):
-        return len(self.encodings.input_ids)
+        return len(self.squad_examples)
 
 
 # ------------ CUSTOM PYTORCH DATASET IMPLEMENTATIONS ------------
