@@ -82,9 +82,8 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     if valid_checkpoint:
         electra_model, optimizer, scheduler, loss_function,\
         new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
-        print("ELECTRA CONTAINED STATISTICS...")
+        print("ELECTRA CONTAINED STATISTICS at loading...")
         print(loss_function.mid_epoch_stats)
-        raise Exception('force stop')
 
         config = update_settings(config, new_config)
     else:
@@ -97,6 +96,9 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
 def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, settings, checkpoint_dir):
     """ Train the model """
     model.to(settings["device"])
+
+    print("ELECTRA CONTAINED STATISTICS before loop...")
+    print(loss_function.mid_epoch_stats)
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     print("\n---------- BEGIN PRE-TRAINING ----------")
@@ -128,11 +130,18 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         iterable_dataset = iter(dataset)
         iterable_dataset.resume_from_step(steps_trained)
 
+        print("ELECTRA CONTAINED STATISTICS start epoch...")
+        print(loss_function.mid_epoch_stats)
+
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
         for training_step in range(settings["max_steps"]):
             batch = next(iterable_dataset)
+
+            print("ELECTRA CONTAINED STATISTICS start step...")
+            print(loss_function.mid_epoch_stats)
+            raise Exception('force stop')
 
             if batch is None:
                 print("Reached the end of the dataset")
@@ -151,6 +160,8 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 
             loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
+
+
 
             print("avg gen loss: ", loss_function.mid_epoch_stats["avg_gen_loss"])
             total_training_loss += loss.item()
@@ -173,12 +184,25 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                 print("{} steps trained in current epoch, {} steps trained overall."
                                  .format(settings["steps_trained"], settings["global_step"]))
 
+                print("ELECTRA CONTAINED STATISTICS before internal save...")
+                print(loss_function.mid_epoch_stats)
+
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+                print("ELECTRA CONTAINED STATISTICS after internal save...")
+                print(loss_function.mid_epoch_stats)
+
+        print("ELECTRA CONTAINED STATISTICS... before update")
+        print(loss_function.mid_epoch_stats)
 
         loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
+        print("ELECTRA CONTAINED STATISTICS after update...")
+        print(loss_function.mid_epoch_stats)
+
         save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
 
+        print("ELECTRA CONTAINED STATISTICS after external save...")
+        print(loss_function.mid_epoch_stats)
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
