@@ -265,11 +265,11 @@ def build_electra_model(model_size: str, get_config=False):
 
     path_to_biotokenizer = os.path.join(base_path, 'tokenization/bio_tokenizer/bio_electra_tokenizer_pubmed_vocab')
     if os.path.exists(path_to_biotokenizer):
-        sys.stderr.write("Using biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
+        sys.stderr.write("\nUsing biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
         # get tokenizer from save file
         electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
     else:
-        sys.stderr.write("Path {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
+        sys.stderr.write("\nPath {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
         electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
 
     # create model components e.g. generator and discriminator

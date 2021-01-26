@@ -125,11 +125,16 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                    replace_prob=0.0,
                    original_prob=0.15)
 
+    sys.stderr.write("\nFinished creating MLM objective")
+
+
     # resume training
     steps_trained = settings["steps_trained"]
 
     for epoch_number in train_iterator:
         iterable_dataset = iter(dataset)
+
+        sys.stderr.write("\n{} steps trained, resuming from this step.".format(steps_trained))
         iterable_dataset.resume_from_step(steps_trained)
 
         # update the current epoch
@@ -138,6 +143,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         step_iterator = tqdm(int(settings["max_steps"]), file=sys.stderr)
 
         for training_step in step_iterator:
+            sys.stderr.write("\nTraining step {}".format(training_step))
             batch = next(iterable_dataset)
 
             if batch is None:

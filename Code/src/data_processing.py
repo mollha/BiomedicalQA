@@ -3,6 +3,7 @@ import pandas as pd
 import pathlib
 import torch
 import unidecode
+import sys
 import numpy as np
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 from functools import partial
@@ -393,7 +394,7 @@ class IterableCSVDataset(IterableDataset):
     def resume_from_step(self, training_step):
         for i in range(training_step):
             next(self)
-        print("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(
+        sys.stderr.write("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(
             self._list_paths_to_csv[self._current_csv_idx])[-11:]))
 
 
