@@ -22,7 +22,7 @@ config = {
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 20000,
+    "update_steps": 1000,
 }
 
 
@@ -84,7 +84,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
         new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
         print("ELECTRA CONTAINED STATISTICS at loading...")
         print(loss_function.mid_epoch_stats)
-        raise Exception('force error here')
+        # raise Exception('force error here')
 
         config = update_settings(config, new_config)
     else:
