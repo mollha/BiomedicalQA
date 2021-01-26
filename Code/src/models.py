@@ -125,11 +125,29 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     :param scheduler: scheduler skeleton to be populated with saved (pre-trained) scheduler state
     :return: model, optimizer and scheduler in their pre-trained states and previous model settings
     """
+
+    # https://discuss.pytorch.org/t/moving-optimizer-from-cpu-to-gpu/96068/2
+    def optimizer_to(optim, device):
+        for param in optim.state.values():
+            # Not sure there are any global tensors in the state dict
+            if isinstance(param, torch.Tensor):
+                param.data = param.data.to(device)
+                if param._grad is not None:
+                    param._grad.data = param._grad.data.to(device)
+            elif isinstance(param, dict):
+                for subparam in param.values():
+                    if isinstance(subparam, torch.Tensor):
+                        subparam.data = subparam.data.to(device)
+                        if subparam._grad is not None:
+                            subparam._grad.data = subparam._grad.data.to(device)
+
+
     # Load in optimizer, tokenizer and scheduler states
     path_to_optimizer = os.path.join(path_to_checkpoint, "optimizer.pt")
 
     if os.path.isfile(path_to_optimizer):
         optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
+        optimizer_to(optimizer, device)
 
     path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
     loss_function = None
@@ -140,10 +158,12 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
         scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
+        scheduler.to(device)
 
     path_to_model = os.path.join(path_to_checkpoint, "model.pt")
     if os.path.isfile(path_to_model):
         model.load_state_dict(torch.load(path_to_model, map_location=torch.device(device)))
+        model.to(device)
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
 
