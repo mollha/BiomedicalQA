@@ -115,7 +115,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
     set_seed(settings["seed"])
 
     # Resume training from the epoch we left off at earlier.
-    train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")
+    train_iterator = range(settings["current_epoch"], int(settings["max_epochs"]))
 
     # # 2. Masked language model objective
     mlm = MaskedLM(mask_tok_id=tokenizer.mask_token_id,
