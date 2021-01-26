@@ -7,9 +7,9 @@
 
 #SBATCH -N 1
 #SBATCH -c 1
-#SBATCH --gres=debug
+#SBATCH --gres=gpu
 #SBATCH --job-name=sm_language
-#SBATCH -p gpu-bigmem
+#SBATCH -p debug
 #SBATCH --qos=long-high-prio
 #SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
