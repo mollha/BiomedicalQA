@@ -233,8 +233,13 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
         tokenized_input = tokenizer(question, short_context, padding=True, max_length=max_length)
         tokenized_context = tokenizer.tokenize(short_context)
-        input_ids, attention_mask, token_type_ids = tokenized_input["input_ids"], tokenized_input["attention_mask"], \
-                                                    tokenized_input["token_type_ids"]
+
+        # prepare the input_ids, attention_mask and token_type_ids as tensors
+        print(tokenized_input["input_ids"])
+        print(type(tokenized_input["input_ids"]))
+        input_ids = torch.LongTensor(tokenized_input["input_ids"])
+        attention_mask = torch.LongTensor(tokenized_input["attention_mask"])
+        token_type_ids = torch.LongTensor(tokenized_input["token_type_ids"])
 
         if squad_example._is_impossible:
             new_start, new_end = -1, -1
@@ -254,7 +259,6 @@ def convert_samples_to_features(samples, tokenizer, max_length):
             tok_start, tok_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
 
             # print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[tok_start: tok_end]))
-
 
             if tokenizer.unk_token not in tokenized_context:
                 corrected_positions = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)

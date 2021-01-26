@@ -283,7 +283,7 @@ if __name__ == "__main__":
     finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
     dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
 
-    # create the finetune directory if it doesn't exist already
+    # create the fine-tune directory if it doesn't exist already
     Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
     # -- Set device
