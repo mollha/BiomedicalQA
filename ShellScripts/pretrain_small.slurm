@@ -9,8 +9,8 @@
 #SBATCH -c 1
 #SBATCH --gres=gpu
 #SBATCH --job-name=sm_language
-#SBATCH -p debug
-#SBATCH --qos=long-high-prio
+#SBATCH -p gpu-bigmem
+#SBATCH --qos=debug
 #SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
