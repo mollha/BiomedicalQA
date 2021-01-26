@@ -160,7 +160,6 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
             loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
 
-            sys.stderr.write("\nAvg Generator Loss: {}".format(loss_function.mid_epoch_stats["avg_gen_loss"]))
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
@@ -181,13 +180,10 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                 sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                                  .format(settings["steps_trained"], settings["global_step"]))
 
-                print("ELECTRA CONTAINED STATISTICS before internal save...")
-                print(loss_function.mid_epoch_stats)
+                sys.stderr.write("\nAvg Generator Loss: {}".format(loss_function.mid_epoch_stats["avg_gen_loss"]))
 
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
-                print("ELECTRA CONTAINED STATISTICS after internal save...")
-                print(loss_function.mid_epoch_stats)
 
         print("ELECTRA CONTAINED STATISTICS... before update")
         print(loss_function.mid_epoch_stats)
