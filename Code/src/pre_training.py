@@ -182,28 +182,28 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                 # Only evaluate when single GPU otherwise metrics may not average well
                 # Evaluate all checkpoints starting with same prefix as model_name ending and ending with step number
 
-                print("{} steps trained in current epoch, {} steps trained overall."
+                sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                                  .format(settings["steps_trained"], settings["global_step"]))
 
-                print("ELECTRA CONTAINED STATISTICS before internal save...")
-                print(loss_function.mid_epoch_stats)
+                sys.stderr.write("ELECTRA CONTAINED STATISTICS before internal save...")
+                sys.stderr.write(loss_function.mid_epoch_stats)
 
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
-                print("ELECTRA CONTAINED STATISTICS after internal save...")
-                print(loss_function.mid_epoch_stats)
+                sys.stderr.write("ELECTRA CONTAINED STATISTICS after internal save...")
+                sys.stderr.write(loss_function.mid_epoch_stats)
 
-        print("ELECTRA CONTAINED STATISTICS... before update")
-        print(loss_function.mid_epoch_stats)
+        sys.stderr.write("ELECTRA CONTAINED STATISTICS... before update")
+        sys.stderr.write(loss_function.mid_epoch_stats)
 
         save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
         loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
-        print("ELECTRA CONTAINED STATISTICS after update...")
-        print(loss_function.mid_epoch_stats)
+        sys.stderr.write("ELECTRA CONTAINED STATISTICS after update...")
+        sys.stderr.write(loss_function.mid_epoch_stats)
 
 
-        print("ELECTRA CONTAINED STATISTICS after external save...")
-        print(loss_function.mid_epoch_stats)
+        sys.stderr.write("ELECTRA CONTAINED STATISTICS after external save...")
+        sys.stderr.write(loss_function.mid_epoch_stats)
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
@@ -233,6 +233,8 @@ if __name__ == "__main__":
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")
+
+    raise Exception("why won't you work")
 
     # -- Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
