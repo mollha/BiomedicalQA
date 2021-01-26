@@ -341,6 +341,7 @@ class IterableCSVDataset(IterableDataset):
         self._transform = transform
         self._device = device
         self._dataset_size = None
+        self._resume = False
 
         self._drop_incomplete_batches = drop_incomplete_batches
         self._list_paths_to_csv = list(pathlib.Path(data_directory).glob('*.csv'))
@@ -361,6 +362,10 @@ class IterableCSVDataset(IterableDataset):
         while True:
             try:
                 batch = next(self._current_iterator)
+
+                if self._resume:    # skip all the extra processing
+                    return
+
                 num_samples_in_batch = len(batch)
 
                 if self._drop_incomplete_batches and num_samples_in_batch < self._batch_size:
@@ -398,6 +403,7 @@ class IterableCSVDataset(IterableDataset):
 
     def resume_from_step(self, training_step):
         sys.stderr.write("\nTraining step - {}".format(training_step))
+        self._resume = True
 
         start_time = time.time()
         for i in range(training_step):
@@ -405,6 +411,8 @@ class IterableCSVDataset(IterableDataset):
                 raise Exception("Took {} seconds to resume from training step {}".format(round(time.time() - start_time, 2),
                                                                                     training_step))
             next(self)
+
+        self._resume = False
         sys.stderr.write("\nTook {} seconds to resume from training step {}".format(round(time.time() - start_time, 2),
                                                                                     training_step))
 
