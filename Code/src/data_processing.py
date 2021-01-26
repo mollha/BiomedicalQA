@@ -2,6 +2,7 @@ from random import randint, random
 import pandas as pd
 import pathlib
 import torch
+import time
 import unidecode
 import sys
 import numpy as np
@@ -396,8 +397,19 @@ class IterableCSVDataset(IterableDataset):
         return iter(data_loader)
 
     def resume_from_step(self, training_step):
+        sys.stderr.write("\nTraining step - {}".format(training_step))
+
+        start_time = time.time()
         for i in range(training_step):
+            if i >= 1000:
+                raise Exception("Took {} seconds to resume from training step {}".format(round(time.time() - start_time, 2),
+                                                                                    training_step))
             next(self)
+        sys.stderr.write("\nTook {} seconds to resume from training step {}".format(round(time.time() - start_time, 2),
+                                                                                    training_step))
+
+
+
         sys.stderr.write("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(
             self._list_paths_to_csv[self._current_csv_idx])[-11:]))
 

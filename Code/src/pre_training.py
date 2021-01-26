@@ -137,7 +137,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         #raise Exception("why won't you work")
 
         sys.stderr.write("\n{} steps trained, resuming from this step.".format(steps_trained))
-        iterable_dataset.resume_from_step(steps_trained)
+        iterable_dataset.resume_from_step(steps_trained)        # this line is causing an issue
         raise Exception("why won't you work")
 
         # update the current epoch
