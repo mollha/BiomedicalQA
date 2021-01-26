@@ -310,7 +310,7 @@ class MappedCSVDataset(Dataset):
     """
 
     def __init__(self, csv_file):
-        self.dataframe = pd.read_csv(csv_file, delimiter='|', error_bad_lines=False, skiprows=1)
+        self.dataframe = pd.read_csv(csv_file, delimiter='|', error_bad_lines=False, skiprows=1, warn_bad_lines=False)
 
     def __len__(self):
         return len(self.dataframe)
