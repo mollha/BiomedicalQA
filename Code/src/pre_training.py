@@ -208,7 +208,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
     # Log Process ID
-    print(f"Process ID: {os.getpid()}\n")
+    sys.stderr.write(f"Process ID: {os.getpid()}\n")
 
     # -- Parse command line arguments (checkpoint name and model size)
     parser = argparse.ArgumentParser(description='Overwrite default settings.')
