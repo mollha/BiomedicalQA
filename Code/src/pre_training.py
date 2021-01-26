@@ -127,12 +127,11 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
 
     sys.stderr.write("\nFinished creating MLM objective")
 
-
     # resume training
     steps_trained = settings["steps_trained"]
 
     for epoch_number in train_iterator:
-        raise Exception("why won't you work")
+        # raise Exception("why won't you work")
 
         iterable_dataset = iter(dataset)
         raise Exception("why won't you work")
