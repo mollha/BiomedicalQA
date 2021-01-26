@@ -148,7 +148,7 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
     qa_model.to(settings["device"])
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
-    print("\n---------- BEGIN FINE-TUNING ----------")
+    sys.stderr.write("\n---------- BEGIN FINE-TUNING ----------")
     sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
                      .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
                              settings["steps_trained"], settings["batch_size"], settings["update_steps"],
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
 
-    print("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
+    sys.stderr.write("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")

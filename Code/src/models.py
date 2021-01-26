@@ -1,5 +1,4 @@
 import collections
-
 import torch
 import os
 from pathlib import Path
@@ -187,10 +186,9 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
         torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
         # the tokenizer state is saved with the model
 
-        print("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
+        sys.stderr.write("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
     except FileExistsError as e:
-        print(e)
-        print("Checkpoint cannot be saved as it already exists - skipping this save.")
+        sys.stderr.write("Checkpoint cannot be saved as it already exists - skipping this save.")
 
 
 def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):

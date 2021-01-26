@@ -103,7 +103,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
     print(loss_function.mid_epoch_stats)
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
-    print("\n---------- BEGIN PRE-TRAINING ----------")
+    sys.stderr.write("\n---------- BEGIN PRE-TRAINING ----------")
     sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
                      .format(settings["device"].upper(), settings["size"], settings["max_epochs"], settings["current_epoch"],
                              settings["steps_trained"], settings["batch_size"], settings["update_steps"],
@@ -156,7 +156,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
             loss = loss_function(outputs, *targets)  # targets = (labels,)
             loss.backward()
 
-            print("avg gen loss: ", loss_function.mid_epoch_stats["avg_gen_loss"])
+            sys.stderr.write("\nAvg Generator Loss: {}".format(loss_function.mid_epoch_stats["avg_gen_loss"]))
             total_training_loss += loss.item()
 
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
 
-    print("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
+    sys.stderr.write("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")
@@ -246,7 +246,7 @@ if __name__ == "__main__":
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()
-    print('\nLoading data from {} and initialising Pytorch Dataset.\n'.format(csv_data_dir))
+    sys.stderr.write('\nLoading data from {} and initialising Pytorch Dataset.\n'.format(csv_data_dir))
     dataset = IterableCSVDataset(csv_data_dir, config["batch_size"], config["device"], transform=data_pre_processor)
 
     # ------ START THE PRE-TRAINING LOOP ------
