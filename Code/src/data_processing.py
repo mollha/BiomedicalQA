@@ -4,6 +4,7 @@ import pathlib
 import torch
 import time
 import unidecode
+from tqdm import trange
 import sys
 import numpy as np
 from torch.utils.data import DataLoader, Dataset, IterableDataset
@@ -406,7 +407,7 @@ class IterableCSVDataset(IterableDataset):
         self._resume = True
 
         start_time = time.time()
-        for i in range(training_step):
+        for _ in trange(0, training_step, desc="Resuming from step:", file=sys.stderr):
             next(self)
 
         self._resume = False
