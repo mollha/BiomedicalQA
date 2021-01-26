@@ -146,6 +146,8 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
             sys.stderr.write("\nTraining step {}".format(training_step))
             batch = next(iterable_dataset)
 
+            raise Exception("why won't you work")
+
             if batch is None:
                 print("Reached the end of the dataset")
                 break
@@ -234,7 +236,6 @@ if __name__ == "__main__":
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")
 
-    raise Exception("why won't you work")
 
     # -- Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
