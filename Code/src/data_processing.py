@@ -407,7 +407,7 @@ class IterableCSVDataset(IterableDataset):
         self._resume = True
 
         start_time = time.time()
-        for _ in trange(0, training_step, desc="Resuming from step:", file=sys.stderr):
+        for _ in range(training_step):
             next(self)
 
         self._resume = False
