@@ -9,7 +9,7 @@
 #SBATCH -c 1
 #SBATCH --gres=gpu
 #SBATCH --job-name=sm_language
-#SBATCH -p gpu-bigmem
+#SBATCH -p ug-gpu-small
 #SBATCH --qos=debug
 #SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
