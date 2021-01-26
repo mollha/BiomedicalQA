@@ -134,7 +134,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         # raise Exception("why won't you work")
 
         iterable_dataset = iter(dataset)
-        raise Exception("why won't you work")
+        #raise Exception("why won't you work")
 
         sys.stderr.write("\n{} steps trained, resuming from this step.".format(steps_trained))
         iterable_dataset.resume_from_step(steps_trained)
