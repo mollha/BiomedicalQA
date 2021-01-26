@@ -37,7 +37,7 @@ done
 
 echo "CHECKPOINT = ${CHECKPOINT}"
 echo "MODEL SIZE = ${SIZE}"
-echo "Starting pre-training...\n"
+echo "Starting pre-training..."
 
 # Run your program (replace this with your program)
 stdbuf -oL python3 ../Code/src/pre_training.py --checkpoint ${CHECKPOINT} --size ${SIZE}
