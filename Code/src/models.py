@@ -158,7 +158,6 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
         scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
-        scheduler.to(device)
 
     path_to_model = os.path.join(path_to_checkpoint, "model.pt")
     if os.path.isfile(path_to_model):
