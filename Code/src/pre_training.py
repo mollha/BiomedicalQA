@@ -7,7 +7,7 @@ import argparse
 import os
 import torch
 from torch import nn
-from tqdm import trange
+from tqdm import trange, tqdm
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pathlib import Path
 import sys
@@ -135,7 +135,9 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
-        for training_step in range(settings["max_steps"]):
+        step_iterator = tqdm(int(settings["max_steps"]))
+
+        for training_step in step_iterator:
             batch = next(iterable_dataset)
 
             if batch is None:
