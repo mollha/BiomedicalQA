@@ -14,7 +14,7 @@ def set_seed(seed_value: int) -> None:
     torch.manual_seed(seed_value)
 
 
-def update_settings(settings: dict, update: dict) -> dict:
+def update_settings(settings: dict, update: dict, exceptions=[]) -> dict:
     """
     Override config in settings dict with config in update dict. This allows
     model specific config to be merged with general training settings to create
@@ -24,6 +24,8 @@ def update_settings(settings: dict, update: dict) -> dict:
     :return: merged config dictionary
     """
     for key, value in update.items():
+        if key in exceptions:
+            continue
         settings[key] = value
 
     return settings
