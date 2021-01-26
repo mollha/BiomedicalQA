@@ -142,22 +142,15 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
-        step_iterator = trange(0, int(settings["max_steps"]), desc="Steps", file=sys.stderr)
+        # If resuming training from a checkpoint, overlook previously trained steps.
+        step_iterator = trange(steps_trained, int(settings["max_steps"]), desc="Steps", file=sys.stderr)
 
         for training_step in step_iterator:
-            sys.stderr.write("\nTraining step {}".format(training_step))
+
             batch = next(iterable_dataset)
-
-            raise Exception("why won't you work")
-
             if batch is None:
                 print("Reached the end of the dataset")
                 break
-
-            # If resuming training from a checkpoint, overlook previously trained steps.
-            if steps_trained > 0:
-                steps_trained -= 1
-                continue
 
             batch = batch.to(settings["device"])  # project batch to correct device
             inputs, targets = mlm.mask_batch(batch)  # mask the batch before passing it to the model
