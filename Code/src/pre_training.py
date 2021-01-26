@@ -86,7 +86,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
         print(loss_function.mid_epoch_stats)
         # raise Exception('force error here')
 
-        config = update_settings(config, new_config, exceptions=["update_steps"])
+        config = update_settings(config, new_config, exceptions=["update_steps", "device"])
 
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")
