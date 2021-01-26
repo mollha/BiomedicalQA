@@ -21,6 +21,7 @@ def update_settings(settings: dict, update: dict, exceptions=[]) -> dict:
     a single dictionary containing configuration.
     :param settings: dictionary containing general model settings
     :param update: dictionary containing update settings.
+    :param exceptions: list of keys to avoid updating. e.g. we want to keep our original config here.
     :return: merged config dictionary
     """
     for key, value in update.items():
