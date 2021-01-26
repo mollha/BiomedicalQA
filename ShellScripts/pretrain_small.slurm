@@ -12,7 +12,7 @@
 #SBATCH -p gpu-bigmem
 #SBATCH --qos=long-high-prio
 #SBATCH -t 7-0:0:0
-#SBATCH --mem=56g
+#SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
 
