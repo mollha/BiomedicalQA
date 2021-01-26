@@ -407,9 +407,6 @@ class IterableCSVDataset(IterableDataset):
 
         start_time = time.time()
         for i in range(training_step):
-            if i >= 1000:
-                raise Exception("Took {} seconds to resume from training step {}".format(round(time.time() - start_time, 2),
-                                                                                    training_step))
             next(self)
 
         self._resume = False
