@@ -135,7 +135,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
-        step_iterator = tqdm(int(settings["max_steps"]))
+        step_iterator = tqdm(int(settings["max_steps"]), file=sys.stderr)
 
         for training_step in step_iterator:
             batch = next(iterable_dataset)
