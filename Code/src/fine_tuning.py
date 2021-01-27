@@ -6,13 +6,14 @@ import sys
 from pathlib import Path
 from tqdm import trange
 from tqdm import tqdm
+
 from torch import nn
 from models import *
 import numpy as np
 from utils import *
 from glob import glob
 from data_processing import convert_samples_to_features, SQuADDataset
-from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
+from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor, SquadExample
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pre_training import build_pretrained_from_checkpoint
 from torch.utils.data import DataLoader, RandomSampler
@@ -168,12 +169,12 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
     steps_trained = settings["steps_trained"]
 
     for epoch_number in train_iterator:
-        epoch_iterator = tqdm(data_loader, desc="Iteration")
+        step_iterator = tqdm(data_loader, desc="Step")
 
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
-        for training_step, batch in enumerate(epoch_iterator):
+        for training_step, batch in enumerate(step_iterator):
 
             print("Batch: ", batch)
 
@@ -347,6 +348,11 @@ if __name__ == "__main__":
                                                 num_warmup_steps=(len(data_loader) // config["max_epochs"]) * config["warmup_fraction"],
                                                 num_training_steps=-1)
     # todo check whether num_training_steps should be -1
+
+    squad_convert_examples_to_features
+
+
+    quit()
 
 
     # ------ START THE FINE-TUNING LOOP ------

@@ -5,6 +5,8 @@ from transformers import DistilBertTokenizerFast
 from spacy.lang.en import English
 import spacy
 from nltk.tokenize import sent_tokenize
+from transformers.data.processors.squad import SquadExample
+
 import string
 from tqdm import tqdm
 
@@ -180,6 +182,18 @@ def read_squad(path_to_file: Path):
                     normalised_answer_end = normalised_answer_start + answer['answer_end'] - answer['answer_start']
 
                     short_context = context_sentences[sentence_number]
+
+                    squad_example = SquadExample(
+                        qas_id=tensor_dict["id"].numpy().decode("utf-8"),
+                        question_text=tensor_dict["question"].numpy().decode("utf-8"),
+                        context_text=tensor_dict["context"].numpy().decode("utf-8"),
+                        answer_text=answer,
+                        start_position_character=answer_start,
+                        title=tensor_dict["title"].numpy().decode("utf-8"),
+                        answers=answers,
+                    )
+
+
                     dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
 
             break   # todo remove

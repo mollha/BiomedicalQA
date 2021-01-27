@@ -44,6 +44,8 @@ skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06
                            ""]
 
 
+
+
 class SQuADFeature:
     def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
                  is_impossible):
@@ -237,8 +239,6 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         tokenized_context = tokenizer.tokenize(short_context)
 
         # prepare the input_ids, attention_mask and token_type_ids as tensors
-        print(tokenized_input["input_ids"])
-        print(type(tokenized_input["input_ids"]))
         input_ids = torch.LongTensor(tokenized_input["input_ids"])
         attention_mask = torch.LongTensor(tokenized_input["attention_mask"])
         token_type_ids = torch.LongTensor(tokenized_input["token_type_ids"])
@@ -288,6 +288,8 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         # answer_start, answer_end, is_impossible
         feature = SQuADFeature(squad_example._question_id, input_ids, attention_mask, token_type_ids, new_start,
                                new_end, squad_example._is_impossible)
+
+
 
         feature_list.append(feature)
 
