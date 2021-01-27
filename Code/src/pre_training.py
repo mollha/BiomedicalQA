@@ -142,9 +142,12 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
         # If resuming training from a checkpoint, overlook previously trained steps.
-        step_iterator = trange(steps_trained, int(settings["max_steps"]), desc="Steps", file=sys.stderr)
+        for training_step in trange(0, int(settings["max_steps"]), desc="Steps", file=sys.stderr):
 
-        for training_step in step_iterator:
+            # If resuming training from a checkpoint, overlook previously trained steps.
+            if steps_trained > 0:
+                steps_trained -= 1
+                continue
 
             batch = next(iterable_dataset)
             if batch is None:

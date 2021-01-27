@@ -319,8 +319,25 @@ if __name__ == "__main__":
     print("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
     read_raw_dataset = dataset_function(dataset_file_path)
 
+    print(read_raw_dataset)
+
+
+    features = squad_convert_examples_to_features(examples=read_raw_dataset,
+                                                  tokenizer=electra_tokenizer,
+                                                  max_seq_length=config["max_length"],
+                                                  doc_stride=config["max_length"] // 3,
+                                                  max_query_length=(2 * config["max_length"]) // 3,
+                                                  is_training=True,
+                                                  return_dataset=True,
+                                                  tqdm_enabled=True,
+                                                  )
+
+    print(features)
+    quit()
+
     print("Converting raw text to features.".format(dataset_file_name))
     features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
+
 
     print("Created {} features of length {}.".format(len(features), config["max_length"]))
 
@@ -349,7 +366,6 @@ if __name__ == "__main__":
                                                 num_training_steps=-1)
     # todo check whether num_training_steps should be -1
 
-    squad_convert_examples_to_features
 
 
     quit()
