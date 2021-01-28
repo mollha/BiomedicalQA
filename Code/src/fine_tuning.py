@@ -38,11 +38,23 @@ from transformers import (
 # hyperparameters are mostly the same for large models as base models - except for a few
 
 config = {
+    'seed': 0,
+    'generator_loss': [],
+    'discriminator_loss': [],
+    'num_workers': 3 if torch.cuda.is_available() else 0,
+    "max_epochs": 9999,
+    "current_epoch": 0,  # track the current epoch in config for saving checkpoints
+    "steps_trained": 0,  # track the steps trained in config for saving checkpoints
+    "global_step": -1,  # total steps over all epochs
+    "update_steps": 20000,
+}
+
+config = {
     "learning_rate": 8e-6,  # The initial learning rate for Adam.
     "decay": 0.0,  # Weight decay if we apply some.
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
     "max_grad_norm": 1.0,  # Max gradient norm.
-    "update_steps": 500,
+    "update_steps": 5,
     'seed': 0,
     'loss': [],
     'num_workers': 3 if torch.cuda.is_available() else 0,
@@ -183,17 +195,6 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
             question_ids = batch.question_ids
             is_impossible = batch.is_impossible
 
-            print("Batch: ", batch)
-            print("Type Batch: ", type(batch))
-
-            # print(batch.question_ids)
-
-            # print(batch.input_ids)
-            # print(batch.attention_mask)
-            # print(batch.token_type_ids)
-            # print(batch.answer_start)
-            # print(batch.answer_end)
-
             # If resuming training from a checkpoint, overlook previously trained steps.
             if steps_trained > 0:
                 steps_trained -= 1
@@ -201,8 +202,6 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
 
             # batch = batch.to(settings["device"])  # project batch to correct device
             qa_model.train()  # train model one step
-
-            print('Batch: ', batch)
 
             inputs = {
                 "input_ids": batch.input_ids,
@@ -241,11 +240,12 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
 
                 # Save model checkpoint
                 # putting loss here is probably wrong.
-                save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+                save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir,
+                                pre_training=False)
 
     # todo update loss function statistics
     # ------------- SAVE FINE-TUNED MODEL -------------
-    save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+    save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir, pre_training=False)
 
 
 if __name__ == "__main__":

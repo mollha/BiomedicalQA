@@ -176,7 +176,7 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     return model, optimizer, scheduler, loss_function, settings
 
 
-def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir):
+def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir, pre_training=True):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
@@ -195,7 +195,9 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
         torch.save(settings, os.path.join(save_dir, "train_settings.bin"))
         torch.save(optimizer.state_dict(), os.path.join(save_dir, "optimizer.pt"))
         torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
-        torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
+
+        if pre_training:
+            torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
 
         # model.discriminator.save_pretrained(save_dir)   # save the discriminator now
 
