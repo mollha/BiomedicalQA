@@ -176,7 +176,7 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     return model, optimizer, scheduler, loss_function, settings
 
 
-def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir, pre_training=True):
+def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_training=True, loss_function=None):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
@@ -199,10 +199,13 @@ def save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkp
         if pre_training:
             torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
 
-        # model.discriminator.save_pretrained(save_dir)   # save the discriminator now
-
-        with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
-            pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
+        if loss_function is not None:
+            with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
+                pickle.dump(loss_function, output, pickle.HIGHEST_PROTOCOL)
+        elif pre_training:
+            # pre-training is true and loss function is None should not occur
+            # pre-training save checkpoint should provide a valid loss function
+            raise Exception("Loss function should not be None during pre-training.")
 
         torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
         # the tokenizer state is saved with the model

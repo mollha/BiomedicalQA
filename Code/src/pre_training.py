@@ -186,12 +186,12 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                 sys.stderr.write("\nAvg Generator Loss: {}".format(loss_function.mid_epoch_stats["avg_gen_loss"]))
 
                 # Save model checkpoint
-                save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+                save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, loss_function=loss_function)
 
         print("ELECTRA CONTAINED STATISTICS... before update")
         print(loss_function.mid_epoch_stats)
 
-        save_checkpoint(model, optimizer, scheduler, loss_function, settings, checkpoint_dir)
+        save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, loss_function=loss_function)
         loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
         print("ELECTRA CONTAINED STATISTICS after update...")
         print(loss_function.mid_epoch_stats)

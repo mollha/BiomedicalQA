@@ -39,39 +39,13 @@ from transformers import (
 
 config = {
     'seed': 0,
-    'generator_loss': [],
-    'discriminator_loss': [],
-    'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 9999,
-    "current_epoch": 0,  # track the current epoch in config for saving checkpoints
-    "steps_trained": 0,  # track the steps trained in config for saving checkpoints
-    "global_step": -1,  # total steps over all epochs
-    "update_steps": 20000,
-}
-
-config = {
-    "learning_rate": 8e-6,  # The initial learning rate for Adam.
-    "decay": 0.0,  # Weight decay if we apply some.
-    "epsilon": 1e-8,  # Epsilon for Adam optimizer.
-    "max_grad_norm": 1.0,  # Max gradient norm.
-    "update_steps": 5,
-    'seed': 0,
     'loss': [],
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 2,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-}
-
-# Adam's beta 1 and 2 are set to 0.9, and 0.999. They are default values for Adam optimizer.
-finetune_qa_config = {
-    "lr": 2e-4,
-    "batch_size": 32,
-    "max_steps": 400 * 1000,
-    "max_length": 512,
-    "generator_size_divisor": 4,
-    'adam_bias_correction': False
+    "update_steps": 50,
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
@@ -240,12 +214,12 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
 
                 # Save model checkpoint
                 # putting loss here is probably wrong.
-                save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir,
+                save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir,
                                 pre_training=False)
 
     # todo update loss function statistics
     # ------------- SAVE FINE-TUNED MODEL -------------
-    save_checkpoint(qa_model, optimizer, scheduler, loss_function, settings, checkpoint_dir, pre_training=False)
+    save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
 
 if __name__ == "__main__":
@@ -336,15 +310,11 @@ if __name__ == "__main__":
     # electra_tokenizer._batch_encode_plus = partial(electra_tokenizer._batch_encode_plus, is_split_into_words=False)
     # electra_tokenizer.encode_plus = partial(electra_tokenizer.encode_plus, is_split_into_words=False)
 
-
-    print("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
+    sys.stderr.write("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
     read_raw_dataset = dataset_function(dataset_file_path)
-
 
     # processor = SquadV2Processor()
     # examples = processor.get_train_examples(selected_dataset_dir, filename=dataset_file_name)
-
-
 
     # features, dataset = squad_convert_examples_to_features(examples=read_raw_dataset, #read_raw_dataset
     #                                               tokenizer=electra_tokenizer,
