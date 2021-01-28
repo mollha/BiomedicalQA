@@ -2,6 +2,8 @@ import torch
 import argparse
 import os
 from read_data import dataset_to_fc
+
+from functools import partial
 import sys
 from pathlib import Path
 from tqdm import trange
@@ -12,12 +14,15 @@ from models import *
 import numpy as np
 from utils import *
 from glob import glob
-from data_processing import convert_samples_to_features, SQuADDataset
+import tokenizers
+from data_processing import convert_samples_to_features, SQuADDataset, collate_wrapper
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor, SquadExample
 from transformers import AdamW, get_linear_schedule_with_warmup
 from pre_training import build_pretrained_from_checkpoint
 from torch.utils.data import DataLoader, RandomSampler
 # from run_factoid import train, evaluate
+
+# print(tokenizers.__version__) # returns 0.9.4 (latest compatible version)
 
 from transformers import (
     WEIGHTS_NAME,
@@ -175,25 +180,36 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
         settings["current_epoch"] = epoch_number  # update the number of epochs
 
         for training_step, batch in enumerate(step_iterator):
+            question_ids = batch.question_ids
+            is_impossible = batch.is_impossible
 
             print("Batch: ", batch)
+            print("Type Batch: ", type(batch))
+
+            # print(batch.question_ids)
+
+            # print(batch.input_ids)
+            # print(batch.attention_mask)
+            # print(batch.token_type_ids)
+            # print(batch.answer_start)
+            # print(batch.answer_end)
 
             # If resuming training from a checkpoint, overlook previously trained steps.
             if steps_trained > 0:
                 steps_trained -= 1
                 continue  # skip this step
 
-            batch = batch.to(settings["device"])  # project batch to correct device
+            # batch = batch.to(settings["device"])  # project batch to correct device
             qa_model.train()  # train model one step
 
             print('Batch: ', batch)
 
             inputs = {
-                "input_ids": batch[0],
-                "attention_mask": batch[1],
-                "token_type_ids": batch[2],
-                "start_positions": batch[3],
-                "end_positions": batch[4],
+                "input_ids": batch.input_ids,
+                "attention_mask": batch.attention_mask,
+                "token_type_ids": batch.token_type_ids,
+                "start_positions": batch.answer_start,
+                "end_positions": batch.answer_end,
             }
 
             outputs = qa_model(**inputs)
@@ -313,27 +329,42 @@ if __name__ == "__main__":
     except KeyError:
         raise KeyError("The dataset '{}' is not contained in the dataset_to_fc map.".format(selected_dataset))
 
-    dataset_file_path = (
-                base_checkpoint_dir / '../datasets/{}/{}'.format(selected_dataset, dataset_file_name)).resolve()
+    all_datasets_dir = (base_checkpoint_dir / '../datasets').resolve()
+    selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
+    dataset_file_path = (selected_dataset_dir / dataset_file_name).resolve()
+
+    # electra_tokenizer._batch_encode_plus = partial(electra_tokenizer._batch_encode_plus, is_split_into_words=False)
+    # electra_tokenizer.encode_plus = partial(electra_tokenizer.encode_plus, is_split_into_words=False)
+
 
     print("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
     read_raw_dataset = dataset_function(dataset_file_path)
 
-    print(read_raw_dataset)
+
+    # processor = SquadV2Processor()
+    # examples = processor.get_train_examples(selected_dataset_dir, filename=dataset_file_name)
 
 
-    features = squad_convert_examples_to_features(examples=read_raw_dataset,
-                                                  tokenizer=electra_tokenizer,
-                                                  max_seq_length=config["max_length"],
-                                                  doc_stride=config["max_length"] // 3,
-                                                  max_query_length=(2 * config["max_length"]) // 3,
-                                                  is_training=True,
-                                                  return_dataset=True,
-                                                  tqdm_enabled=True,
-                                                  )
 
-    print(features)
-    quit()
+    # features, dataset = squad_convert_examples_to_features(examples=read_raw_dataset, #read_raw_dataset
+    #                                               tokenizer=electra_tokenizer,
+    #                                               max_seq_length=110,
+    #                                               doc_stride=60,
+    #                                               max_query_length=50,
+    #                                               is_training=True,
+    #                                               return_dataset="pt",
+    #                                               )
+
+    # features, dataset = squad_convert_examples_to_features(
+    #     examples=examples,
+    #     tokenizer=tokenizer,
+    #     max_seq_length=max_seq_length,
+    #     doc_stride=doc_stride,
+    #     max_query_length=max_query_length,
+    #     is_training=not evaluate,
+    #     return_dataset="pt",
+    # )
+
 
     print("Converting raw text to features.".format(dataset_file_name))
     features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
@@ -344,7 +375,8 @@ if __name__ == "__main__":
     train_dataset = SQuADDataset(features)  # not valid - todo change this
 
     # Random Sampler used during training.
-    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=1) # batch_size=config["batch_size"])
+    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=2,
+                             collate_fn=collate_wrapper)  # batch_size=config["batch_size"])
 
     layerwise_learning_rates = get_layer_lrs(electra_for_qa.named_parameters(),
                                              config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
@@ -365,10 +397,6 @@ if __name__ == "__main__":
                                                 num_warmup_steps=(len(data_loader) // config["max_epochs"]) * config["warmup_fraction"],
                                                 num_training_steps=-1)
     # todo check whether num_training_steps should be -1
-
-
-
-    quit()
 
 
     # ------ START THE FINE-TUNING LOOP ------

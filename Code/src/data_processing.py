@@ -68,6 +68,17 @@ class SQuADFeature:
             "is_impossible": self._is_impossible,
         }
 
+    def get_input_features(self):
+        return (
+            self._question_id,
+            self._input_ids,
+            self._attention_mask,
+            self._token_type_ids,
+            self._answer_start,
+            self._answer_end,
+            self._is_impossible,
+        )
+
 
 def convert_samples_to_features(samples, tokenizer, max_length):
 
@@ -235,13 +246,15 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         end_pos = squad_example._answer_end
 
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
-        tokenized_input = tokenizer(question, short_context, padding=True, max_length=max_length)
+        tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
+                                    max_length=max_length)  # only truncate the second sequence
         tokenized_context = tokenizer.tokenize(short_context)
+        # print(len(tokenized_input["input_ids"]))
 
         # prepare the input_ids, attention_mask and token_type_ids as tensors
-        input_ids = torch.LongTensor(tokenized_input["input_ids"])
-        attention_mask = torch.LongTensor(tokenized_input["attention_mask"])
-        token_type_ids = torch.LongTensor(tokenized_input["token_type_ids"])
+        input_ids = tokenized_input["input_ids"]
+        attention_mask = tokenized_input["attention_mask"]
+        token_type_ids = tokenized_input["token_type_ids"]
 
         if squad_example._is_impossible:
             new_start, new_end = -1, -1
@@ -285,6 +298,7 @@ def convert_samples_to_features(samples, tokenizer, max_length):
             new_start = tok_start + 1
             new_end = tok_end + 1
 
+
         # answer_start, answer_end, is_impossible
         feature = SQuADFeature(squad_example._question_id, input_ids, attention_mask, token_type_ids, new_start,
                                new_end, squad_example._is_impossible)
@@ -297,6 +311,35 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
 
 # ------------ FINE-TUNING PYTORCH DATASETS ------------
+class BatchInputFeatures:
+    def __init__(self, data):
+        transposed_data = list(zip(*data))
+        device = "cuda" if torch.cuda.is_available() else "cpu"  # device
+
+        self.question_ids = list(transposed_data[0])
+        self.input_ids = torch.LongTensor(transposed_data[1], device=device)
+        self.attention_mask = torch.LongTensor(transposed_data[2], device=device)
+        self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
+        self.answer_start = torch.LongTensor(transposed_data[4], device=device)
+        self.answer_end = torch.LongTensor(transposed_data[5], device=device)
+        self.is_impossible = torch.BoolTensor(transposed_data[6], device=device)
+
+    # custom memory pinning method on custom type
+    def pin_memory(self):
+        self.question_ids = self.question_ids.pin_memory()
+        self.input_ids = self.input_ids.pin_memory()
+        self.attention_mask = self.attention_mask.pin_memory()
+        self.token_type_ids = self.token_type_ids.pin_memory()
+        self.answer_start = self.answer_start.pin_memory()
+        self.answer_end = self.answer_end.pin_memory()
+        self.is_impossible = self.is_impossible.pin_memory()
+        return self
+
+
+def collate_wrapper(batch):
+    return BatchInputFeatures(batch)
+
+
 class SQuADDataset(Dataset):
     def __init__(self, squad_examples):
         self.squad_examples = squad_examples
@@ -306,7 +349,7 @@ class SQuADDataset(Dataset):
             idx = idx.tolist()
 
         selected_example = self.squad_examples[idx]
-        return selected_example.get_properties()
+        return selected_example.get_input_features()
 
     def __len__(self):
         return len(self.squad_examples)

@@ -183,19 +183,19 @@ def read_squad(path_to_file: Path):
 
                     short_context = context_sentences[sentence_number]
 
-                    squad_example = SquadExample(
-                        qas_id=question_id,
-                        question_text=question,
-                        context_text=passage['context'],
-                        answer_text=answer_text,
-                        title="",
-                        start_position_character=answer['answer_start'],
-                        is_impossible=is_impossible
-                    )
-                    dataset.append(squad_example)
+                    # squad_example = SquadExample(
+                    #     qas_id=question_id,
+                    #     question_text=question,
+                    #     context_text=passage['context'],
+                    #     answer_text=answer_text,
+                    #     title="test",
+                    #     start_position_character=answer['answer_start'],
+                    #     is_impossible=is_impossible
+                    # )
+                    # dataset.append(squad_example)
 
 
-                    # dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
+                    dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
 
             break   # todo remove
     return dataset
