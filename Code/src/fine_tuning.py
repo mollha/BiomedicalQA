@@ -1,37 +1,13 @@
-import torch
 import argparse
-import os
 from read_data import dataset_to_fc
-
-from functools import partial
-import sys
-from pathlib import Path
 from tqdm import trange
 from tqdm import tqdm
-
-from torch import nn
 from models import *
-import numpy as np
 from utils import *
-from glob import glob
-import tokenizers
 from data_processing import convert_samples_to_features, SQuADDataset, collate_wrapper
-from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor, SquadExample
-from transformers import AdamW, get_linear_schedule_with_warmup
+from transformers import AdamW, get_linear_schedule_with_warmup, ElectraForQuestionAnswering
 from pre_training import build_pretrained_from_checkpoint
 from torch.utils.data import DataLoader, RandomSampler
-# from run_factoid import train, evaluate
-
-# print(tokenizers.__version__) # returns 0.9.4 (latest compatible version)
-
-from transformers import (
-    WEIGHTS_NAME,
-    AutoConfig,
-    AutoModelForQuestionAnswering,
-    ElectraForQuestionAnswering,
-    AutoTokenizer,
-    squad_convert_examples_to_features,
-)
 
 # Ensure that lowercase model is used for model_type
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
@@ -142,7 +118,6 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                                                                                       pretrain_checkpoint_dir,
                                                                                                       pretrained_checkpoint_name)
         discriminator = pretrained_model.discriminator
-
 
     electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
                                                                  state_dict=discriminator.state_dict(),
@@ -343,9 +318,6 @@ if __name__ == "__main__":
     # Random Sampler used during training.
     data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
                              collate_fn=collate_wrapper)
-
-    # electra_for_qa, optimizer, scheduler, electra_tokenizer, loss_function, \
-    # config = build_finetuned_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, from_finetuned)
 
     electra_for_qa, optimizer, scheduler, electra_tokenizer,\
     config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,
