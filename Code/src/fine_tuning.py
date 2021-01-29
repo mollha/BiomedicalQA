@@ -41,7 +41,7 @@ config = {
     'seed': 0,
     'loss': [],
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 2,  # can override the val in config
+    # "max_epochs": 2,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
@@ -60,57 +60,96 @@ datasets = {
 }
 
 
+def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_dir, finetuned_checkpoint_dir,
+                                    checkpoint_name, question_type, config={}):
 
-def build_finetuned_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, config={}):
+    pretrained_checkpoint_name, finetuned_checkpoint_name = checkpoint_name
 
     # create the checkpoint directory if it doesn't exist
-    Path(checkpoint_directory).mkdir(exist_ok=True, parents=True)
+    Path(pretrained_checkpoint_dir).mkdir(exist_ok=True, parents=True)
+    Path(finetuned_checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
-    # -- Override general config with model specific config, for models of different sizes
-    model_settings = get_model_config(model_size)
-    generator, discriminator, electra_tokenizer = build_electra_model(model_size)
-    electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
+    model_settings = get_model_config(model_size)  # override general config with model specific config
+    generator, discriminator, electra_tokenizer,\
+    discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
 
-    # Prepare optimizer and schedule (linear warm up and decay)
-    # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
-    optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=model_settings["lr"],
-                      correct_bias=model_settings["adam_bias_correction"])
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
-                                                num_training_steps=model_settings["max_steps"])
+    # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
+    # get pre-trained model from which to begin fine-tuning
+    layerwise_learning_rates = get_layer_lrs(discriminator.named_parameters(), model_settings["lr"],
+                                             model_settings["layerwise_lr_decay"],
+                                             discriminator_config.num_hidden_layers)
 
-    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT OR FROM SCRATCH --------
-    valid_checkpoint, path_to_checkpoint = False, None
+    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
 
-    if checkpoint_name.lower() == "recent":
+    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
+    for n, p in discriminator.named_parameters():
+        wd = model_settings["decay"] if not any(nd in n for nd in no_decay) else 0
+        lr = layerwise_learning_rates[n]
+        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
 
-        subfolders = [x for x in Path(checkpoint_directory).iterdir() \
-                      if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]]
+    # Create the optimizer and scheduler
+    optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
+    scheduler = get_linear_schedule_with_warmup(optimizer,
+                num_warmup_steps=(len(data_loader) // model_settings["max_epochs"]) * model_settings["warmup_fraction"],
+                num_training_steps=-1)  # todo check whether num_training_steps should be -1
 
-        if len(subfolders) > 0:
-            path_to_checkpoint = get_recent_checkpoint_name(checkpoint_directory, subfolders)
-            print("\nTraining from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
-            valid_checkpoint = True
-    elif checkpoint_name:
-        path_to_checkpoint = os.path.join(checkpoint_directory, checkpoint_name)
-        if os.path.exists(path_to_checkpoint):
-            print(
-                "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
-            # if the directory with the checkpoint name exists, we can retrieve the correct config from here
-            valid_checkpoint = True
+    #   -------- DETERMINE WHETHER TRAINING FROM A FINE-TUNED CHECKPOINT OR FROM PRETRAINED CHECKPOINT --------
+    valid_finetune_checkpoint, path_to_checkpoint, building_from_pretrained = False, None, True
+
+    if finetuned_checkpoint_name != "": # if we have a valid name for fine-tuned checkpoint
+        if finetuned_checkpoint_name.lower() == "recent":  # if fine-tuned checkpoint_name is recent
+            # get the fine-tuned checkpoint with highest fine-tuned epochs and steps
+            # (does not care about the most pretrained)
+
+            # pick the most recent fine-tuned checkpoint
+            subfolders = [x for x in Path(finetuned_checkpoint_dir).iterdir() \
+                          if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]
+                          and question_type in str(x)[str(x).rfind('/') + 1:]]
+
+            if len(subfolders) > 0:
+                path_to_checkpoint = get_recent_checkpoint_name(finetuned_checkpoint_dir, subfolders)
+                print("\nTraining from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
+                valid_finetune_checkpoint = True
+                building_from_pretrained = False
+
+        else:  # fine-tuned checkpoint name should contain full checkpoint info (pretrained and fine-tuned)
+            path_to_checkpoint = os.path.join(finetuned_checkpoint_dir, finetuned_checkpoint_name)
+            if os.path.exists(path_to_checkpoint):
+                print(
+                    "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+                # if the directory with the checkpoint name exists, we can retrieve the correct config from here
+                valid_finetune_checkpoint = True
+                building_from_pretrained = False
+            else:
+                print(
+                    "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
+
+        if valid_finetune_checkpoint:
+            discriminator, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, discriminator,
+                                                                              optimizer, scheduler, device,
+                                                                              pre_training=False)
+
+            config = update_settings(config, new_config, exceptions=["update_steps", "device"])
+            building_from_pretrained = False
+
         else:
-            print(
-                "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
+            print("\nFine-tuning from the most advanced pre-trained checkpoint - invalid checkpoint '{}' provided.\n"
+                  .format(finetuned_checkpoint_name))
 
-    if valid_checkpoint:
-        electra_model, optimizer, scheduler, loss_function,\
-        new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
+    if building_from_pretrained:
+        # no fine-tuned checkpoint provided so we just fine-tune the most advanced pre-trained checkpoint (using existing logic)
+        pretrained_model, _, _, electra_tokenizer, _, model_config = build_pretrained_from_checkpoint(model_size, device,
+                                                                                                      pretrain_checkpoint_dir,
+                                                                                                      pretrained_checkpoint_name)
+        discriminator = pretrained_model.discriminator
 
-        config = update_settings(config, new_config, exceptions=["update_steps", "device"])
 
-    else:
-        print("\nTraining from scratch - no checkpoint provided.\n")
+    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
+                                                                 state_dict=discriminator.state_dict(),
+                                                                 config=discriminator_config)
 
-    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
+    return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
+
 
 def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
@@ -212,16 +251,23 @@ if __name__ == "__main__":
         help="The size of the electra model e.g. 'small', 'base' or 'large",
     )
     parser.add_argument(
-        "--checkpoint",
+        "--p-checkpoint",
         default="recent",
         type=str,
-        help="The name of the pre-training, or fine-tuning, checkpoint to use e.g. small_15_10230",
+        help="The name of the pre-training checkpoint to use e.g. small_15_10230.",
     )
     parser.add_argument(
-        "--finetuned",
-        default=False,
-        type=bool,
-        help="Whether training from fine-tuned checkpoint or from pretrained checkpoint",
+        "--f-checkpoint",
+        default="", # if not provided, we assume fine-tuning from pre-trained
+        type=str,
+        help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
+    )
+    parser.add_argument(
+        "--question-type",
+        default="factoid",
+        choices=['factoid', 'yesno', 'list'],
+        type=str,
+        help="Type of fine-tuned model should be created - factoid, list or yesno?",
     )
     parser.add_argument(
         "--dataset",
@@ -232,9 +278,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     config['size'] = args.size
-    from_finetuned = args.finetuned
+    question_type = args.question_type
 
-    sys.stderr.write("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
+    sys.stderr.write("Selected finetuning checkpoint {} and model size {}".format(args.checkpoint, args.size))
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")
@@ -249,7 +295,10 @@ if __name__ == "__main__":
 
     # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
-    checkpoint_name = args.checkpoint
+    f_checkpoint_name = args.f_checkpoint
+    p_checkpoint_name = args.p_checkpoint
+    checkpoint_name = (f_checkpoint_name, p_checkpoint_name)
+
     selected_dataset = args.dataset.lower()
 
     base_checkpoint_dir = (base_path / '../checkpoints').resolve()
@@ -295,54 +344,12 @@ if __name__ == "__main__":
     data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
                              collate_fn=collate_wrapper)
 
-    # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
-    # get pre-trained model from which to begin fine-tuning
-    layerwise_learning_rates = get_layer_lrs(discriminator.named_parameters(), config["lr"],
-                                             config["layerwise_lr_decay"], discriminator_config.num_hidden_layers)
+    # electra_for_qa, optimizer, scheduler, electra_tokenizer, loss_function, \
+    # config = build_finetuned_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, from_finetuned)
 
-    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
-
-    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
-    for n, p in discriminator.named_parameters():
-        wd = config["decay"] if not any(nd in n for nd in no_decay) else 0
-        lr = layerwise_learning_rates[n]
-        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
-
-    # Create the optimizer and scheduler
-    optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
-    scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=(len(data_loader) // config["max_epochs"]) *
-                                                                 config["warmup_fraction"],
-                                                num_training_steps=-1)  # todo check whether num_training_steps should be -1
-
-    if from_finetuned:  # load the fine-tuned checkpoint
-        discriminator, optimizer, scheduler, settings = load_checkpoint(path_to_checkpoint, discriminator, optimizer,
-                                                                        scheduler, config["device"], pre_training=False)
-    else:
-        pretrained_model, _, _, electra_tokenizer, _, model_config = build_pretrained_from_checkpoint(config['size'],
-                                                                                                   config['device'],
-                                                                                                   pretrain_checkpoint_dir,
-                                                                                                   checkpoint_name)
-
-        discriminator = pretrained_model.discriminator
-
-
-    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
-                                                                 state_dict=discriminator.state_dict(),
-                                                                 config=discriminator_config)
-
-
-
-
+    electra_for_qa, optimizer, scheduler, electra_tokenizer,\
+    config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,
+                                             finetune_checkpoint_dir, checkpoint_name, question_type, config)
 
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(data_loader, electra_for_qa, scheduler, optimizer, config, finetune_checkpoint_dir)
-
-    # # output folder for model checkpoints and predictions
-    # save_dir = "./output"
-    #
-    # # DECIDE WHETHER TO TRAIN, EVALUATE, OR BOTH.
-    # train_model, evaluate_model = True, True
-    #
-    # model_info = {"model_path": "google/electra-base-discriminator", "uncased": False}
-    # dataset_info = datasets["bioasq"]

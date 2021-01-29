@@ -39,7 +39,7 @@ def get_recent_checkpoint_name(directory, subfolders: list):
     start from if no specific checkpoint name was provided to the pre-training loop.
 
     Pre-trained checkpoints have the form {size}_{p_epoch}_{p_step}
-    Fine-tuned checkpoints have the form {size}_{p_epoch}_{p_step}_{t_epoch}_{t_step}
+    Fine-tuned checkpoints have the form {size}_{question_type}_{p_epoch}_{p_step}_{t_epoch}_{t_step}
 
     :param directory: directory containing model checkpoints.
     :param subfolders: list of checkpoint directories
