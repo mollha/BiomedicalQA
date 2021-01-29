@@ -180,13 +180,18 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     return model, optimizer, scheduler, settings
 
 
-
 def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_training=True, loss_function=None):
     now = datetime.datetime.now()
     today = datetime.date.today()
 
     # WE NEED TO CREATE A NEW CHECKPOINT NAME
-    checkpoint_name = "{}_{}_{}".format(settings["size"], settings["current_epoch"], settings["steps_trained"])
+    if pre_training:
+        checkpoint_name = "{}_{}_{}".format(settings["size"], settings["current_epoch"], settings["steps_trained"])
+    else:
+        pretrained_settings = settings["pretrained_settings"]
+        checkpoint_name = "{}_{}_{}_{}_{}".format(settings["size"], settings["question_type"],
+                                                  pretrained_settings["epochs"], pretrained_settings["steps"],
+                                                  settings["current_epoch"], settings["steps_trained"])
 
     # save the time and date of when the model was last saved
     settings["saved_on"] = today.strftime("%d/%m/%y")

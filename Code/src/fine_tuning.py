@@ -22,6 +22,10 @@ config = {
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
     "update_steps": 50,
+    "pretrained_settings": {
+        "epochs": 0,
+        "steps": 0,
+    }
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
@@ -45,7 +49,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     Path(pretrained_checkpoint_dir).mkdir(exist_ok=True, parents=True)
     Path(finetuned_checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
-    model_settings = get_model_config(model_size)  # override general config with model specific config
+    model_settings = get_model_config(model_size, pretrain=False)  # override general config with model specific config
     generator, discriminator, electra_tokenizer,\
     discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
 
@@ -72,7 +76,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     #   -------- DETERMINE WHETHER TRAINING FROM A FINE-TUNED CHECKPOINT OR FROM PRETRAINED CHECKPOINT --------
     valid_finetune_checkpoint, path_to_checkpoint, building_from_pretrained = False, None, True
 
-    if finetuned_checkpoint_name != "": # if we have a valid name for fine-tuned checkpoint
+    if finetuned_checkpoint_name != "":  # if we have a valid name for fine-tuned checkpoint
         if finetuned_checkpoint_name.lower() == "recent":  # if fine-tuned checkpoint_name is recent
             # get the fine-tuned checkpoint with highest fine-tuned epochs and steps
             # (does not care about the most pretrained)
@@ -114,9 +118,12 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
     if building_from_pretrained:
         # no fine-tuned checkpoint provided so we just fine-tune the most advanced pre-trained checkpoint (using existing logic)
-        pretrained_model, _, _, electra_tokenizer, _, model_config = build_pretrained_from_checkpoint(model_size, device,
+        pretrained_model, _, _, electra_tokenizer, _, p_model_config = build_pretrained_from_checkpoint(model_size, device,
                                                                                                       pretrain_checkpoint_dir,
                                                                                                       pretrained_checkpoint_name)
+
+        config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"],
+                                         "steps": p_model_config["steps_trained"]}
         discriminator = pretrained_model.discriminator
 
     electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
@@ -150,7 +157,7 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
     steps_trained = settings["steps_trained"]
 
     for epoch_number in train_iterator:
-        step_iterator = tqdm(data_loader, desc="Step")
+        step_iterator = tqdm(train_dataloader, desc="Step")
 
         # update the current epoch
         settings["current_epoch"] = epoch_number  # update the number of epochs
@@ -233,7 +240,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--f-checkpoint",
-        default="", # if not provided, we assume fine-tuning from pre-trained
+        default="",  # if not provided, we assume fine-tuning from pre-trained
         type=str,
         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
     )
@@ -253,12 +260,22 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     config['size'] = args.size
-    question_type = args.question_type
+    config["question_type"] = args.question_type
 
-    sys.stderr.write("Selected finetuning checkpoint {} and model size {}".format(args.checkpoint, args.size))
-    if args.checkpoint != "recent" and args.size not in args.checkpoint:
-        raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
-                        "e.g. --checkpoint small_15_10230 --size small")
+    sys.stderr.write("Selected finetuning checkpoint {}, pretraining checkpoint {} and model size {}"
+                     .format(args.f_checkpoint, args.p_checkpoint, args.size))
+
+    if args.f_checkpoint != "" and args.f_checkpoint != "recent":
+        if args.size not in args.f_checkpoint:
+            raise Exception("If using a fine-tuned checkpoint, the model size of the checkpoint must match provided model size."
+                            "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --size small")
+        if args.question_type not in args.f_checkpoint:
+            raise Exception(
+                "If using a fine-tuned checkpoint, the question type of the checkpoint must match question type."
+                "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --question-type factoid")
+    elif args.p_checkpoint != "recent" and args.size not in args.p_checkpoint:
+        raise Exception("If not using the most recent checkpoint, the model size of the checkpoint must match model size."
+                        "e.g. --p-checkpoint small_15_10230 --size small")
 
     # -- Set torch backend and set seed
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
@@ -272,7 +289,7 @@ if __name__ == "__main__":
     base_path = Path(__file__).parent
     f_checkpoint_name = args.f_checkpoint
     p_checkpoint_name = args.p_checkpoint
-    checkpoint_name = (f_checkpoint_name, p_checkpoint_name)
+    checkpoint_name = (p_checkpoint_name, f_checkpoint_name)
 
     selected_dataset = args.dataset.lower()
 
@@ -313,7 +330,7 @@ if __name__ == "__main__":
     features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
 
     print("Created {} features of length {}.".format(len(features), config["max_length"]))
-    train_dataset = SQuADDataset(features)  # not valid - todo change this
+    train_dataset = SQuADDataset(features)  # todo change this
 
     # Random Sampler used during training.
     data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
@@ -321,7 +338,7 @@ if __name__ == "__main__":
 
     electra_for_qa, optimizer, scheduler, electra_tokenizer,\
     config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,
-                                             finetune_checkpoint_dir, checkpoint_name, question_type, config)
+                                             finetune_checkpoint_dir, checkpoint_name, config["question_type"], config)
 
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(data_loader, electra_for_qa, scheduler, optimizer, config, finetune_checkpoint_dir)
