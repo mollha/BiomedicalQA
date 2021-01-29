@@ -59,19 +59,25 @@ def get_recent_checkpoint_name(directory, subfolders: list):
             return p_epoch, p_step, t_epoch, t_step
         else:
             raise Exception("Checkpoint name is {} when it should be of the form [size]_[p_epoch]_[p_step] for "
-                            "pre_trained or [size]_[p_epoch]_[p_step]_[t_epoch]_[t_step]")
-
+                            "pre_trained or [size]_[p_epoch]_[p_step]_[t_epoch]_[t_step]".format(config_str))
 
     max_file, max_epoch, max_step_in_epoch = None, None, None
     for subdirectory in subfolders:
-        epoch, step = parse_name(subdirectory)
+        parsed_name = parse_name(subdirectory)
 
-        if max_epoch is None or epoch > max_epoch:
-            max_epoch = epoch
-            max_step_in_epoch = step
+        if len(parsed_name) == 2:
+            p_epoch, p_step, t_epoch, t_step = parsed_name
+        elif len(parsed_name) == 4:
+            p_epoch, p_step = parsed_name
+        else:
+            raise Exception("parse_name should only be returning 2 or 4 elements - returned {}.".format(parsed_name))
+
+        if max_epoch is None or p_epoch > max_epoch:
+            max_epoch = p_epoch
+            max_step_in_epoch = p_step
             max_file = subdirectory
-        elif epoch == max_epoch:
-            if step > max_step_in_epoch:
-                max_step_in_epoch = step
+        elif p_epoch == max_epoch:
+            if p_step > max_step_in_epoch:
+                max_step_in_epoch = p_step
                 max_file = subdirectory
     return max_file
