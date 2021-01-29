@@ -37,6 +37,10 @@ def get_recent_checkpoint_name(directory, subfolders: list):
     Find the name of the most advanced model checkpoint saved in the checkpoints directory.
     This is the model checkpoint that has been trained the most, so it is the best candidate to
     start from if no specific checkpoint name was provided to the pre-training loop.
+
+    Pre-trained checkpoints have the form {size}_{p_epoch}_{p_step}
+    Fine-tuned checkpoints have the form {size}_{p_epoch}_{p_step}_{t_epoch}_{t_step}
+
     :param directory: directory containing model checkpoints.
     :param subfolders: list of checkpoint directories
     :return:
@@ -45,8 +49,18 @@ def get_recent_checkpoint_name(directory, subfolders: list):
 
     def parse_name(subdir: str):
         config_str = str(subdir)[str(subdir).find(directory) + len(directory):]
-        first_undsc, second_undsc = config_str.find('_'), config_str.rfind('_')
-        return int(config_str[first_undsc + 1: second_undsc]), int(config_str[second_undsc + 1:])
+        elements = config_str.split("_")
+
+        if len(elements) == 3:  # treat this as a pre-trained checkpoint
+            p_epoch, p_step = int(elements[1]), int(elements[2])
+            return p_epoch, p_step
+        elif len(elements) == 5:  # treat this as a fine-tuned checkpoint
+            p_epoch, p_step, t_epoch, t_step = int(elements[1]), int(elements[2]), int(elements[3]), int(elements[4])
+            return p_epoch, p_step, t_epoch, t_step
+        else:
+            raise Exception("Checkpoint name is {} when it should be of the form [size]_[p_epoch]_[p_step] for "
+                            "pre_trained or [size]_[p_epoch]_[p_step]_[t_epoch]_[t_step]")
+
 
     max_file, max_epoch, max_step_in_epoch = None, None, None
     for subdirectory in subfolders:

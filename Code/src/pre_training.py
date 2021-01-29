@@ -45,7 +45,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
 
     # -- Override general config with model specific config, for models of different sizes
     model_settings = get_model_config(model_size)
-    generator, discriminator, electra_tokenizer, disc_config = build_electra_model(model_size, get_config=True)
+    generator, discriminator, electra_tokenizer = build_electra_model(model_size)
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
     # Prepare optimizer and schedule (linear warm up and decay)
@@ -82,16 +82,13 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     if valid_checkpoint:
         electra_model, optimizer, scheduler, loss_function,\
         new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
-        print("ELECTRA CONTAINED STATISTICS at loading...")
-        print(loss_function.mid_epoch_stats)
-        # raise Exception('force error here')
 
         config = update_settings(config, new_config, exceptions=["update_steps", "device"])
 
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")
 
-    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config, disc_config
+    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
 
 
 # ---------- DEFINE MAIN PRE-TRAINING LOOP ----------
@@ -245,7 +242,7 @@ if __name__ == "__main__":
     config = {**model_specific_config, **config}
 
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
-    config, disc_config = build_pretrained_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
+    config = build_pretrained_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])

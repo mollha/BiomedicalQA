@@ -106,7 +106,7 @@ def get_model_config(model_size: str, pretrain=True) -> dict:
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
 def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    scheduler: torch.optim.lr_scheduler, device: str) -> tuple:
+                    scheduler: torch.optim.lr_scheduler, device: str, pre_training=True) -> tuple:
     """
     Given a path to a checkpoint directory, the model, optimizer, scheduler and training settings
     are loaded from this directory, ready to continue pre-training.
@@ -149,12 +149,6 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
         optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
         optimizer_to(optimizer, device)
 
-    path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
-    loss_function = None
-    if os.path.isfile(path_to_loss_fc):
-        with open(path_to_loss_fc, 'rb') as input_file:
-            loss_function = pickle.load(input_file)
-
     path_to_scheduler = os.path.join(path_to_checkpoint, "scheduler.pt")
     if os.path.isfile(path_to_scheduler):
         scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
@@ -165,6 +159,13 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
         model.to(device)
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
+    loss_function = None
+
+    if pre_training:
+        path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
+        if os.path.isfile(path_to_loss_fc):
+            with open(path_to_loss_fc, 'rb') as input_file:
+                loss_function = pickle.load(input_file)
 
     print(
         "Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
@@ -173,7 +174,11 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     # update the device as this may have changed since last checkpoint.
     settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    return model, optimizer, scheduler, loss_function, settings
+
+    if pre_training:
+        return model, optimizer, scheduler, loss_function, settings
+    return model, optimizer, scheduler, settings
+
 
 
 def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_training=True, loss_function=None):
@@ -269,7 +274,7 @@ def build_electra_model(model_size: str, get_config=False):
     Helper function for creating the base components of the electra model with default configuration.
 
     :param model_size: e.g. small, base or large
-    :param get_config: whether or not the discriminator's config should be returned. Used for finetuning only.
+    :param get_config: whether or not the discriminator's config should be returned. Used for fine-tuning only.
     :return: generator, discriminator, tokenizer and (sometimes) discriminator's config.
     """
     base_path = Path(__file__).parent

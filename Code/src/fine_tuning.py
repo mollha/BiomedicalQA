@@ -59,83 +59,59 @@ datasets = {
     }
 }
 
-def load_and_cache_examples(tokenizer, model_path, train_file, evaluate=False, output_examples=False):
-    overwrite_cached_features = True
-    max_seq_length = 384  # The maximum total input sequence length after WordPiece tokenization. Sequences " "longer than this will be truncated, and sequences shorter than this will be padded."
-    predict_file = "gdrive/My Drive/BioBERT/qa_datasets/QA/BioASQ/BioASQ-test-factoid-7b.json"  # "..qa_datasets/QA/BioASQ/BioASQ-test-factoid-7b.json" # # The input evaluation file. If a data dir is specified, will look for the file there" If no data dir or train/predict files are specified, will run with tensorflow_datasets.",
-    version_2_with_negative = False
-    doc_stride = 128  # When splitting up a long document into chunks, how much stride to take between chunks
-    max_query_length = 64  # The maximum number of tokens for the question. Questions longer than this will " "be truncated to this length.
-    data_dir = None  # The input data dir. Should contain the .json files for the task. If no data dir or train/predict files are specified, will run with tensorflow_datasets."
 
-    if doc_stride >= max_seq_length - max_query_length:
-        print("WARNING - Doc stride may be larger than question length in some "
-              "samples. This could result in errors when building features from the examples. Please reduce the doc "
-              "stride or increase the maximum length to ensure the features are correctly built.")
 
-    # Load data features from cache or dataset file
-    input_dir = data_dir if data_dir else "."
-    cached_features_file = os.path.join(
-        input_dir,
-        "cached_{}_{}_{}".format(
-            "dev" if evaluate else "train",
-            list(filter(None, model_path.split("/"))).pop(),
-            str(max_seq_length),
-        ),
-    )
+def build_finetuned_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, config={}):
 
-    # Init features and dataset from cache if it exists
-    if os.path.exists(cached_features_file) and not overwrite_cached_features:
-        print("Loading features from cached file {}".format(cached_features_file))
-        features_and_dataset = torch.load(cached_features_file)
-        features, dataset, examples = (
-            features_and_dataset["features"],
-            features_and_dataset["dataset"],
-            features_and_dataset["examples"],
-        )
-    else:
-        print("Creating features from dataset file at {}".format(input_dir))
+    # create the checkpoint directory if it doesn't exist
+    Path(checkpoint_directory).mkdir(exist_ok=True, parents=True)
 
-        if not data_dir and ((evaluate and not predict_file) or (not evaluate and not train_file)):
-            try:
-                import tensorflow_datasets as tfds
-            except ImportError:
-                raise ImportError("If not data_dir is specified, tensorflow_datasets needs to be installed.")
+    # -- Override general config with model specific config, for models of different sizes
+    model_settings = get_model_config(model_size)
+    generator, discriminator, electra_tokenizer = build_electra_model(model_size)
+    electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
-            if version_2_with_negative:
-                print("tensorflow_datasets does not handle version 2 of squad.")
+    # Prepare optimizer and schedule (linear warm up and decay)
+    # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
+    optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=model_settings["lr"],
+                      correct_bias=model_settings["adam_bias_correction"])
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
+                                                num_training_steps=model_settings["max_steps"])
 
-            tfds_examples = tfds.load("squad")
-            examples = SquadV1Processor().get_examples_from_dataset(tfds_examples, evaluate=evaluate)
+    #   -------- DETERMINE WHETHER TRAINING FROM A CHECKPOINT OR FROM SCRATCH --------
+    valid_checkpoint, path_to_checkpoint = False, None
+
+    if checkpoint_name.lower() == "recent":
+
+        subfolders = [x for x in Path(checkpoint_directory).iterdir() \
+                      if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]]
+
+        if len(subfolders) > 0:
+            path_to_checkpoint = get_recent_checkpoint_name(checkpoint_directory, subfolders)
+            print("\nTraining from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
+            valid_checkpoint = True
+    elif checkpoint_name:
+        path_to_checkpoint = os.path.join(checkpoint_directory, checkpoint_name)
+        if os.path.exists(path_to_checkpoint):
+            print(
+                "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+            # if the directory with the checkpoint name exists, we can retrieve the correct config from here
+            valid_checkpoint = True
         else:
-            processor = SquadV2Processor() if version_2_with_negative else SquadV1Processor()
-            if evaluate:
-                examples = processor.get_dev_examples(data_dir, filename=predict_file)
-            else:
-                examples = processor.get_train_examples(data_dir, filename=train_file)
+            print(
+                "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
-        features, dataset = squad_convert_examples_to_features(
-            examples=examples,
-            tokenizer=tokenizer,
-            max_seq_length=max_seq_length,
-            doc_stride=doc_stride,
-            max_query_length=max_query_length,
-            is_training=not evaluate,
-            return_dataset="pt",
-        )
+    if valid_checkpoint:
+        electra_model, optimizer, scheduler, loss_function,\
+        new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
 
-        print("Saving features into cached file {}".format(cached_features_file))
-        torch.save({"features": features, "dataset": dataset, "examples": examples}, cached_features_file)
+        config = update_settings(config, new_config, exceptions=["update_steps", "device"])
 
-    if output_examples:
-        return dataset, examples, features
-    return dataset
+    else:
+        print("\nTraining from scratch - no checkpoint provided.\n")
 
+    return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
 
-def loss_function():
-    return ""
-
-# ---------- DEFINE MAIN FINE-TUNING LOOP ----------
 def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
 
@@ -239,7 +215,13 @@ if __name__ == "__main__":
         "--checkpoint",
         default="recent",
         type=str,
-        help="The name of the pre-training checkpoint to use e.g. small_15_10230",
+        help="The name of the pre-training, or fine-tuning, checkpoint to use e.g. small_15_10230",
+    )
+    parser.add_argument(
+        "--finetuned",
+        default=False,
+        type=bool,
+        help="Whether training from fine-tuned checkpoint or from pretrained checkpoint",
     )
     parser.add_argument(
         "--dataset",
@@ -250,6 +232,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     config['size'] = args.size
+    from_finetuned = args.finetuned
 
     sys.stderr.write("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
@@ -281,16 +264,8 @@ if __name__ == "__main__":
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     print("Device: {}\n".format(config["device"].upper()))
 
-    # get pre-trained model from which to begin fine-tuning
-    electra_model, _, _, electra_tokenizer, _, model_config, disc_config = \
-        build_pretrained_from_checkpoint(config['size'], config['device'], pretrain_checkpoint_dir, checkpoint_name)
-
-    discriminator = electra_model.discriminator
-    generator = electra_model.generator
-
-    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
-                                                                 state_dict=discriminator.state_dict(),
-                                                                 config=disc_config)
+    # get basic model building blocks
+    generator, discriminator, electra_tokenizer, discriminator_config = build_electra_model(config['size'], get_config=True)
 
     # -- Load the data and prepare it in squad format
     try:
@@ -307,56 +282,28 @@ if __name__ == "__main__":
     selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
     dataset_file_path = (selected_dataset_dir / dataset_file_name).resolve()
 
-    # electra_tokenizer._batch_encode_plus = partial(electra_tokenizer._batch_encode_plus, is_split_into_words=False)
-    # electra_tokenizer.encode_plus = partial(electra_tokenizer.encode_plus, is_split_into_words=False)
-
     sys.stderr.write("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
     read_raw_dataset = dataset_function(dataset_file_path)
-
-    # processor = SquadV2Processor()
-    # examples = processor.get_train_examples(selected_dataset_dir, filename=dataset_file_name)
-
-    # features, dataset = squad_convert_examples_to_features(examples=read_raw_dataset, #read_raw_dataset
-    #                                               tokenizer=electra_tokenizer,
-    #                                               max_seq_length=110,
-    #                                               doc_stride=60,
-    #                                               max_query_length=50,
-    #                                               is_training=True,
-    #                                               return_dataset="pt",
-    #                                               )
-
-    # features, dataset = squad_convert_examples_to_features(
-    #     examples=examples,
-    #     tokenizer=tokenizer,
-    #     max_seq_length=max_seq_length,
-    #     doc_stride=doc_stride,
-    #     max_query_length=max_query_length,
-    #     is_training=not evaluate,
-    #     return_dataset="pt",
-    # )
-
 
     print("Converting raw text to features.".format(dataset_file_name))
     features = convert_samples_to_features(read_raw_dataset, electra_tokenizer, config["max_length"])
 
-
     print("Created {} features of length {}.".format(len(features), config["max_length"]))
-
     train_dataset = SQuADDataset(features)  # not valid - todo change this
 
     # Random Sampler used during training.
-    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=2,
-                             collate_fn=collate_wrapper)  # batch_size=config["batch_size"])
+    data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
+                             collate_fn=collate_wrapper)
 
-    layerwise_learning_rates = get_layer_lrs(electra_for_qa.named_parameters(),
-                                             config["lr"], config["layerwise_lr_decay"], disc_config.num_hidden_layers)
+    # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
+    # get pre-trained model from which to begin fine-tuning
+    layerwise_learning_rates = get_layer_lrs(discriminator.named_parameters(), config["lr"],
+                                             config["layerwise_lr_decay"], discriminator_config.num_hidden_layers)
 
-    # Prepare optimizer and schedule (linear warm up and decay)
-    no_decay = ["bias", "LayerNorm", "layer_norm"]
+    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
 
-    # todo check if lr should be dependent on non-zero wd
-    layerwise_params = []
-    for n, p in electra_for_qa.named_parameters():
+    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
+    for n, p in discriminator.named_parameters():
         wd = config["decay"] if not any(nd in n for nd in no_decay) else 0
         lr = layerwise_learning_rates[n]
         layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
@@ -364,9 +311,28 @@ if __name__ == "__main__":
     # Create the optimizer and scheduler
     optimizer = AdamW(layerwise_params, eps=config["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=(len(data_loader) // config["max_epochs"]) * config["warmup_fraction"],
-                                                num_training_steps=-1)
-    # todo check whether num_training_steps should be -1
+                                                num_warmup_steps=(len(data_loader) // config["max_epochs"]) *
+                                                                 config["warmup_fraction"],
+                                                num_training_steps=-1)  # todo check whether num_training_steps should be -1
+
+    if from_finetuned:  # load the fine-tuned checkpoint
+        discriminator, optimizer, scheduler, settings = load_checkpoint(path_to_checkpoint, discriminator, optimizer,
+                                                                        scheduler, config["device"], pre_training=False)
+    else:
+        pretrained_model, _, _, electra_tokenizer, _, model_config = build_pretrained_from_checkpoint(config['size'],
+                                                                                                   config['device'],
+                                                                                                   pretrain_checkpoint_dir,
+                                                                                                   checkpoint_name)
+
+        discriminator = pretrained_model.discriminator
+
+
+    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
+                                                                 state_dict=discriminator.state_dict(),
+                                                                 config=discriminator_config)
+
+
+
 
 
     # ------ START THE FINE-TUNING LOOP ------
