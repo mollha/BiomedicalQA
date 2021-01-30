@@ -47,36 +47,35 @@ skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06
 
 
 class SQuADFeature:
-    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
-                 is_impossible):
+    def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end):
         self._question_id = question_id
+        self._is_impossible = is_impossible
         self._input_ids = input_ids
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
         self._answer_start = answer_start
         self._answer_end = answer_end
-        self._is_impossible = is_impossible
 
     def get_properties(self):
         return {
             "question_id": self._question_id,
+            "is_impossible": self._is_impossible,
             "input_ids": self._input_ids,
             "attention_mask": self._attention_mask,
             "token_type_ids": self._token_type_ids,
             "answer_start": self._answer_start,
             "answer_end": self._answer_end,
-            "is_impossible": self._is_impossible,
         }
 
     def get_input_features(self):
         return (
             self._question_id,
+            self._is_impossible,
             self._input_ids,
             self._attention_mask,
             self._token_type_ids,
             self._answer_start,
             self._answer_end,
-            self._is_impossible,
         )
 
 
@@ -300,8 +299,8 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
 
         # answer_start, answer_end, is_impossible
-        feature = SQuADFeature(squad_example._question_id, input_ids, attention_mask, token_type_ids, new_start,
-                               new_end, squad_example._is_impossible)
+        feature = SQuADFeature(squad_example._question_id, squad_example._is_impossible, input_ids, attention_mask, token_type_ids, new_start,
+                               new_end)
 
 
 
@@ -317,22 +316,25 @@ class BatchInputFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
 
         self.question_ids = list(transposed_data[0])
-        self.input_ids = torch.LongTensor(transposed_data[1], device=device)
-        self.attention_mask = torch.LongTensor(transposed_data[2], device=device)
-        self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
-        self.answer_start = torch.LongTensor(transposed_data[4], device=device)
-        self.answer_end = torch.LongTensor(transposed_data[5], device=device)
-        self.is_impossible = torch.BoolTensor(transposed_data[6], device=device)
+        self.is_impossible = torch.BoolTensor(transposed_data[1], device=device)
+        self.input_ids = torch.LongTensor(transposed_data[2], device=device)
+        self.attention_mask = torch.LongTensor(transposed_data[3], device=device)
+        self.token_type_ids = torch.LongTensor(transposed_data[4], device=device)
+
+        if len(transposed_data) == 7:  # assume fine-tuning mode with answer_start and answer_end
+            self.answer_start = torch.LongTensor(transposed_data[5], device=device)
+            self.answer_end = torch.LongTensor(transposed_data[6], device=device)
+
 
     # custom memory pinning method on custom type
     def pin_memory(self):
         self.question_ids = self.question_ids.pin_memory()
+        self.is_impossible = self.is_impossible.pin_memory()
         self.input_ids = self.input_ids.pin_memory()
         self.attention_mask = self.attention_mask.pin_memory()
         self.token_type_ids = self.token_type_ids.pin_memory()
         self.answer_start = self.answer_start.pin_memory()
         self.answer_end = self.answer_end.pin_memory()
-        self.is_impossible = self.is_impossible.pin_memory()
         return self
 
 

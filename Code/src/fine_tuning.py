@@ -170,7 +170,6 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
                 steps_trained -= 1
                 continue  # skip this step
 
-            # batch = batch.to(settings["device"])  # project batch to correct device
             qa_model.train()  # train model one step
 
             inputs = {

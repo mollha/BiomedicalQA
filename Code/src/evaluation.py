@@ -3,6 +3,7 @@ import sys
 import torch
 from datasets import load_metric
 import argparse
+from tqdm import tqdm
 from read_data import dataset_to_fc
 from fine_tuning import datasets, build_finetuned_from_checkpoint
 from models import *
@@ -23,8 +24,6 @@ config = {
     "version_2_with_negative": False,  # If true, the squad examples contain some that do not have an answer.
 }
 
-
-
 # ----------- DEFINE METRIC CONFIG --------
 def precision_recall_f1():
     pass
@@ -34,7 +33,28 @@ def exact_match():
 
 metrics = {}
 
-def evaluate(finetuned_model, test_dataset):
+def evaluate(finetuned_model, test_dataloader):
+
+    step_iterator = tqdm(test_dataloader, desc="Step")
+
+    for eval_step, batch in enumerate(step_iterator):
+        question_ids = batch.question_ids
+        is_impossible = batch.is_impossible
+
+        finetuned_model.train()  # train model one step
+
+        # todo not sure how to get electra into prediction mode - for now just remove start and end positions
+        inputs = {
+            "input_ids": batch.input_ids,
+            "attention_mask": batch.attention_mask,
+            "token_type_ids": batch.token_type_ids,
+        }
+
+        outputs = finetuned_model(**inputs)
+
+        # model outputs are always tuples in transformers
+        loss = outputs.loss
+        loss.backward()
 
 
 
