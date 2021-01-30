@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader, RandomSampler
 config = {
     'seed': 0,
     'losses': [],
+    'avg_loss': [0, 0],
     'num_workers': 3 if torch.cuda.is_available() else 0,
     # "max_epochs": 2,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
@@ -144,12 +145,9 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
                              settings["steps_trained"], settings["batch_size"], settings["update_steps"],
                              settings["max_length"]))
 
-    total_training_loss, logging_loss = 0.0, 0.0
     qa_model.zero_grad()
     # Added here for reproducibility
     set_seed(settings["seed"])
-
-    # evaluate during training always.
 
     # Resume training from the epoch we left off at earlier.
     train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")
@@ -189,7 +187,8 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
             loss = outputs.loss
             loss.backward()
 
-            total_training_loss += loss.item()
+            settings["avg_loss"][0] += float(loss.item())
+            settings["avg_loss"][1] += 1
 
             nn.utils.clip_grad_norm_(qa_model.parameters(), 1.)
 
@@ -216,6 +215,8 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
                                 pre_training=False)
 
     # todo update loss function statistics
+    settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])   # bank stats
+    settings["avg_loss"] = [0, 0]  # reset stats
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
