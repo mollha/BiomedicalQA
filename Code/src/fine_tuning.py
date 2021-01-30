@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, RandomSampler
 
 config = {
     'seed': 0,
-    'loss': [],
+    'losses': [],
     'num_workers': 3 if torch.cuda.is_available() else 0,
     # "max_epochs": 2,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
@@ -25,7 +25,8 @@ config = {
     "pretrained_settings": {
         "epochs": 0,
         "steps": 0,
-    }
+    },
+    "evaluate_during_training": True
 }
 
 # ----------------------- SPECIFY DATASET PATHS -----------------------
@@ -109,7 +110,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                                                               optimizer, scheduler, device,
                                                                               pre_training=False)
 
-            config = update_settings(config, new_config, exceptions=["update_steps", "device"])
+            config = update_settings(config, new_config, exceptions=["update_steps", "device", "evaluate_during_training"])
             building_from_pretrained = False
 
         else:
