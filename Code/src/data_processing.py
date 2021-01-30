@@ -325,7 +325,6 @@ class BatchInputFeatures:
             self.answer_start = torch.LongTensor(transposed_data[5], device=device)
             self.answer_end = torch.LongTensor(transposed_data[6], device=device)
 
-
     # custom memory pinning method on custom type
     def pin_memory(self):
         self.question_ids = self.question_ids.pin_memory()

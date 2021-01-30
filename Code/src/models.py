@@ -189,7 +189,7 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_t
         checkpoint_name = "{}_{}_{}".format(settings["size"], settings["current_epoch"], settings["steps_trained"])
     else:
         pretrained_settings = settings["pretrained_settings"]
-        checkpoint_name = "{}_{}_{}_{}_{}".format(settings["size"], settings["question_type"],
+        checkpoint_name = "{}_{}_{}_{}_{}_{}".format(settings["size"], settings["question_type"],
                                                   pretrained_settings["epochs"], pretrained_settings["steps"],
                                                   settings["current_epoch"], settings["steps_trained"])
 

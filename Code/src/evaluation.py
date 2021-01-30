@@ -34,7 +34,6 @@ def exact_match():
 metrics = {}
 
 def evaluate(finetuned_model, test_dataloader):
-
     step_iterator = tqdm(test_dataloader, desc="Step")
 
     for eval_step, batch in enumerate(step_iterator):
@@ -92,14 +91,14 @@ if __name__ == "__main__":
         default="factoid",
         choices=['factoid', 'yesno', 'list'],
         type=str,
-        help="Type of fine-tuned model should be created - factoid, list or yesno?",
+        help="Type of fine-tuned model to evaluate - factoid, list or yesno?",
     )
     parser.add_argument(
         "--dataset",
         default="squad",
         choices=['squad'],
         type=str,
-        help="The name of the dataset to use in training e.g. squad",
+        help="The name of the dataset to use in evaluated e.g. squad",
     )
     args = parser.parse_args()
     config['size'] = args.size

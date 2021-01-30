@@ -22,7 +22,7 @@ config = {
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 50,
+    "update_steps": 5,
     "pretrained_settings": {
         "epochs": 0,
         "steps": 0,
@@ -107,7 +107,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                     "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
         if valid_finetune_checkpoint:
-            discriminator, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, discriminator,
+            qa_model = ElectraForQuestionAnswering(config=discriminator_config)
+            electra_for_qa, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model,
                                                                               optimizer, scheduler, device,
                                                                               pre_training=False)
 
@@ -128,9 +129,9 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                          "steps": p_model_config["steps_trained"]}
         discriminator = pretrained_model.discriminator
 
-    electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
-                                                                 state_dict=discriminator.state_dict(),
-                                                                 config=discriminator_config)
+        electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
+                                                                     state_dict=discriminator.state_dict(),
+                                                                     config=discriminator_config)
 
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
 
@@ -241,7 +242,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--f-checkpoint",
-        default="",  # if not provided, we assume fine-tuning from pre-trained
+        default="recent",  # if not provided, we assume fine-tuning from pre-trained
         type=str,
         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
     )
