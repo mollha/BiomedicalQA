@@ -28,6 +28,7 @@ def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=N
 
 def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
     path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
+    print(path_to_loss_fc)
     if os.path.isfile(path_to_loss_fc):
         with open(path_to_loss_fc, 'rb') as input_file:
             loss_function = pickle.load(input_file)
@@ -88,7 +89,7 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "small_9_6565"    # e.g. small_10_50
+    chckpt_name = "small_22_87883"    # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
