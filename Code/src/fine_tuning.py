@@ -72,7 +72,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     # Create the optimizer and scheduler
     optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
-                num_warmup_steps=(len(data_loader) // model_settings["max_epochs"]) * model_settings["warmup_fraction"],
+                num_warmup_steps=(config["num_warmup_steps"]) * model_settings["warmup_fraction"],
                 num_training_steps=-1)  # todo check whether num_training_steps should be -1
 
     #   -------- DETERMINE WHETHER TRAINING FROM A FINE-TUNED CHECKPOINT OR FROM PRETRAINED CHECKPOINT --------
@@ -122,7 +122,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     if building_from_pretrained:
         # no fine-tuned checkpoint provided so we just fine-tune the most advanced pre-trained checkpoint (using existing logic)
         pretrained_model, _, _, electra_tokenizer, _, p_model_config = build_pretrained_from_checkpoint(model_size, device,
-                                                                                                      pretrain_checkpoint_dir,
+                                                                                                      pretrained_checkpoint_dir,
                                                                                                       pretrained_checkpoint_name)
 
         config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"],
@@ -337,6 +337,8 @@ if __name__ == "__main__":
     # Random Sampler used during training.
     data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
                              collate_fn=collate_wrapper)
+
+    config["num_warmup_steps"] = len(data_loader) // config["max_epochs"]
 
     electra_for_qa, optimizer, scheduler, electra_tokenizer,\
     config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,

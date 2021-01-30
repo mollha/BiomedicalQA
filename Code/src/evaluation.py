@@ -50,10 +50,10 @@ def evaluate(finetuned_model, test_dataloader):
         }
 
         outputs = finetuned_model(**inputs)
+        print(outputs)
 
         # model outputs are always tuples in transformers
-        loss = outputs.loss
-        loss.backward()
+
 
 
 
@@ -73,25 +73,10 @@ if __name__ == "__main__":
     # -- Parse command line arguments (checkpoint name and model size)
     parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
     parser.add_argument(
-        "--size",
-        default="small",
-        choices=['small', 'base', 'large'],
-        type=str,
-        help="The size of the electra model e.g. 'small', 'base' or 'large",
-    )
-
-    parser.add_argument(
         "--f-checkpoint",
-        default="",  # if not provided, we assume fine-tuning from pre-trained
+        default="small_factoid_22_87883_0_45",  # we can no longer use recent here - got to get specific :(
         type=str,
         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
-    )
-    parser.add_argument(
-        "--question-type",
-        default="factoid",
-        choices=['factoid', 'yesno', 'list'],
-        type=str,
-        help="Type of fine-tuned model to evaluate - factoid, list or yesno?",
     )
     parser.add_argument(
         "--dataset",
@@ -100,29 +85,23 @@ if __name__ == "__main__":
         type=str,
         help="The name of the dataset to use in evaluated e.g. squad",
     )
+
     args = parser.parse_args()
-    config['size'] = args.size
-    config["question_type"] = args.question_type
+
+    split_name = args.f_checkpoint.split("_")
+    model_size, question_type = split_name[0], split_name[1]
 
     sys.stderr.write("Selected finetuning checkpoint {} and model size {}"
-                     .format(args.f_checkpoint, args.size))
-
-    if args.f_checkpoint != "" and args.f_checkpoint != "recent":
-        if args.size not in args.f_checkpoint:
-            raise Exception("If using a fine-tuned checkpoint, the model size of the checkpoint must match provided model size."
-                            "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --size small")
-        if args.question_type not in args.f_checkpoint:
-            raise Exception(
-                "If using a fine-tuned checkpoint, the question type of the checkpoint must match question type."
-                "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --question-type factoid")
+                     .format(args.f_checkpoint, model_size))
 
     # ---- Set torch backend and set seed ----
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
     set_seed(config["seed"])  # set seed for reproducibility
 
     # -- Override general config with model specific config, for models of different sizes
-    model_specific_config = get_model_config(config['size'], pretrain=False)
+    model_specific_config = get_model_config(model_size, pretrain=False)
     config = {**model_specific_config, **config}
+    config["num_warmup_steps"] = 100  # dummy value to avoid an error when building fine-tuned checkpoint.
 
     # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
@@ -142,8 +121,7 @@ if __name__ == "__main__":
     print("Device: {}\n".format(config["device"].upper()))
 
     # get basic model building blocks
-    generator, discriminator, electra_tokenizer, discriminator_config = build_electra_model(config['size'],
-                                                                                            get_config=True)
+    generator, discriminator, electra_tokenizer, discriminator_config = build_electra_model(model_size, get_config=True)
 
     # ---- Load the data and prepare it in squad format ----
     try:
@@ -173,8 +151,8 @@ if __name__ == "__main__":
     # Random Sampler not used during evaluation - we need to maintain order.
     data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
     electra_for_qa, _, _, electra_tokenizer,\
-    config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,
-                                             finetune_checkpoint_dir, checkpoint_name, config["question_type"], config)
+    config = build_finetuned_from_checkpoint(model_size, config["device"], pretrain_checkpoint_dir,
+                                             finetune_checkpoint_dir, checkpoint_name, question_type, config)
 
     # ------ START THE EVALUATION PROCESS ------
     evaluate(electra_for_qa, data_loader)
