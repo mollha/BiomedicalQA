@@ -1,3 +1,6 @@
+import string
+
+
 # --------- METRIC HELPER FUNCTIONS ---------
 def check_match(prediction, expected):
     """
@@ -13,6 +16,9 @@ def check_match(prediction, expected):
         :param text: text to transform
         :return: transformed text
         """
+
+        # remove punctuation from the string
+        text = text.translate(str.maketrans('', '', string.punctuation))
 
         # translate characters to lower case
         return text.lower()
