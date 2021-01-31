@@ -17,6 +17,28 @@ BioASQ metrics differ for different question types:
 """
 
 
+# --------- METRIC HELPER FUNCTIONS ---------
+def check_match(prediction, expected):
+    """
+    Defines the logic for checking if a prediction matches the expected answer.
+    We can decide what we constitute as a match.
+    :return:
+    """
+
+    def transform(text: str) -> str:
+        """
+        Process text to ensure comparable and consistent format.
+        For now, we only convert to lower case.
+        :param text: text to transform
+        :return: transformed text
+        """
+
+        # translate characters to lower case
+        return text.lower()
+
+    return transform(prediction) == transform(expected)
+
+
 # --------- METRICS FOR YES/NO QUESTIONS ---------
 def yes_no_evaluation(predictions, ground_truth):
     if len(predictions) != len(ground_truth):
@@ -78,4 +100,19 @@ def yes_no_evaluation(predictions, ground_truth):
     }
     return metrics
 
+
+# --------- METRICS FOR FACTOID QUESTIONS ---------
+def factoid_evaluation(predictions, ground_truth):
+    if len(predictions) != len(ground_truth):
+        # not enough labels to match
+        raise Exception(
+            "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
+
+
+
 # --------- METRICS FOR LIST QUESTIONS ---------
+def list_evaluation(predictions, ground_truth):
+    if len(predictions) != len(ground_truth):
+        # not enough labels to match
+        raise Exception(
+            "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
