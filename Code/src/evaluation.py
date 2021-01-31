@@ -8,9 +8,10 @@ from utils import *
 from data_processing import convert_samples_to_features, SQuADDataset, collate_wrapper
 from torch.utils.data import DataLoader
 
-"""
-BioASQ metrics:
-    - 
+
+
+""" ----------- SQUAD EVALUATION METRICS -----------
+
 """
 
 accuracy = load_metric("accuracy")
@@ -26,6 +27,7 @@ config = {
     "version_2_with_negative": False,  # If true, the squad examples contain some that do not have an answer.
 }
 
+
 # ----------- DEFINE METRIC CONFIG --------
 def precision_recall_f1():
     pass
@@ -34,6 +36,10 @@ def exact_match():
     pass
 
 metrics = {}
+
+
+def perform_bioasq_evaluation():
+    pass
 
 
 """
