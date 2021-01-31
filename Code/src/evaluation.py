@@ -8,6 +8,7 @@ from utils import *
 from data_processing import convert_samples_to_features, SQuADDataset, collate_wrapper
 from torch.utils.data import DataLoader
 
+import metrics.bioasq_metrics
 
 
 """ ----------- SQUAD EVALUATION METRICS -----------
