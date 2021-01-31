@@ -108,6 +108,42 @@ def factoid_evaluation(predictions, ground_truth):
         raise Exception(
             "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
 
+    total_questions = len(predictions)
+    correct_in_position_1 = 0
+    correct_in_any_position = 0
+    total_one_over_ri = 0
+    for idx, prediction in enumerate(predictions):  # for every prediction
+        # We expect each prediction to be a list of candidate answers,
+        # however, the ground truth answer should be a single string.
+
+        # get the corresponding ground truth label
+        truth_value = ground_truth[idx]
+
+        match_position = None
+        for list_pos, candidate_answer in enumerate(prediction):
+            match = check_match(candidate_answer, truth_value)
+
+            if match:
+                correct_in_any_position += 1
+                if list_pos == 0:  # if the first position is a match
+                    correct_in_position_1 += 1
+                match_position = list_pos + 1  # best score is meant to be in position 1
+                break
+
+        # 0 if no match was found, else 1 / r(i)
+        one_over_ri = 0 if match_position is None else 1 / match_position
+        total_one_over_ri += one_over_ri
+
+    strict_accuracy = round(correct_in_position_1 / total_questions, 3)
+    leniant_accuracy = round(correct_in_any_position / total_questions, 3)
+    mrr = round((1 / total_questions) / total_one_over_ri, 3)
+
+    metrics = {
+        "strict_accuracy": strict_accuracy,
+        "leniant_accuracy": leniant_accuracy,
+        "mrr": mrr,
+    }
+    return metrics
 
 
 # --------- METRICS FOR LIST QUESTIONS ---------
@@ -116,3 +152,9 @@ def list_evaluation(predictions, ground_truth):
         # not enough labels to match
         raise Exception(
             "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
+
+
+    for idx, prediction in enumerate(predictions):  # for every prediction
+
+        # get the corresponding ground truth label
+        truth_value = ground_truth[idx]
