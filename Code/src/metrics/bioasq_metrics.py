@@ -83,8 +83,8 @@ def yes_no_evaluation(predictions, ground_truth):
     accuracy = round((tp + tn) / (tp + tn + fp + fn), 3)
     precision_y = round(tp / (tp + fp), 3)
     recall_y = round(tp / (tp + fn), 3)
-    precision_n = round(tp / (tp + fp), 3)
-    recall_n = round(tp / (tp + fn), 3)
+    precision_n = round(tn / (tn + fn), 3)
+    recall_n = round(tn / (tn + fp), 3)
 
     f1_y = round(2 * ((precision_y * recall_y) / (precision_y + recall_y)), 3)
     f1_n = round(2 * ((precision_n * recall_n) / (precision_n + recall_n)), 3)
@@ -153,8 +153,44 @@ def list_evaluation(predictions, ground_truth):
         raise Exception(
             "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
 
+    """
+        - list questions (produce a list of answers per question - up to 100)
+            - for every answer list, compute precision, recall and f measure
+            - compute mean avg precision, recall and f-measure (official eval metric)
+    """
 
+    total_questions = len(predictions)
+    total_precision = 0
+    total_recall = 0
+    total_f1 = 0
     for idx, prediction in enumerate(predictions):  # for every prediction
+        # We expect each prediction to be a list of candidate answers,
+        # The ground truth answer should also be a list of answers.
 
-        # get the corresponding ground truth label
-        truth_value = ground_truth[idx]
+        # get the corresponding ground truth answers
+        truth_values = ground_truth[idx]
+
+        tp, fp, tn, fn = 0, 0, 0, 0
+        for list_pos, candidate_answer in enumerate(prediction):
+
+            pass
+
+        precision = tp / (tp + fp)  # save the rounding for avg calculation
+        recall = tp / (tp + fn)
+        f1 = 2 * ((precision * recall) / (precision + recall))
+
+        total_precision += precision
+        total_recall += recall
+        total_f1 += f1
+
+    mean_average_precision = round(total_precision / total_questions, 3)
+    mean_average_recall = round(total_recall / total_questions, 3)
+    mean_average_f1 = round(total_f1 / total_questions, 3)
+
+    metrics = {
+        "mean_average_precision": mean_average_precision,
+        "mean_average_recall": mean_average_recall,
+        "mean_average_f1": mean_average_f1,
+    }
+    return metrics
+
