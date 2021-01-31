@@ -1,13 +1,19 @@
 import matplotlib.pyplot as plt
+from matplotlib import rc
 import os
 import torch
 from pathlib import Path
 import pickle
 
+rc('font', **{'family': 'serif', 'serif': ['Times']})
+rc('text', usetex=True)
+
+
 base_path = Path(__file__).parent
 checkpoint_dir = (base_path / '../checkpoints/pretrain').resolve()
 graphs_path = (base_path / 'visualisations/pre_training_graphs').resolve()
 Path(graphs_path).mkdir(exist_ok=True, parents=True)
+
 
 
 def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=None, more_data=None,
@@ -16,7 +22,7 @@ def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=N
     if more_data is not None:
         plt.plot(epochs, more_data, label=more_data_label)
 
-    plt.title(graph_title)
+    plt.title(r"\textbf{" + graph_title + "}")
     plt.xlabel("Epochs")
     y_label = y_label if y_label is not None else data_label
     graph_save_name = checkpoint_name + "_" + y_label.lower().replace(" ", "_") + "_epochs.png"
@@ -30,7 +36,7 @@ def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=N
     return plt
 
 
-def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
+def load_stats_from_checkpoint(path_to_checkpoint):
     path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
     print(path_to_loss_fc)
     if os.path.isfile(path_to_loss_fc):
@@ -59,6 +65,7 @@ def create_subplots(statistics, checkpoint_name):
     num_epochs = range(1, len(generator_losses) + 1)
     fig = plt.figure(0, figsize=(8, 8))
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    axis_font_size = 12
     # fig.suptitle("Statistics during Pre-training", fontsize=12, fontweight="bold", y=0.96)
 
     # Note: we don't include this in the subplots for now. It can be a standalone graph.
@@ -81,6 +88,7 @@ def create_subplots(statistics, checkpoint_name):
                checkpoint_name=checkpoint_name,
                color="b",
                save_figure=False)
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
 
     print("Creating graph of Discriminator Accuracy")
@@ -92,6 +100,8 @@ def create_subplots(statistics, checkpoint_name):
                checkpoint_name=checkpoint_name,
                color="g",
                save_figure=False)
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
 
 
     plt.subplot(2, 2, 3)
@@ -103,6 +113,8 @@ def create_subplots(statistics, checkpoint_name):
                checkpoint_name=checkpoint_name,
                color="r",
                save_figure=False)
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
 
     plt.subplot(2, 2, 4)
     print("Creating graph of Discriminator Recall")
@@ -113,9 +125,11 @@ def create_subplots(statistics, checkpoint_name):
                checkpoint_name=checkpoint_name,
                color="c",
                save_figure=False)
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
 
     plt.subplots_adjust(hspace=0.35, wspace=0.4)
+    plt.savefig((graphs_path / "pretraining_subplot.png").resolve())  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")
 
@@ -179,6 +193,6 @@ if __name__ == "__main__":
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
 
     checkpoint_path = (checkpoint_dir / chckpt_name).resolve()
-    stats = load_stats_from_checkpoint(checkpoint_path, chckpt_name)
+    stats = load_stats_from_checkpoint(checkpoint_path)
     create_subplots(stats, chckpt_name)
     create_separate_plots(stats, chckpt_name)

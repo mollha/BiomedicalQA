@@ -47,7 +47,7 @@ skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06
 
 
 class SQuADFeature:
-    def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end):
+    def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end, answer_text):
         self._question_id = question_id
         self._is_impossible = is_impossible
         self._input_ids = input_ids
@@ -55,6 +55,8 @@ class SQuADFeature:
         self._token_type_ids = token_type_ids
         self._answer_start = answer_start
         self._answer_end = answer_end
+        self._answer_text = answer_text
+
 
     def get_properties(self):
         return {
@@ -65,6 +67,7 @@ class SQuADFeature:
             "token_type_ids": self._token_type_ids,
             "answer_start": self._answer_start,
             "answer_end": self._answer_end,
+            "answer_text": self._answer_text,
         }
 
     def get_input_features(self):
@@ -76,6 +79,7 @@ class SQuADFeature:
             self._token_type_ids,
             self._answer_start,
             self._answer_end,
+            self._answer_text,
         )
 
 
@@ -300,7 +304,7 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
         # answer_start, answer_end, is_impossible
         feature = SQuADFeature(squad_example._question_id, squad_example._is_impossible, input_ids, attention_mask, token_type_ids, new_start,
-                               new_end)
+                               new_end, squad_example._answer)
 
 
 
@@ -321,9 +325,10 @@ class BatchInputFeatures:
         self.attention_mask = torch.LongTensor(transposed_data[3], device=device)
         self.token_type_ids = torch.LongTensor(transposed_data[4], device=device)
 
-        if len(transposed_data) == 7:  # assume fine-tuning mode with answer_start and answer_end
+        if len(transposed_data) == 8:  # assume fine-tuning mode with answer_start and answer_end
             self.answer_start = torch.LongTensor(transposed_data[5], device=device)
             self.answer_end = torch.LongTensor(transposed_data[6], device=device)
+            self.answer_text = list(transposed_data[7])
 
     # custom memory pinning method on custom type
     def pin_memory(self):
@@ -334,6 +339,8 @@ class BatchInputFeatures:
         self.token_type_ids = self.token_type_ids.pin_memory()
         self.answer_start = self.answer_start.pin_memory()
         self.answer_end = self.answer_end.pin_memory()
+        self.answer_text = self.answer_text.pin_memory()
+
         return self
 
 

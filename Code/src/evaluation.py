@@ -1,6 +1,3 @@
-import os
-import sys
-import torch
 from datasets import load_metric
 import argparse
 from tqdm import tqdm
@@ -9,7 +6,12 @@ from fine_tuning import datasets, build_finetuned_from_checkpoint
 from models import *
 from utils import *
 from data_processing import convert_samples_to_features, SQuADDataset, collate_wrapper
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader
+
+"""
+BioASQ metrics:
+    - 
+"""
 
 accuracy = load_metric("accuracy")
 f1 = load_metric("f1")
@@ -34,7 +36,13 @@ def exact_match():
 metrics = {}
 
 
-def evaluate(finetuned_model, test_dataloader):
+"""
+Refer to the following code
+https://huggingface.co/transformers/task_summary.html#extractive-question-answering
+"""
+
+def evaluate(finetuned_model, test_dataloader, tokenizer):
+
     step_iterator = tqdm(test_dataloader, desc="Step")
 
     for eval_step, batch in enumerate(step_iterator):
@@ -50,10 +58,50 @@ def evaluate(finetuned_model, test_dataloader):
             "token_type_ids": batch.token_type_ids,
         }
 
-        outputs = finetuned_model(**inputs)
-        print(outputs)
-
         # model outputs are always tuples in transformers
+        outputs = finetuned_model(**inputs)
+
+        answer_start_logits = outputs.start_logits
+        answer_end_logits = outputs.end_logits
+
+        print("Start logits", answer_start_logits)
+        print("End logits", answer_end_logits)
+
+        # dim=1 makes sure we produce an answer start for each x in batch
+        answer_start = torch.argmax(answer_start_logits, dim=1)  # Get the most likely beginning of answer with the argmax of the score
+        answer_end = torch.argmax(answer_end_logits, dim=1) + 1  # Get the most likely end of answer with the argmax of the score
+
+        # pair the start and end positions
+        start_end_positions = zip(answer_start, answer_end)
+
+        print('input ids 0', batch.input_ids[0])
+        print('answer text 0', batch.answer_text[0])
+
+        # print(start_end_positions)
+        # print("Start pos", answer_start)
+        # print("End pos", answer_end)
+
+        # print([(i, s, e) for i, s, e in start_end_positions])
+        special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
+        # convert the start and end positions to answers.
+        for index, (s, e) in enumerate(start_end_positions):
+            input_ids = batch.input_ids[index]
+            expected_answer = batch.answer_text[index]
+
+            tokens = tokenizer.convert_ids_to_tokens(input_ids)
+            # print('s: {}, e: {}'.format(s, e))
+            clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
+            # print('clipped tokens', clipped_tokens)
+            predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+            print('Predicted Answer: {}, Expected Answer: {}'.format(predicted_answer, expected_answer))
+
+        #
+        # answers = [tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(i[int(s):int(e)]))
+        #            for index, s, e in enumerate(start_end_positions)]
+        #
+
+        # print('Answers', answers)
+
 
 
 
@@ -75,7 +123,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
     parser.add_argument(
         "--f-checkpoint",
-        default="small_factoid_22_87883_0_45",  # we can no longer use recent here - got to get specific :(
+        default="small_factoid_26_11229_1_73",  # we can no longer use recent here - got to get specific :(
         type=str,
         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
     )
@@ -156,5 +204,5 @@ if __name__ == "__main__":
                                              finetune_checkpoint_dir, checkpoint_name, question_type, config)
 
     # ------ START THE EVALUATION PROCESS ------
-    evaluate(electra_for_qa, data_loader)
+    evaluate(electra_for_qa, data_loader, electra_tokenizer)
     # todo what happens if we start from a checkpoint here (vs passing a checkpoint from fine-tuning)
