@@ -42,16 +42,13 @@ https://huggingface.co/transformers/task_summary.html#extractive-question-answer
 """
 
 def evaluate(finetuned_model, test_dataloader, tokenizer):
-
+    results = []
     step_iterator = tqdm(test_dataloader, desc="Step")
 
     for eval_step, batch in enumerate(step_iterator):
         question_ids = batch.question_ids
         is_impossible = batch.is_impossible
 
-        finetuned_model.train()  # train model one step
-
-        # todo not sure how to get electra into prediction mode - for now just remove start and end positions
         inputs = {
             "input_ids": batch.input_ids,
             "attention_mask": batch.attention_mask,
@@ -61,57 +58,33 @@ def evaluate(finetuned_model, test_dataloader, tokenizer):
         # model outputs are always tuples in transformers
         outputs = finetuned_model(**inputs)
 
-        answer_start_logits = outputs.start_logits
-        answer_end_logits = outputs.end_logits
-
-        print("Start logits", answer_start_logits)
-        print("End logits", answer_end_logits)
-
         # dim=1 makes sure we produce an answer start for each x in batch
-        answer_start = torch.argmax(answer_start_logits, dim=1)  # Get the most likely beginning of answer with the argmax of the score
-        answer_end = torch.argmax(answer_end_logits, dim=1) + 1  # Get the most likely end of answer with the argmax of the score
+        answer_start = torch.argmax(outputs.start_logits, dim=1)  # Get the most likely beginning of answer with the argmax of the score
+        answer_end = torch.argmax(outputs.end_logits, dim=1) + 1  # Get the most likely end of answer with the argmax of the score
 
         # pair the start and end positions
         start_end_positions = zip(answer_start, answer_end)
-
-        print('input ids 0', batch.input_ids[0])
-        print('answer text 0', batch.answer_text[0])
-
-        # print(start_end_positions)
-        # print("Start pos", answer_start)
-        # print("End pos", answer_end)
-
-        # print([(i, s, e) for i, s, e in start_end_positions])
         special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
+
+        batch_results = []
+
         # convert the start and end positions to answers.
         for index, (s, e) in enumerate(start_end_positions):
             input_ids = batch.input_ids[index]
             expected_answer = batch.answer_text[index]
 
             tokens = tokenizer.convert_ids_to_tokens(input_ids)
-            # print('s: {}, e: {}'.format(s, e))
             clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
-            # print('clipped tokens', clipped_tokens)
             predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+
+            batch_results.append((predicted_answer, expected_answer))
             print('Predicted Answer: {}, Expected Answer: {}'.format(predicted_answer, expected_answer))
 
-        #
-        # answers = [tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(i[int(s):int(e)]))
-        #            for index, s, e in enumerate(start_end_positions)]
-        #
+        results.append(batch_results)
 
-        # print('Answers', answers)
+    # todo now we have predicted and expected answers, we need to turn these into metrics
 
-
-
-
-
-
-    metrics = {
-
-    }
-
-    return metrics
+    return results
 
 
 
