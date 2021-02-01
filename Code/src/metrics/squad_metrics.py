@@ -91,10 +91,6 @@ def squad_evaluation(predictions, ground_truth):
                 max_exact_match = exact_match
 
             f1 = compute_f1_from_span(candidate_answer_span, truth_value)
-            if f1 > 0:
-                print(f1)
-                print(candidate_answer_span)
-                print(truth_value)
             if f1 > max_f1:
                 max_f1 = f1
 
