@@ -1,4 +1,4 @@
-from helper_metrics import check_match
+from .helper_metrics import check_match
 
 """ ----------- SQUAD EVALUATION METRICS -----------
 There is a single question type in the squad dataset
@@ -47,9 +47,12 @@ def compute_f1_from_span(predicted_span, expected_span):
 
     precision = tp / (tp + fp)  # save the rounding for avg calculation
     recall = tp / (tp + fn)
-    f1 = 2 * ((precision * recall) / (precision + recall))
+    try:
+        f1 = 2 * ((precision * recall) / (precision + recall))
+    except ZeroDivisionError:
+        f1 = 0
 
-    return precision, recall, f1
+    return f1
 
 
 def compute_em_from_span(predicted_span, expected_span):
@@ -88,6 +91,10 @@ def squad_evaluation(predictions, ground_truth):
                 max_exact_match = exact_match
 
             f1 = compute_f1_from_span(candidate_answer_span, truth_value)
+            if f1 > 0:
+                print(f1)
+                print(candidate_answer_span)
+                print(truth_value)
             if f1 > max_f1:
                 max_f1 = f1
 

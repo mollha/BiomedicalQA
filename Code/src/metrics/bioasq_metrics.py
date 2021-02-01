@@ -1,4 +1,4 @@
-from helper_metrics import check_match
+from .helper_metrics import check_match
 
 """ ----------- BIOASQ EVALUATION METRICS -----------
 In the BioASQ challenge, task b phase b presents three different question types.

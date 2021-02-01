@@ -9,7 +9,7 @@ from data_processing import convert_samples_to_features, SQuADDataset, collate_w
 from torch.utils.data import DataLoader
 
 import metrics.bioasq_metrics
-
+from metrics.squad_metrics import squad_evaluation
 
 """ ----------- SQUAD EVALUATION METRICS -----------
 
@@ -52,6 +52,9 @@ def evaluate(finetuned_model, test_dataloader, tokenizer):
     results = []
     step_iterator = tqdm(test_dataloader, desc="Step")
 
+    predictions = []
+    ground_truths = []
+
     for eval_step, batch in enumerate(step_iterator):
         question_ids = batch.question_ids
         is_impossible = batch.is_impossible
@@ -73,8 +76,6 @@ def evaluate(finetuned_model, test_dataloader, tokenizer):
         start_end_positions = zip(answer_start, answer_end)
         special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
 
-        batch_results = []
-
         # convert the start and end positions to answers.
         for index, (s, e) in enumerate(start_end_positions):
             input_ids = batch.input_ids[index]
@@ -84,14 +85,18 @@ def evaluate(finetuned_model, test_dataloader, tokenizer):
             clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
             predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
 
-            batch_results.append((predicted_answer, expected_answer))
-            print('Predicted Answer: {}, Expected Answer: {}'.format(predicted_answer, expected_answer))
+            predictions.append(predicted_answer)
+            ground_truths.append(expected_answer)
+            # batch_results.append((predicted_answer, expected_answer))
+            # print('Predicted Answer: {}, Expected Answer: {}'.format(predicted_answer, expected_answer))
 
-        results.append(batch_results)
 
     # todo now we have predicted and expected answers, we need to turn these into metrics
 
-    return results
+    metrics = squad_evaluation(predictions, ground_truths)
+    print(metrics)
+
+    return metrics
 
 
 
