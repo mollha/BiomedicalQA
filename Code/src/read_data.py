@@ -16,7 +16,6 @@ from spacy.lang.en.stop_words import STOP_WORDS
 nlp = spacy.load('en_core_web_sm')
 
 
-
 class SQuADExample:
     def __init__(self, question_id, question, short_context, full_context, answer, answer_start, answer_end,
                  is_impossible):
@@ -42,7 +41,6 @@ class SQuADExample:
         print("Answer Start:", self._answer_start)
         print("Answer End:", self._answer_end)
         print("Is Impossible:", self._is_impossible)
-
 
 
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------

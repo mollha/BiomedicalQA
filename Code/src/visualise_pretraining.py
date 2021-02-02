@@ -63,9 +63,9 @@ def create_subplots(statistics, checkpoint_name):
     discriminator_recall = statistics
 
     num_epochs = range(1, len(generator_losses) + 1)
-    fig = plt.figure(0, figsize=(8, 8))
+    fig = plt.figure(0, figsize=(6, 6))
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-    axis_font_size = 12
+    axis_font_size = 14
     # fig.suptitle("Statistics during Pre-training", fontsize=12, fontweight="bold", y=0.96)
 
     # Note: we don't include this in the subplots for now. It can be a standalone graph.
@@ -95,7 +95,7 @@ def create_subplots(statistics, checkpoint_name):
     plt.subplot(2, 2, 2)
     draw_graph(graph_title="Discriminator Accuracy",
                data=discriminator_accuracy,
-               data_label="Discriminator Accuracy",
+               data_label="Accuracy",
                epochs=num_epochs,
                checkpoint_name=checkpoint_name,
                color="g",
@@ -108,7 +108,7 @@ def create_subplots(statistics, checkpoint_name):
     print("Creating graph of Discriminator Precision")
     draw_graph(graph_title="Discriminator Precision",
                data=discriminator_precision,
-               data_label="Discriminator Precision",
+               data_label="Precision",
                epochs=num_epochs,
                checkpoint_name=checkpoint_name,
                color="r",
@@ -120,7 +120,7 @@ def create_subplots(statistics, checkpoint_name):
     print("Creating graph of Discriminator Recall")
     draw_graph(graph_title="Discriminator Recall",
                data=discriminator_recall,
-               data_label="Discriminator Recall",
+               data_label="Recall",
                epochs=num_epochs,
                checkpoint_name=checkpoint_name,
                color="c",
@@ -128,7 +128,7 @@ def create_subplots(statistics, checkpoint_name):
     for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
 
-    plt.subplots_adjust(hspace=0.35, wspace=0.4)
+    plt.subplots_adjust(hspace=0.35, wspace=0.45)
     plt.savefig((graphs_path / "pretraining_subplot.png").resolve())  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")

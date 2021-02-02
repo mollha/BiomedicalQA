@@ -5,7 +5,12 @@ from tqdm import tqdm
 from models import *
 from utils import *
 from data_processing import convert_samples_to_features, SQuADDataset, collate_wrapper
-from transformers import AdamW, get_linear_schedule_with_warmup, ElectraForQuestionAnswering
+from transformers import (
+    AdamW,
+    get_linear_schedule_with_warmup,
+    ElectraForQuestionAnswering,
+    ElectraForSequenceClassification
+)
 from pre_training import build_pretrained_from_checkpoint
 from torch.utils.data import DataLoader, RandomSampler
 
@@ -107,7 +112,14 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                     "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
         if valid_finetune_checkpoint:
-            qa_model = ElectraForQuestionAnswering(config=discriminator_config)
+            # check if the question_type is yesno or factoid
+            if question_type == "factoid" or question_type == "list":
+                qa_model = ElectraForQuestionAnswering(config=discriminator_config)
+            elif question_type == "yesno":
+                qa_model = ElectraForSequenceClassification(config=discriminator_config, return_dict=True)
+            else:
+                raise Exception("Question type must be factoid, list or yesno.")
+
             electra_for_qa, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model,
                                                                               optimizer, scheduler, device,
                                                                               pre_training=False)
@@ -129,9 +141,16 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                          "steps": p_model_config["steps_trained"]}
         discriminator = pretrained_model.discriminator
 
-        electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
+        if question_type == "factoid" or question_type == "list":
+            electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
                                                                      state_dict=discriminator.state_dict(),
                                                                      config=discriminator_config)
+        elif question_type == "yesno":
+            electra_for_qa = ElectraForSequenceClassification.from_pretrained(pretrained_model_name_or_path=None,
+                                                                     state_dict=discriminator.state_dict(),
+                                                                     config=discriminator_config)
+        else:
+            raise Exception("Question type must be factoid, list or yesno.")
 
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
 
@@ -181,7 +200,25 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
                 "end_positions": batch.answer_end,
             }
 
+            if settings["question_type"] == "factoid" or settings["question_type"] == "list":
+                inputs = {
+                    "input_ids": batch.input_ids,
+                    "attention_mask": batch.attention_mask,
+                    "token_type_ids": batch.token_type_ids,
+                    "start_positions": batch.answer_start,
+                    "end_positions": batch.answer_end,
+                }
+            elif settings["question_type"] == "yesno":
+                inputs = {
+                    "input_ids": batch.input_ids,
+                    "attention_mask": batch.attention_mask,
+                    "token_type_ids": batch.token_type_ids,
+                }
+            else:
+                raise Exception("Question type must be factoid, list or yesno.")
+
             outputs = qa_model(**inputs)
+            print(outputs)
 
             # model outputs are always tuples in transformers
             loss = outputs.loss
@@ -248,7 +285,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--question-type",
-        default="factoid",
+        default="yesno",
         choices=['factoid', 'yesno', 'list'],
         type=str,
         help="Type of fine-tuned model should be created - factoid, list or yesno?",
