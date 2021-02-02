@@ -38,7 +38,6 @@ def exact_match():
 
 metrics = {}
 
-
 def perform_bioasq_evaluation():
     pass
 

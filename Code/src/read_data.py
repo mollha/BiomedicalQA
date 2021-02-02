@@ -16,9 +16,26 @@ from spacy.lang.en.stop_words import STOP_WORDS
 nlp = spacy.load('en_core_web_sm')
 
 
-class SQuADExample:
+class BinaryExample:
+    def __init__(self, question_id, question, short_context, answer):
+        self._question_type = "yesno"
+        self._question_id = question_id
+        self._question = question
+        self._short_context = short_context
+        self._answer = answer
+
+    def print_info(self):
+        print("\n----- Yes/No (binary) Example -----\n")
+        print("Question ID:", self._question_id)
+        print("Question:", self._question)
+        print("Short Context:", self._short_context)
+        print("Answer:", self._answer)
+
+
+class FactoidExample:
     def __init__(self, question_id, question, short_context, full_context, answer, answer_start, answer_end,
                  is_impossible):
+        self._question_type = "factoid"
         self._question_id = question_id
         self._question = question
         self._short_context = short_context
@@ -28,11 +45,8 @@ class SQuADExample:
         self._answer_end = answer_end
         self._is_impossible = is_impossible
 
-    def write(self):
-        pass
-
     def print_info(self):
-        print("\nSQuAD Example\n--------------")
+        print("\n----- Factoid (squad) Example -----\n")
         print("Question ID:", self._question_id)
         print("Question:", self._question)
         print("Short Context:", self._short_context)
@@ -92,7 +106,7 @@ def read_squad(path_to_file: Path):
 
     for group in tqdm(squad_dict['data']):
         for passage in group['paragraphs']:
-            full_context = passage['context'].rstrip()      # remove trailing whitespace
+            full_context = passage['context'].rstrip()  # remove trailing whitespace
 
             context_sentences = [sent for sent in sent_tokenize(full_context)]
 
@@ -123,47 +137,15 @@ def read_squad(path_to_file: Path):
                     continue
 
                 start_position_of_sent_in_context = full_context.find(sent, cumulative_length)
-                #
-                # print("start_position_of_sent_in_context {}".format(start_position_of_sent_in_context))
-                # print("cumulativee length {}".format(cumulative_length))
-                # print("last sentence", last_sentence)
                 num_whitespaces_to_add = start_position_of_sent_in_context - (last_sentence[0] + last_sentence[1])
-
-                # print("adding {} whitespaces to {}".format(num_whitespaces_to_add, context_sentences[sent_idx - 1]))
                 context_sentences[sent_idx - 1] = context_sentences[sent_idx - 1] + (" " * num_whitespaces_to_add)
 
                 cumulative_length += sentence_length + num_whitespaces_to_add
                 last_sentence = (start_position_of_sent_in_context, sentence_length)
 
-
-            #
-            #
-            # start_sentences = []
-            # cumulative_length = 0
-            # for sent in context_sentences:
-            #     sentence_length = len(sent)
-            #     start_sentences.append((full_context.find(sent, cumulative_length), sentence_length))
-            #     cumulative_length += sentence_length
-            #
-            #
-            # # correct the context sentences to include appropriate whitespaces - this protects start and end pos.
-            # last_total = (0, 0)
-            # for i, (s, l) in enumerate(start_sentences):
-            #     print(s, l)
-            #     # add whitespaces
-            #     print("adding {} whitespaces to {}".format(s - (last_total[0] + last_total[1]), context_sentences[i-1]))
-            #     context_sentences[i-1] = context_sentences[i-1] + (" " * (s - (last_total[0] + last_total[1])))
-            #     last_total = (s, l)
-
             context_sent_lengths = [len(sent) for sent in context_sentences]
 
             if sum(context_sent_lengths) != len(full_context):
-                # print('len full context', len(full_context))
-                # print('full context', (full_context))
-                # print('sum(context_sent_lengths)', sum(context_sent_lengths))
-                #
-                # print(context_sentences)
-
                 raise Exception('length no match')
 
             for qa in passage['qas']:
@@ -180,23 +162,20 @@ def read_squad(path_to_file: Path):
                     normalised_answer_end = normalised_answer_start + answer['answer_end'] - answer['answer_start']
 
                     short_context = context_sentences[sentence_number]
+                    dataset.append(FactoidExample(question_id, question, short_context, full_context, answer_text,
+                                                normalised_answer_start, normalised_answer_end, is_impossible))
 
-                    # squad_example = SquadExample(
-                    #     qas_id=question_id,
-                    #     question_text=question,
-                    #     context_text=passage['context'],
-                    #     answer_text=answer_text,
-                    #     title="test",
-                    #     start_position_character=answer['answer_start'],
-                    #     is_impossible=is_impossible
-                    # )
-                    # dataset.append(squad_example)
-
-
-                    dataset.append(SQuADExample(question_id, question, short_context, full_context, answer_text, normalised_answer_start, normalised_answer_end, is_impossible))
-
-            break   # todo remove
+            break  # todo remove
     return dataset
+
+
+def update_dataset_metrics(total_metrics, additional_metrics):
+    for key in additional_metrics:
+        if key in total_metrics:
+            total_metrics[key] += additional_metrics[key]
+        else:
+            total_metrics[key] = additional_metrics[key]
+    return total_metrics
 
 
 def read_bioasq(path_to_file: Path):
@@ -216,16 +195,25 @@ def read_bioasq(path_to_file: Path):
     :return: a list containing a dictionary for each context, question and answer triple.
     """
 
+    dataset = {
+        "list": [],
+        "factoid": [],
+        "yesno": []
+    }
+
     with open(path_to_file, 'rb') as f:
         bioasq_dict = json.load(f)
 
     articles_file_name = "pubmed_{}".format(str(path_to_file).split('/').pop())
-    articles_file_path = Path(path_to_file / '../{}'.format(articles_file_name)).resolve()
+    articles_file_path = Path(path_to_file / '../../processed_data/{}'.format(articles_file_name)).resolve()
 
     with open(articles_file_path, 'rb') as f:
         articles_dict = json.load(f)
 
     def match_answer_to_passage(answer: str, passage: str) -> list:
+        #
+        # print("\nanswer", answer)
+        # print("passage", passage)
         # remove punctuation
 
         answer = answer.lower()
@@ -233,10 +221,23 @@ def read_bioasq(path_to_file: Path):
 
         def remove_punctuation(text: str) -> tuple:
             position_list = []
+            escape_words = ["&apos;"]
+
+            spacy_doc = nlp(text)
+            spacy_tokens = [token.text for token in spacy_doc if token.tag_ == 'POS']
+
+            escape_words.extend(spacy_tokens)  # also don't care about POS
+            escape_range = [range(m.start(), m.end()) for word in escape_words for m in re.finditer(word, text)]
 
             for char_position, char in enumerate(text):
                 # this character needs to be removed if in punctuation, but we should preserve its position
-                if char not in string.punctuation:
+                in_escape_range = False
+                for ra in escape_range:
+                    if char_position in ra:
+                        in_escape_range = True
+                        break
+
+                if char not in string.punctuation and not in_escape_range:
                     position_list.append(char_position)
 
             return "".join([c for idx, c in enumerate(text) if idx in position_list]), position_list
@@ -244,20 +245,29 @@ def read_bioasq(path_to_file: Path):
         p_answer, answer_positions = remove_punctuation(answer)
         p_passage, passage_positions = remove_punctuation(passage)
 
-        if p_answer in p_passage:
+        if p_answer in p_passage:  # if the answer appears in the passage at least once
             match_cleaned_starts = [m.start() for m in re.finditer(p_answer, p_passage)]
             match_raw_starts = [passage_positions[m] for m in match_cleaned_starts]
             match_raw_ends = [passage_positions[m + len(p_answer) - 1] for m in match_cleaned_starts]
+            # todo check if we should return end instead of end + 1
+            return [[start, end + 1] for start, end in zip(match_raw_starts, match_raw_ends)]
 
-            return [[start, end] for start, end in zip(match_raw_starts, match_raw_ends)]
+        return []  # answer does not appear in passage
 
-    def process_factoid(data):
+    def process_factoid_question(data):
         question_id = data["id"]
         question = data["body"]
         answer = data["exact_answer"]
         snippets = data["snippets"]
+        examples_from_question = []
+
+        metrics = {
+            "impossible": 0,
+            "num_examples": 0,
+        }
 
         for snippet in snippets:
+            context = snippet['text']
             article_id = snippet["document"].split('/').pop()
             section = snippet["beginSection"] if snippet["beginSection"] != "sections.0" else "abstract"
 
@@ -266,69 +276,82 @@ def read_bioasq(path_to_file: Path):
 
             try:
                 article = articles_dict[article_id]
-                # if the corresponding article is not here - we need to skip it.
-                # todo is it ok that some articles aren't here? probably not - let's try and find them.
             except KeyError:
-                continue
+                article = None
+                # the article did not exist
 
-            paragraph = article[section]
-            # print("\nquestion:", question)
-            # print("paragraph:", paragraph)
+            matches = match_answer_to_passage("".join(answer), context)
 
-            # parsed_answer = [remove_stopwords_and_stem(sub_answer) for sub_answer in answer]
+            if len(matches) == 0:  # there are no matches in the passage at all.
+                is_impossible = True
+                start_pos, end_pos = -1, -1
+                metrics["impossible"] += 1
+                metrics["num_examples"] += 1
+                examples_from_question.append(FactoidExample(question_id, question, context,
+                                                             context if article is None else article[section], "",
+                                                             start_pos, end_pos, is_impossible))
+            else:
+                is_impossible = False
 
-            matches = match_answer_to_passage("".join(answer), snippet['text'])
+                # we have at least one match, iterate through each match
+                # and create an example for each get the matching text
+                for start_pos, end_pos in matches:
+                    matching_text = context[start_pos:end_pos]
+                    metrics["num_examples"] += 1
 
-            # if matches is not None:
-            #     print([snippet['text'][pair[0]:pair[1]+1] for pair in matches])
+                    # create an example per match
+                    examples_from_question.append(
+                        FactoidExample(question_id, question, context, context if article is None else article[section],
+                                       matching_text, start_pos, end_pos, is_impossible)
+                    )
 
-            beginOffset, endOffset = int(snippet["offsetInBeginSection"]), int(snippet["offsetInEndSection"])
-            # print('clipped section:', paragraph[beginOffset:endOffset])
-            # print('snippet text:', snippet['text'])
-            # print('exact answer:', answer)
-            # print('type', data["type"])
-            # print("begin", snippet["beginSection"])
-            # print("end", snippet["endSection"])
+        return examples_from_question, metrics
 
+    def process_list_question(data):
+        print(data)
+        question_id = data["id"]
+        question = data["body"]
+        snippets = data["snippets"]
+        answer = data["exact_answer"]
 
+        pass
 
+    def process_yesno_question(data):
+        question_id = data["id"]
+        question = data["body"]
+        snippets = data["snippets"]
+        answer = data["exact_answer"]
 
+        metrics = {
+            "num_examples": 0
+        }
 
-
-        sub_dataset = []
-
-
+        examples_from_question = []
         for snippet in snippets:
-            context = snippet["text"]
-            sub_dataset.append({"id": question_id,
-                                "context": context,
-                                "question": question,
-                                "answer": answer})
-
-        print(sub_dataset)
-        return sub_dataset
-
-    def process_list():
-        pass
-
-    def process_yesno():
-        pass
+            snippet_text = snippet['text']
+            metrics["num_examples"] += 1
+            example = BinaryExample(question_id=question_id,
+                                    question=question,
+                                    short_context=snippet_text,
+                                    answer=answer)
+            examples_from_question.append(example)
+        return examples_from_question, metrics
 
     fc_map = {
-        "factoid": process_factoid,
-        "yesno": process_yesno,
-        # "list": process_list,
+        "factoid": process_factoid_question,
+        "yesno": process_yesno_question,
+        "list": process_list_question,
     }
 
-    dataset = []
+    combined_metrics = {}
 
     for data_point in bioasq_dict['questions']:
         question_type = data_point["type"]
 
         # todo remove
-        if question_type in ['list', 'yesno', 'summary']:
+        # we don't care about summary questions
+        if question_type in ['list', 'summary']:
             continue
-
 
         try:
             fc = fc_map[question_type]
@@ -337,70 +360,17 @@ def read_bioasq(path_to_file: Path):
                 continue
             raise KeyError("Question type {} is not in fc_map".format_map(question_type))
 
-        context_answer_pairs = fc(data_point)
-        dataset.extend(context_answer_pairs)
+        example_list, question_metrics = fc(data_point)  # apply the right function for the question type
+        combined_metrics = update_dataset_metrics(combined_metrics, question_metrics)
+        dataset[question_type].extend(example_list)  # collate examples
 
-
-        # for snippet in snippets:
-        #     print(snippet)
-        #     context = snippet["text"]
-        #     print(data_point["exact_answer"])
-        #     # answer = fc()
-        #     # dataset.append({"context": context, "question": question, "answer": answer})
-        #
-        # # for snippet in data_point["snippets"]:
-        # #     context =
-        #
-        # context = passage['context']
-        # for qa in passage['qas']:
-        #     question = qa['question']
-        #     for answer in qa['answers']:
-        #         add_end_idx(answer, context)
-        #         dataset.append({"context": context, "question": question, "answer": answer})
-        #
-        #
-        # print("body", data_point["body"])
-        # print("documents", data_point["documents"])
-        # print("ideal_answer", data_point["ideal_answer"])
-        # print("concepts", data_point["concepts"])
-        # print("type", data_point["type"])
-        # print("id", data_point["id"])
-
-
-    # snippets = question["snippets"]
-    # question_type = question["type"]
-    # question_answer = question["type"]
-
-    # print(bioasq_dict)
-    # print("Keys", bioasq_dict.keys())
-
-    # print(questions)
-
-
-
-
-def add_token_positions(encodings, answers):
-    start_positions = []
-    end_positions = []
-    for i in range(len(answers)):
-        start_positions.append(encodings.char_to_token(i, answers[i]['answer_start']))
-        end_positions.append(encodings.char_to_token(i, answers[i]['answer_end']))
-
-        # if start position is None, the answer passage has been truncated
-        if start_positions[-1] is None:
-            start_positions[-1] = tokenizer.model_max_length
-
-        # if end position is None, the 'char_to_token' function points to the space before the correct token - > add + 1
-        if end_positions[-1] is None:
-            end_positions[-1] = encodings.char_to_token(i, answers[i]['answer_end'] + 1)
-    encodings.update({'start_positions': start_positions, 'end_positions': end_positions})
+    return dataset, combined_metrics
 
 
 dataset_to_fc = {
     "squad": read_squad,
     "bioasq": read_bioasq
 }
-
 
 if __name__ == "__main__":
     # todo delete this section after testing
@@ -431,6 +401,3 @@ if __name__ == "__main__":
     # train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
     # add_token_positions(train_encodings, train_answers)
     # print(train_encodings)
-
-
-

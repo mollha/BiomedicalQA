@@ -15,38 +15,52 @@ import random
 # Sometimes, the answer span is not correct or does not make sense
 # Sometimes, the way we split sentences has a detrimental affect on separating answers.
 # The answer gets split over multiple sentences - todo fix this.
-skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06',
-                           "571a94b810f8ca140030517a", "57262473271a42140099d4ed",
-                           "5726bd56708984140094cfd1", '572822da3acd2414000df55f',
-                           "573189d6e6313a140071d066", "5730115eb2c2fd14005687e3",
-                           "573084818ab72b1400f9c544", "56bf7e603aeaaa14008c9681",
-                           "56cf609aaab44d1400b89187", "56cbdea66d243a140015edae",
-                           "56d20a6ae7d4791d0090261a", "56cf63b4aab44d1400b891c1",
-                           "56d22055e7d4791d00902687", "56cf67c74df3c31400b0d72f",
-                           "56d313b559d6e41400146211", "56cf6af94df3c31400b0d763",
-                           "56cbeb396d243a140015edec", "56cf69144df3c31400b0d749",
-                           "56cfdb3e234ae51400d9bf7d", "56cc100b6d243a140015ee8a",
-                           "56cc15956d243a140015eea8", "56cfe1d7234ae51400d9bff9",
-                           "56d3ac8e2ccc5a1400d82e1b", "56cf5284aab44d1400b88fcb",
-                           "56cfeb52234ae51400d9c0c2", "56d38c2b59d6e41400146707",
-                           "56cfef3c234ae51400d9c10f", "56cff2e0234ae51400d9c14b",
-                           "56d39cea59d6e41400146812", "56d39ed559d6e41400146827",
-                           "56cffba5234ae51400d9c1f1", "56cffcf3234ae51400d9c20e",
-                           "56d3a74159d6e414001468a3", "56ccde7862d2951400fa64d9",
-                           "56cd682162d2951400fa658e", '56cc57466d243a140015ef24',
-                           "56ce750daab44d1400b887b4", "56cd73af62d2951400fa65c4",
-                           "56cd8ffa62d2951400fa6723", "56cfe987234ae51400d9c09b",
-                           "56d11a1217492d1400aab957", "56d1056017492d1400aab755",
-                           "56cf884a234ae51400d9be0a", "56d137b1e7d4791d0090202d",
-                           "56d1c2d2e7d4791d00902121", "56d23cc4b329da140004ec43",
-                           "56d24a6fb329da140004ed00", "56d383b159d6e414001465e7",
-                           "56d3883859d6e41400146678", "56d5fc2a1c85041400946ea0",
-                           ""]
+# skip_squad_question_ids = ["570d2681fed7b91900d45c65", '571a275210f8ca1400304f06',
+#                            "571a94b810f8ca140030517a", "57262473271a42140099d4ed",
+#                            "5726bd56708984140094cfd1", '572822da3acd2414000df55f',
+#                            "573189d6e6313a140071d066", "5730115eb2c2fd14005687e3",
+#                            "573084818ab72b1400f9c544", "56bf7e603aeaaa14008c9681",
+#                            "56cf609aaab44d1400b89187", "56cbdea66d243a140015edae",
+#                            "56d20a6ae7d4791d0090261a", "56cf63b4aab44d1400b891c1",
+#                            "56d22055e7d4791d00902687", "56cf67c74df3c31400b0d72f",
+#                            "56d313b559d6e41400146211", "56cf6af94df3c31400b0d763",
+#                            "56cbeb396d243a140015edec", "56cf69144df3c31400b0d749",
+#                            "56cfdb3e234ae51400d9bf7d", "56cc100b6d243a140015ee8a",
+#                            "56cc15956d243a140015eea8", "56cfe1d7234ae51400d9bff9",
+#                            "56d3ac8e2ccc5a1400d82e1b", "56cf5284aab44d1400b88fcb",
+#                            "56cfeb52234ae51400d9c0c2", "56d38c2b59d6e41400146707",
+#                            "56cfef3c234ae51400d9c10f", "56cff2e0234ae51400d9c14b",
+#                            "56d39cea59d6e41400146812", "56d39ed559d6e41400146827",
+#                            "56cffba5234ae51400d9c1f1", "56cffcf3234ae51400d9c20e",
+#                            "56d3a74159d6e414001468a3", "56ccde7862d2951400fa64d9",
+#                            "56cd682162d2951400fa658e", '56cc57466d243a140015ef24',
+#                            "56ce750daab44d1400b887b4", "56cd73af62d2951400fa65c4",
+#                            "56cd8ffa62d2951400fa6723", "56cfe987234ae51400d9c09b",
+#                            "56d11a1217492d1400aab957", "56d1056017492d1400aab755",
+#                            "56cf884a234ae51400d9be0a", "56d137b1e7d4791d0090202d",
+#                            "56d1c2d2e7d4791d00902121", "56d23cc4b329da140004ec43",
+#                            "56d24a6fb329da140004ed00", "56d383b159d6e414001465e7",
+#                            "56d3883859d6e41400146678", "56d5fc2a1c85041400946ea0",
+#                            ""]
 
+class BinaryFeature:
+    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_text):
+        self._question_id = question_id
+        self._input_ids = input_ids
+        self._attention_mask = attention_mask
+        self._token_type_ids = token_type_ids
+        self._answer_text = answer_text
 
+    def get_features(self):
+        return (
+            self._question_id,
+            self._input_ids,
+            self._attention_mask,
+            self._token_type_ids,
+            self._answer_text,
+        )
 
-
-class SQuADFeature:
+class FactoidFeature:
     def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end, answer_text):
         self._question_id = question_id
         self._is_impossible = is_impossible
@@ -57,63 +71,20 @@ class SQuADFeature:
         self._answer_end = answer_end
         self._answer_text = answer_text
 
-
-    def get_properties(self):
-        return {
-            "question_id": self._question_id,
-            "is_impossible": self._is_impossible,
-            "input_ids": self._input_ids,
-            "attention_mask": self._attention_mask,
-            "token_type_ids": self._token_type_ids,
-            "answer_start": self._answer_start,
-            "answer_end": self._answer_end,
-            "answer_text": self._answer_text,
-        }
-
-    def get_input_features(self):
+    def get_features(self):
         return (
             self._question_id,
-            self._is_impossible,
             self._input_ids,
             self._attention_mask,
             self._token_type_ids,
+            self._answer_text,
             self._answer_start,
             self._answer_end,
-            self._answer_text,
+            self._is_impossible,
         )
 
 
-def convert_samples_to_features(samples, tokenizer, max_length):
-
-    unhandled_questions = 0
-
-    def verify_tokens_match_answer(tokens, answer):
-        # if we have an unknown token, we can't really check
-
-        # remove spaces from answer
-        characters_in_tokens = "".join([char for token in tokens for char in token if char != "#"])
-        characters_in_answer = answer.replace(" ", "").lower()
-        unaccented_characters_in_answer = unidecode.unidecode(characters_in_answer)
-        unaccented_characters_in_tokens = unidecode.unidecode(characters_in_tokens)
-
-        return unaccented_characters_in_answer == unaccented_characters_in_tokens
-
-    def correct_for_unaccounted(tokens, answer, start, end):
-        # sometimes answers are off by a character or two – fix this
-        for step_left in range(-3, 3):
-
-            for step_right in range(-3, 3):
-
-                if verify_tokens_match_answer(tokens[start + step_left:end + step_right], answer):
-                    return start + step_left, end + step_right  # When the gold label is off by n characters
-
-#        raise Exception("Even after correction, the answer will not align.")
-
-    def tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
-        # print("\nstart", start)
-        # print("end", end)
-        # print('text', text)
-
+def find_tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
         """
         The tokenizer removes some characters from text when creating tokens e.g.  ̃
         We need to correct for it being out by 1 or 2 characters
@@ -129,16 +100,9 @@ def convert_samples_to_features(samples, tokenizer, max_length):
             last_token_idx = len(tokenized_word) - 1
             tokens_handled = 1
 
-            # print("unk_idx", unk_idx)
-            # print("all tokens in word", tokenized_word)
-
             for tok_idx, tok_word in enumerate(tokenized_word):
                 if tok_idx < unk_idx:
                     continue
-                #
-                # print("tok_word", tok_word)
-                # print("tok_idx", tok_idx)
-                # print("char_in_raw", char_in_raw)
 
                 if tok_word == tokenizer.unk_token:
                     # found right unk token (there could be multiple)
@@ -232,25 +196,38 @@ def convert_samples_to_features(samples, tokenizer, max_length):
             new_e = num_tokens  # last token if not set
         return new_s, new_e + 1  # +1 means we don't cut off too early
 
+
+def convert_samples_to_features(samples, tokenizer, max_length):
+    # keep track of the number of questions we had to skip.
+    unhandled_questions = 0
+
+    def verify_tokens_match_answer(tokens, answer):
+        # note: if we have an unknown token, we can't check this.
+        # remove spaces from answer
+        characters_in_tokens = "".join([char for token in tokens for char in token if char != "#"])
+        characters_in_answer = answer.replace(" ", "").lower()
+        unaccented_characters_in_answer = unidecode.unidecode(characters_in_answer)
+        unaccented_characters_in_tokens = unidecode.unidecode(characters_in_tokens)
+
+        return unaccented_characters_in_answer == unaccented_characters_in_tokens
+
+    def correct_for_unaccounted(tokens, answer, start, end):
+        # sometimes answers are off by a character or two – fix this
+        for step_left in range(-3, 3):
+            for step_right in range(-3, 3):
+                if verify_tokens_match_answer(tokens[start + step_left:end + step_right], answer):
+                    return start + step_left, end + step_right  # When the gold label is off by n characters
+
     feature_list = []
 
-    for example_number, squad_example in enumerate(samples):
-        # print("\nexample number", example_number)
-
-        if squad_example._question_id in skip_squad_question_ids:
-            # raise Exception("Skipping question with answer {}".format(squad_example._answer))
-            unhandled_questions += 1
-            continue
-
-        short_context = squad_example._short_context
-        # full_context = squad_example._full_context
-        question = squad_example._question
-        start_pos = squad_example._answer_start
-        end_pos = squad_example._answer_end
+    for example_number, example in enumerate(samples):
+        short_context = example._short_context
+        question = example._question
 
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
         tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
                                     max_length=max_length)  # only truncate the second sequence
+        # todo might be good to add a docstride idk
         tokenized_context = tokenizer.tokenize(short_context)
         # print(len(tokenized_input["input_ids"]))
 
@@ -259,56 +236,59 @@ def convert_samples_to_features(samples, tokenizer, max_length):
         attention_mask = tokenized_input["attention_mask"]
         token_type_ids = tokenized_input["token_type_ids"]
 
-        if squad_example._is_impossible:
-            new_start, new_end = -1, -1
+        # check the type of the example.
+        if example._question_type == "yesno":
+            feature = BinaryFeature(example._question_id, input_ids, attention_mask,
+                                     token_type_ids, example._answer)
+
+        elif example._question_type == "factoid" or example._question_type == "list":
+            # if example._question_id in skip_squad_question_ids:
+            #     # raise Exception("Skipping question with answer {}".format(squad_example._answer))
+            #     unhandled_questions += 1
+            #     continue
+
+            start_pos = example._answer_start
+            end_pos = example._answer_end
+
+            if example._is_impossible:
+                new_start, new_end = -1, -1
+            else:
+                # start and end now refers to tokens, not characters
+                # however, they only include characters in short context.
+                tok_start, tok_end = find_tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
+                # print("Official Answer: {}, Predicted Answer: {}".format(example._answer, tokenized_context[tok_start: tok_end]))
+
+                if tokenizer.unk_token not in tokenized_context:
+                    corrected_positions = correct_for_unaccounted(tokenized_context, example._answer, tok_start,tok_end)
+
+                    if corrected_positions is None:
+                        # need to split into subtokens to handle these questions
+                        unhandled_questions += 1
+                        continue
+
+                    corr_start, corr_end = corrected_positions
+                    m = verify_tokens_match_answer(tokenized_context[corr_start: corr_end], example._answer)
+                    if not m:
+                        unhandled_questions += 1
+                        # answer has probably been cut from the context :(
+                        continue
+                        # raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[tok_start: tok_end], squad_example._answer))
+
+                    tok_start, tok_end = corr_start, corr_end
+
+                # add on 1 for the newly-appended [CLS] token
+                new_start = tok_start + 1
+                new_end = tok_end + 1
+
+            feature = FactoidFeature(example._question_id, example._is_impossible, input_ids, attention_mask,
+                                   token_type_ids, new_start, new_end, example._answer)
+
         else:
-            # squad_example.print_info()
-            # tokenizer(question, short_context)
-
-            # print('id', squad_example._question_id)
-            # print("short context: {}".format(short_context))
-            # print("Question: {}".format(squad_example._question))
-            # print("Clipped Answer: {}".format(short_context[start_pos: end_pos]))
-            # print("Official Answer: {}".format(squad_example._answer))
-            # print("Is impossible: {}".format(squad_example._is_impossible))
-
-            # start and end now refers to tokens, not characters
-            # however, they only include characters in short context.
-            tok_start, tok_end = tokenized_start_end_pos(tokenizer, short_context, start_pos, end_pos)
-
-            # print("Official Answer: {}, Predicted Answer: {}".format(squad_example._answer, tokenized_context[tok_start: tok_end]))
-
-            if tokenizer.unk_token not in tokenized_context:
-                corrected_positions = correct_for_unaccounted(tokenized_context, squad_example._answer, tok_start, tok_end)
-
-                if corrected_positions is None:
-                    # need to split into subtokens to handle these questions
-                    unhandled_questions += 1
-                    continue
-
-                corr_start, corr_end = corrected_positions
-
-                m = verify_tokens_match_answer(tokenized_context[corr_start: corr_end], squad_example._answer)
-                if not m:
-                    unhandled_questions += 1
-                    # answer has probably been cut from the context :(
-                    continue
-                    # raise Exception("Characters in tokens '{}' do not match characters in answer '{}'.".format(tokenized_context[tok_start: tok_end], squad_example._answer))
-
-                tok_start, tok_end = corr_start, corr_end
-
-            # add on 1 for the newly-appended [CLS] token
-            new_start = tok_start + 1
-            new_end = tok_end + 1
-
-
-        # answer_start, answer_end, is_impossible
-        feature = SQuADFeature(squad_example._question_id, squad_example._is_impossible, input_ids, attention_mask, token_type_ids, new_start,
-                               new_end, squad_example._answer)
-
-
+            raise Exception("Question type of example '{}' should be either list, factoid or yesno.".format(example.get_features()))
 
         feature_list.append(feature)
+
+
 
     return feature_list
 
@@ -320,47 +300,34 @@ class BatchInputFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
 
         self.question_ids = list(transposed_data[0])
-        self.is_impossible = torch.BoolTensor(transposed_data[1], device=device)
-        self.input_ids = torch.LongTensor(transposed_data[2], device=device)
-        self.attention_mask = torch.LongTensor(transposed_data[3], device=device)
-        self.token_type_ids = torch.LongTensor(transposed_data[4], device=device)
+        self.input_ids = torch.LongTensor(transposed_data[1], device=device)
+        self.attention_mask = torch.LongTensor(transposed_data[2], device=device)
+        self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
+        self.answer_text = list(transposed_data[4])
 
-        if len(transposed_data) == 8:  # assume fine-tuning mode with answer_start and answer_end
+        if len(transposed_data) > 5:  # assume fine-tuning mode with answer_start and answer_end
             self.answer_start = torch.LongTensor(transposed_data[5], device=device)
             self.answer_end = torch.LongTensor(transposed_data[6], device=device)
-            self.answer_text = list(transposed_data[7])
-
-    # custom memory pinning method on custom type
-    def pin_memory(self):
-        self.question_ids = self.question_ids.pin_memory()
-        self.is_impossible = self.is_impossible.pin_memory()
-        self.input_ids = self.input_ids.pin_memory()
-        self.attention_mask = self.attention_mask.pin_memory()
-        self.token_type_ids = self.token_type_ids.pin_memory()
-        self.answer_start = self.answer_start.pin_memory()
-        self.answer_end = self.answer_end.pin_memory()
-        self.answer_text = self.answer_text.pin_memory()
-
-        return self
+            self.is_impossible = torch.BoolTensor(transposed_data[7], device=device)
 
 
 def collate_wrapper(batch):
     return BatchInputFeatures(batch)
 
 
-class SQuADDataset(Dataset):
-    def __init__(self, squad_examples):
-        self.squad_examples = squad_examples
+class QADataset(Dataset):
+    def __init__(self, examples):
+        self.examples = examples
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        selected_example = self.squad_examples[idx]
-        return selected_example.get_input_features()
+        selected_example = self.examples[idx]
+        return selected_example.get_features()
 
     def __len__(self):
-        return len(self.squad_examples)
+        return len(self.examples)
 
 
 # ------------ CUSTOM PYTORCH DATASET IMPLEMENTATIONS ------------
