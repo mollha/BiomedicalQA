@@ -22,7 +22,6 @@ def evaluate_yesno(yes_no_model, test_dataloader):
 
     for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
         question_ids = batch.question_ids
-        print(batch.answer_text)
 
         inputs = {
             "input_ids": batch.input_ids,

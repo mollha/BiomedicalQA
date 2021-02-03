@@ -51,6 +51,7 @@ def yes_no_evaluation(predictions, ground_truth):
             raise Exception("Prediction of the form {} is not a valid yes or no response. "
                             "Expected one of {} -> (yes) or {} -> (no)".format(truth_value, true_yes, true_no))
 
+        print(prediction, truth_value)
         # --- Evaluate answer ---
         if prediction in true_yes:  # predicted answer was yes
             if prediction == truth_value:   # ground truth answer was yes (true positive)
@@ -69,8 +70,16 @@ def yes_no_evaluation(predictions, ground_truth):
     precision_n = round(tn / (tn + fn), 3)
     recall_n = round(tn / (tn + fp), 3)
 
-    f1_y = round(2 * ((precision_y * recall_y) / (precision_y + recall_y)), 3)
-    f1_n = round(2 * ((precision_n * recall_n) / (precision_n + recall_n)), 3)
+    try:  # try this with the caveat that precision_y + recall_y could be zero
+        f1_y = round(2 * ((precision_y * recall_y) / (precision_y + recall_y)), 3)
+    except ZeroDivisionError:
+        f1_y = 0
+
+    try:  # try this with the caveat that precision_n + recall_n could be zero
+        f1_n = round(2 * ((precision_n * recall_n) / (precision_n + recall_n)), 3)
+    except ZeroDivisionError:
+        f1_n = 0
+
     f1_ma = round((f1_y + f1_n) / 2, 3)
 
     metrics = {
