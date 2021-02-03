@@ -34,14 +34,34 @@ def evaluate_yesno(yes_no_model, test_dataloader):
 
         # treat outputs as if they correspond to a yes/no question
         # dim=1 makes sure we produce an answer start for each x in batch
-        predicted_labels = torch.softmax(outputs.logits, dim=1).tolist()[0]
+        predicted_labels = torch.softmax(outputs.logits, dim=1)
 
         for question_idx, question_id in enumerate(question_ids):
-            predicted_answer = ["yes" if predicted_labels[question_idx] == 1 else "no"]
+            predicted_label = torch.argmax(predicted_labels[question_idx])
+            # predicted_label = int(round(predicted_labels[question_idx] * 100))
             if question_idx in results_by_question_id:
-                results_by_question_id[question_id].append(predicted_answer)
+                results_by_question_id[question_id].append(predicted_label)
             else:
-                results_by_question_id[question_id] = [predicted_answer]
+                results_by_question_id[question_id] = [predicted_label]
+
+    # iterate through predictions for each question
+    # we need to combine these predictions to produce a final "yes" or "no" prediction.
+    for q_id in results_by_question_id:
+        print()
+        # results_by_question_id[q_id].append(torch.tensor(0))  # todo remove
+        print(results_by_question_id[q_id])
+
+        # results_by_question_id[q_id] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
+        pred_tensor = torch.Tensor(results_by_question_id[q_id])
+
+        # get the most common value in the prediction tensor
+        best_pred = torch.mode(pred_tensor, 0).values
+        print(best_pred)
+
+        predicted_answer = "yes" if best_pred == 1 else "no"
+
+        results_by_question_id[q_id] = predicted_answer
+        print(results_by_question_id[q_id])
 
     return results_by_question_id
 
@@ -141,7 +161,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
     parser.add_argument(
         "--f-checkpoint",
-        default="small_factoid_26_11229_1_380",  # we can no longer use recent here - got to get specific :(
+        default="small_yesno_26_11229_1_374",  # we can no longer use recent here - got to get specific :(
         type=str,
         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
     )
@@ -157,8 +177,8 @@ if __name__ == "__main__":
     split_name = args.f_checkpoint.split("_")
     model_size, question_type = split_name[0], split_name[1]
 
-    sys.stderr.write("Selected finetuning checkpoint {} and model size {}"
-                     .format(args.f_checkpoint, model_size))
+    sys.stderr.write("\nEvaluating checkpoint {} - model size is {} and question type is {}\n"
+                     .format(args.f_checkpoint, model_size, question_type))
 
     # -- Override general config with model specific config, for models of different sizes
     config = get_model_config(model_size, pretrain=False)
@@ -216,7 +236,6 @@ if __name__ == "__main__":
 
     print(read_raw_dataset)
 
-    question_type = "factoid"
     raw_dataset = read_raw_dataset[question_type]
 
     print("Converting raw text to features.")
@@ -239,6 +258,7 @@ if __name__ == "__main__":
     # todo for now we're only allowing factoid evals
 
     #evaluate(electra_for_qa, data_loader, electra_tokenizer)
+    evaluate_yesno(electra_for_qa, data_loader)
 
-    evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 1)
+    #evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 1)
     # todo what happens if we start from a checkpoint here (vs passing a checkpoint from fine-tuning)

@@ -359,9 +359,9 @@ def read_bioasq(path_to_file: Path, testing=False):
     for data_point in bioasq_dict['questions']:
         question_type = data_point["type"]
 
-        # todo remove
+        # todo remove all except summary from here - we only exclude the ones we can't handle for now.
         # we don't care about summary questions
-        if question_type in ['summary', 'yesno', 'list']:
+        if question_type in ['summary', 'list']:
             continue
 
         try:
