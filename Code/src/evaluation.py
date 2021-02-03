@@ -62,21 +62,18 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
         # model outputs are always tuples in transformers
         outputs = factoid_model(**inputs)
 
-        print(outputs.start_logits)
-        answer_start = torch.argmax(outputs.start_logits,
-                                    dim=1)  # Get the most likely beginning of answer with the argmax of the score
+        # print(outputs.start_logits)
+        # answer_start = torch.argmax(outputs.start_logits,
+        #                             dim=1)  # Get the most likely beginning of answer with the argmax of the score
         answer_starts, start_indices = torch.topk(outputs.start_logits, k=k, dim=1)
         answer_ends, end_indices = torch.topk(outputs.end_logits, k=k, dim=1)
 
-        print('answer_start', answer_start)
-        print('indices', start_indices)
+        # print('answer_start', answer_start)
+        # print('indices', start_indices)
 
         start_end_positions = [x for x in zip(start_indices, end_indices)]
 
         for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
-            print('start tensor', start_tensor)
-            print('end tensor', end_tensor)
-
             sub_start_end_positions = zip(start_tensor, end_tensor)
             input_ids = batch.input_ids[index]
             expected_answer = batch.answer_text[index]
@@ -86,6 +83,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
 
             # convert the start and end positions to answers.
             for (s, e) in sub_start_end_positions:
+                print('s', s, 'e', e)
                 tokens = tokenizer.convert_ids_to_tokens(input_ids)
                 clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
                 predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
@@ -97,35 +95,23 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
                 results_by_question_id[question_id] = {"predictions": [list_of_predictions],
                                                        "expected_answer": expected_answer}
 
-            print(results_by_question_id[question_id])
+    # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
+    for ex in results_by_question_id:
+        pred_lists = results_by_question_id[ex]["predictions"]
 
-        # quit()
-        # # answer_start = torch.argmax(outputs.start_logits, dim=1)  # Get the most likely beginning of answer with the argmax of the score
-        # # answer_end = torch.argmax(outputs.end_logits, dim=1) + 1  # Get the most likely end of answer with the argmax of the score
-        #
-        # for i in range(k):  # iterate in order of most likely to least in top_k
-        #     answer_end, answer_start = answer_ends[i], answer_starts[i]
-        #
-        #     # pair the start and end positions
-        #     start_end_positions = zip(answer_start, answer_end)
-        #     special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
-        #
-        #     # convert the start and end positions to answers.
-        #     for index, (s, e) in enumerate(start_end_positions):
-        #         input_ids = batch.input_ids[index]
-        #         expected_answer = batch.answer_text[index]
-        #         question_id = batch.question_ids[index]
-        #
-        #         tokens = tokenizer.convert_ids_to_tokens(input_ids)
-        #         clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
-        #         predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
-        #
-        #     if question_id in results_by_question_id:
-        #         results_by_question_id[question_id].append(predicted_answer)
-        #     else:
-        #         results_by_question_id[question_id] = [predicted_answer]
-        #
+        all_predictions = []
+        for pred_list in pred_lists:
+            for p_idx in range(k):
+                all_predictions.append([pred_list[p_idx]])
 
+        results_by_question_id[ex]["predictions"] = all_predictions
+
+        print(all_predictions)
+        break
+
+    # todo add in a max length for this prediction list
+
+    # todo evaluate factoid
 
     return results_by_question_id
 
@@ -145,7 +131,6 @@ def evaluate(finetuned_model, test_dataloader, tokenizer):
 
 
     # return metrics
-
 
 
 if __name__ == "__main__":
@@ -255,5 +240,5 @@ if __name__ == "__main__":
 
     #evaluate(electra_for_qa, data_loader, electra_tokenizer)
 
-    evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 5)
+    evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 1)
     # todo what happens if we start from a checkpoint here (vs passing a checkpoint from fine-tuning)
