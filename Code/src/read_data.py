@@ -58,7 +58,7 @@ class FactoidExample:
 
 
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------
-def read_squad(path_to_file: Path):
+def read_squad(path_to_file: Path, testing=False):
     """
     Read the squad data into three categories of contexts, questions and answers
 
@@ -178,7 +178,7 @@ def update_dataset_metrics(total_metrics, additional_metrics):
     return total_metrics
 
 
-def read_bioasq(path_to_file: Path):
+def read_bioasq(path_to_file: Path, testing=False):
     """
     Read the bioasq data into three categories of contexts, questions and answers.
     BioASQ contexts are different than SQuAD, as they are a combination of articles and snippets.
@@ -280,30 +280,41 @@ def read_bioasq(path_to_file: Path):
                 article = None
                 # the article did not exist
 
-            matches = match_answer_to_passage("".join(answer), context)
+            print(context)
+            print(answer)
 
-            if len(matches) == 0:  # there are no matches in the passage at all.
-                is_impossible = True
-                start_pos, end_pos = -1, -1
-                metrics["impossible"] += 1
+            if testing:
+                # create an example per match
                 metrics["num_examples"] += 1
-                examples_from_question.append(FactoidExample(question_id, question, context,
-                                                             context if article is None else article[section], "",
-                                                             start_pos, end_pos, is_impossible))
+                examples_from_question.append(
+                    FactoidExample(question_id, question, context, context if article is None else article[section],
+                                   answer, None, None, None)
+                )
             else:
-                is_impossible = False
+                matches = match_answer_to_passage("".join(answer), context)
 
-                # we have at least one match, iterate through each match
-                # and create an example for each get the matching text
-                for start_pos, end_pos in matches:
-                    matching_text = context[start_pos:end_pos]
+                if len(matches) == 0:  # there are no matches in the passage at all.
+                    is_impossible = True
+                    start_pos, end_pos = -1, -1
+                    metrics["impossible"] += 1
                     metrics["num_examples"] += 1
+                    examples_from_question.append(FactoidExample(question_id, question, context,
+                                                                 context if article is None else article[section], "",
+                                                                 start_pos, end_pos, is_impossible))
+                else:
+                    is_impossible = False
 
-                    # create an example per match
-                    examples_from_question.append(
-                        FactoidExample(question_id, question, context, context if article is None else article[section],
-                                       matching_text, start_pos, end_pos, is_impossible)
-                    )
+                    # we have at least one match, iterate through each match
+                    # and create an example for each get the matching text
+                    for start_pos, end_pos in matches:
+                        matching_text = context[start_pos:end_pos]
+                        metrics["num_examples"] += 1
+
+                        # create an example per match
+                        examples_from_question.append(
+                            FactoidExample(question_id, question, context, context if article is None else article[section],
+                                           matching_text, start_pos, end_pos, is_impossible)
+                        )
 
         return examples_from_question, metrics
 
@@ -350,7 +361,7 @@ def read_bioasq(path_to_file: Path):
 
         # todo remove
         # we don't care about summary questions
-        if question_type in ['list', 'summary']:
+        if question_type in ['summary', 'yesno', 'list']:
             continue
 
         try:
@@ -372,12 +383,12 @@ dataset_to_fc = {
     "bioasq": read_bioasq
 }
 
-if __name__ == "__main__":
-    # todo delete this section after testing
-    base_path = Path(__file__).parent
-    squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
-    data = read_squad(squad_dir)
-    print("length of data", len(data))
+# if __name__ == "__main__":
+    # # todo delete this section after testing
+    # base_path = Path(__file__).parent
+    # squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
+    # data = read_squad(squad_dir)
+    # print("length of data", len(data))
 
     # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
     # train_contexts = [d["context"] for d in data]

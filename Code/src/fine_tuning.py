@@ -4,7 +4,7 @@ from tqdm import trange
 from tqdm import tqdm
 from models import *
 from utils import *
-from data_processing import convert_samples_to_features, QADataset, collate_wrapper
+from data_processing import convert_train_samples_to_features, QADataset, collate_training_wrapper
 from transformers import (
     AdamW,
     get_linear_schedule_with_warmup,
@@ -38,9 +38,6 @@ config = {
 # ----------------------- SPECIFY DATASET PATHS -----------------------
 # the folder structure of bioasq is different to squad, as we need to download matching articles
 datasets = {
-    # "bioasq": {"train_file": "../qa_datasets/QA/BioASQ/BioASQ-train-factoid-7b.json",
-    #            "golden_file": "../qa_datasets/QA/BioASQ/7B_golden.json",
-    #            "official_eval_dir": "./scripts/bioasq_eval"},
     # "bioasq": {"train": ["raw_data/training8b.json"],
     #            "test": ["8B1_golden.json", "8B2_golden.json", "8B3_golden.json", "8B4_golden.json", "8B5_golden.json"]
     #            },
@@ -220,6 +217,7 @@ def fine_tune(train_dataloader, qa_model, scheduler, optimizer, settings, checkp
                     "input_ids": batch.input_ids,
                     "attention_mask": batch.attention_mask,
                     "token_type_ids": batch.token_type_ids,
+                    "labels": batch.labels,
                 }
             else:
                 raise Exception("Question type must be factoid, list or yesno.")
@@ -344,7 +342,6 @@ if __name__ == "__main__":
     base_checkpoint_dir = (base_path / '../checkpoints').resolve()
     pretrain_checkpoint_dir = (base_checkpoint_dir / 'pretrain').resolve()
     finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
-    dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
 
     # create the fine-tune directory if it doesn't exist already
     Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)
@@ -381,14 +378,14 @@ if __name__ == "__main__":
     raw_dataset = read_raw_dataset[config["question_type"]]
 
     print("Converting raw text to features.")
-    features = convert_samples_to_features(raw_dataset, electra_tokenizer, config["max_length"])
+    features = convert_train_samples_to_features(raw_dataset, electra_tokenizer, config["max_length"])
 
     print("Created {} features of length {}.".format(len(features), config["max_length"]))
     train_dataset = QADataset(features)  # todo change this
 
     # Random Sampler used during training.
     data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
-                             collate_fn=collate_wrapper)
+                             collate_fn=collate_training_wrapper)
 
     config["num_warmup_steps"] = len(data_loader) // config["max_epochs"]
 

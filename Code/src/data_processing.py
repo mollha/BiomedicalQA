@@ -43,6 +43,7 @@ import random
 #                            "56d3883859d6e41400146678", "56d5fc2a1c85041400946ea0",
 #                            ""]
 
+
 class BinaryFeature:
     def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_text):
         self._question_id = question_id
@@ -50,6 +51,7 @@ class BinaryFeature:
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
         self._answer_text = answer_text
+        self._label = 1 if answer_text else 0
 
     def get_features(self):
         return (
@@ -58,7 +60,9 @@ class BinaryFeature:
             self._attention_mask,
             self._token_type_ids,
             self._answer_text,
+            self._label
         )
+
 
 class FactoidFeature:
     def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end, answer_text):
@@ -197,7 +201,37 @@ def find_tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> 
         return new_s, new_e + 1  # +1 means we don't cut off too early
 
 
-def convert_samples_to_features(samples, tokenizer, max_length):
+def convert_test_samples_to_features(samples, tokenizer, max_length):
+    feature_list = []
+
+    for example_number, example in enumerate(samples):
+        short_context = example._short_context
+        question = example._question
+
+        # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
+        tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
+                                    max_length=max_length)  # only truncate the second sequence
+
+        # prepare the input_ids, attention_mask and token_type_ids as tensors
+        input_ids = tokenized_input["input_ids"]
+        attention_mask = tokenized_input["attention_mask"]
+        token_type_ids = tokenized_input["token_type_ids"]
+
+        # check the type of the example.
+        if example._question_type == "yesno":
+            feature = BinaryFeature(example._question_id, input_ids, attention_mask,
+                                    token_type_ids, example._answer)
+            feature_list.append(feature)
+
+        elif example._question_type == "factoid" or example._question_type == "list":
+            feature = FactoidFeature(example._question_id, example._is_impossible, input_ids, attention_mask,
+                                     token_type_ids, None, None, example._answer)
+            feature_list.append(feature)
+
+    return feature_list
+
+
+def convert_train_samples_to_features(samples, tokenizer, max_length):
     # keep track of the number of questions we had to skip.
     unhandled_questions = 0
 
@@ -294,7 +328,7 @@ def convert_samples_to_features(samples, tokenizer, max_length):
 
 
 # ------------ FINE-TUNING PYTORCH DATASETS ------------
-class BatchInputFeatures:
+class BatchTrainingFeatures:
     def __init__(self, data):
         transposed_data = list(zip(*data))
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
@@ -305,14 +339,32 @@ class BatchInputFeatures:
         self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
         self.answer_text = list(transposed_data[4])
 
-        if len(transposed_data) > 5:  # assume fine-tuning mode with answer_start and answer_end
+        if len(transposed_data) == 8:  # assume fine-tuning factoid mode
             self.answer_start = torch.LongTensor(transposed_data[5], device=device)
             self.answer_end = torch.LongTensor(transposed_data[6], device=device)
             self.is_impossible = torch.BoolTensor(transposed_data[7], device=device)
+        elif len(transposed_data) == 6:  # assume fine-tuning factoid mode
+            self.labels = torch.LongTensor(transposed_data[5], device=device)
 
 
-def collate_wrapper(batch):
-    return BatchInputFeatures(batch)
+class BatchTestingFeatures:
+    def __init__(self, data):
+        transposed_data = list(zip(*data))
+        device = "cuda" if torch.cuda.is_available() else "cpu"  # device
+
+        self.question_ids = list(transposed_data[0])
+        self.input_ids = torch.LongTensor(transposed_data[1], device=device)
+        self.attention_mask = torch.LongTensor(transposed_data[2], device=device)
+        self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
+        self.answer_text = list(transposed_data[4])
+
+
+def collate_training_wrapper(batch):
+    return BatchTrainingFeatures(batch)
+
+
+def collate_testing_wrapper(batch):
+    return BatchTestingFeatures(batch)
 
 
 class QADataset(Dataset):
