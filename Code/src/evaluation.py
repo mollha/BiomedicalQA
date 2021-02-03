@@ -22,6 +22,7 @@ def evaluate_yesno(yes_no_model, test_dataloader):
 
     for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
         question_ids = batch.question_ids
+        print(batch.answer_text)
 
         inputs = {
             "input_ids": batch.input_ids,
@@ -29,41 +30,36 @@ def evaluate_yesno(yes_no_model, test_dataloader):
             "token_type_ids": batch.token_type_ids,
         }
 
-        # model outputs are always tuples in transformers
-        outputs = yes_no_model(**inputs)
-
+        outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
         # treat outputs as if they correspond to a yes/no question
         # dim=1 makes sure we produce an answer start for each x in batch
         predicted_labels = torch.softmax(outputs.logits, dim=1)
-
         for question_idx, question_id in enumerate(question_ids):
+            expected_answer = batch.answer_text[question_idx]
             predicted_label = torch.argmax(predicted_labels[question_idx])
-            # predicted_label = int(round(predicted_labels[question_idx] * 100))
             if question_idx in results_by_question_id:
-                results_by_question_id[question_id].append(predicted_label)
+                results_by_question_id[question_id]["predictions"].append(predicted_label)
             else:
-                results_by_question_id[question_id] = [predicted_label]
+                results_by_question_id[question_id] = {"predictions": [predicted_label],
+                                                       "expected_answer": expected_answer}
 
     # iterate through predictions for each question
     # we need to combine these predictions to produce a final "yes" or "no" prediction.
+    predictions_list = []
+    ground_truth_list = []
     for q_id in results_by_question_id:
-        print()
-        # results_by_question_id[q_id].append(torch.tensor(0))  # todo remove
-        print(results_by_question_id[q_id])
-
         # results_by_question_id[q_id] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
-        pred_tensor = torch.Tensor(results_by_question_id[q_id])
+        pred_tensor = torch.Tensor(results_by_question_id[q_id]["predictions"])
+        best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
+        predicted_answer = "yes" if best_pred == 1 else "no"  # convert 0s to yes and 1s to no
+        predictions_list.append(predicted_answer)
+        ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
 
-        # get the most common value in the prediction tensor
-        best_pred = torch.mode(pred_tensor, 0).values
-        print(best_pred)
+    # create a list of predictions and a list of ground_truth for evaluation
+    evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
 
-        predicted_answer = "yes" if best_pred == 1 else "no"
-
-        results_by_question_id[q_id] = predicted_answer
-        print(results_by_question_id[q_id])
-
-    return results_by_question_id
+    print(evaluation_metrics)
+    return results_by_question_id   # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
 
 
 def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
