@@ -44,11 +44,11 @@ def yes_no_evaluation(predictions, ground_truth):
                 "Cannot compare prediction and ground truth label of type {} and {}".format(type(prediction),
                                                                                             type(truth_value)))
 
-        if prediction not in true_yes or prediction not in true_no:
-            raise Exception("Prediction of the form {} is not a valid yes or no response."
+        if prediction not in true_yes and prediction not in true_no:
+            raise Exception("Prediction of the form {} is not a valid yes or no response. "
                             "Expected one of {} -> (yes) or {} -> (no)".format(prediction, true_yes, true_no))
-        if truth_value not in true_no or truth_value not in true_no:
-            raise Exception("Prediction of the form {} is not a valid yes or no response."
+        if truth_value not in true_yes and truth_value not in true_no:
+            raise Exception("Prediction of the form {} is not a valid yes or no response. "
                             "Expected one of {} -> (yes) or {} -> (no)".format(truth_value, true_yes, true_no))
 
         # --- Evaluate answer ---
