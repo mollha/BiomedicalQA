@@ -51,6 +51,7 @@ def evaluate_yesno(yes_no_model, test_dataloader):
         pred_tensor = torch.Tensor(results_by_question_id[q_id]["predictions"])
         best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
         predicted_answer = "yes" if best_pred == 1 else "no"  # convert 0s to yes and 1s to no
+        results_by_question_id[q_id]["predictions"] = predicted_answer
         predictions_list.append(predicted_answer)
         ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
 
@@ -58,7 +59,7 @@ def evaluate_yesno(yes_no_model, test_dataloader):
     evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
 
     print(evaluation_metrics)
-    return results_by_question_id   # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
+    return results_by_question_id, evaluation_metrics   # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
 
 
 def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
@@ -128,11 +129,13 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
 
     # todo evaluate factoid
 
-    return results_by_question_id
+    evaluation_metrics = {}
+
+    return results_by_question_id, evaluation_metrics
 
 
 def evaluate_list(list_model, test_dataloader, tokenizer, k):
-    pass
+    return
 
 
 

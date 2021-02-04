@@ -1,6 +1,7 @@
 from evaluation import evaluate_yesno, evaluate_factoid, evaluate_list
 from pathlib import Path
 import sys
+import json
 from read_data import dataset_to_fc
 from fine_tuning import datasets, build_finetuned_from_checkpoint
 from models import *
@@ -8,9 +9,46 @@ from utils import *
 from data_processing import convert_test_samples_to_features, QADataset, collate_testing_wrapper
 from torch.utils.data import DataLoader
 
+
+def write_predictions(path_to_read_file, path_to_write_file, predictions):
+    """
+    Write predictions to a file within a folder named after the dataset.
+
+    The format of a bioasq dataset is as follow:
+    -- questions
+    ------ body
+    ------ id
+    ------ ideal_answer
+    ------ exact_answer
+    ------ documents
+    ------ snippets
+    ------ concepts
+    ------ triples
+
+    :param predictions: predictions is a dictionary of question id to either list (factoid and list) or string (yesno)
+    :return: None
+    """
+    # we want to create file at path_to_new_file within which we can write our predictions
+    with open(path_to_read_file, 'rb') as infile:
+        data_dict = json.load(infile)
+
+    # now we need to add our predictions into the data_dict
+    questions = data_dict["questions"]
+
+    # iterate through every question
+    for question in questions:
+        question_id = question["id"]
+
+        if question_id in predictions: # if we have a prediction for this question
+            pred = predictions[question_id]["predictions"]
+            question["exact_answer"] = pred
+
+    with open(path_to_write_file, 'w') as outfile:
+        json.dump(data_dict, outfile)
+
+
+
 # in bioasq, we need to provide results by file
-
-
 if __name__ == "__main__":
     yes_no_checkpoint = "small_yesno_26_11229_1_374"
     factoid_checkpoint = "small_factoid_26_11229_1_380"
@@ -28,16 +66,27 @@ if __name__ == "__main__":
     pretrain_checkpoint_dir = (base_checkpoint_dir / 'pretrain').resolve()
     finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
     all_datasets_dir = (base_checkpoint_dir / '../datasets').resolve()
+    predictions_dir = (base_checkpoint_dir / '../predictions').resolve()
+
+    # create the predictions dir if it doesn't already exist.
+    Path(predictions_dir).mkdir(exist_ok=True, parents=True)
+
     selected_dataset = "bioasq"
     dataset_files = ["raw_data/8B1_golden.json", "raw_data/8B2_golden.json", "raw_data/8B3_golden.json",
                      "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"]
     all_question_types = ['yesno', 'factoid', 'list']
 
+    # find directory specific for predictions from our chosen dataset
+    predictions_dataset_dir = (predictions_dir / selected_dataset).resolve()
+    # create the predictions dir for this dataset if it doesn't already exist.
+    Path(predictions_dataset_dir).mkdir(exist_ok=True, parents=True)
 
+    # ---- build a dictionary for storing the metrics we collect
     metric_dictionary = {}
-    # build a dictionary for storing the metrics we collect
     for d_file in dataset_files:
         metric_dictionary[d_file] = {q_type: {} for q_type in all_question_types}
+
+    results_by_question_id_dictionary = {d_file: {} for d_file in dataset_files}
 
     print("\nEvaluating on the '{}' dataset using the following files:".format(selected_dataset))
     for f in dataset_files:
@@ -97,15 +146,21 @@ if __name__ == "__main__":
 
             # ------ START THE EVALUATION PROCESS ------
             if question_type == "factoid":
-                results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 1)
+                results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 1)
             elif question_type == "yesno":
-                results = evaluate_yesno(electra_for_qa, data_loader)
+                results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
+                results_by_question_id_dictionary[dataset_file_name] = {**results_by_question_id_dictionary[dataset_file_name],
+                                                     **results_by_question_id}  # todo move this to the end once done (i.e. once we have results_by_question_id for all question types)
             elif question_type == "list":
-                results = evaluate_list(electra_for_qa, data_loader, electra_tokenizer, 1)  # todo this is not valid yet don't forget
+                results_by_question_id, metric_results = evaluate_list(electra_for_qa, data_loader, electra_tokenizer, 1)  # todo this is not valid yet don't forget
             else:
                 raise Exception("No other question types permitted except factoid, yesno and list.")
 
-            metric_dictionary[dataset_file_name][question_type] = results
+            metric_dictionary[dataset_file_name][question_type] = metric_results
+            break
+        break
+
+    print(results_by_question_id_dictionary)
 
     print('----- METRICS -----')  # pretty-print the metrics
     for key in metric_dictionary.keys():
@@ -115,3 +170,15 @@ if __name__ == "__main__":
         for qt in metrics_for_dset.keys():
             metrics_for_qt_dset = metrics_for_dset[qt]
             print('Question Type: {}, Metrics: {}'.format(qt, metrics_for_qt_dset))
+
+    # iterate through our predictions for each dataset and write them to text files
+    for key, value in results_by_question_id_dictionary.items():
+        selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
+
+        # get the name of the file name
+        path_to_prediction_file = (predictions_dataset_dir / key.split('/')[-1]).resolve()
+        path_to_original_file = (selected_dataset_dir / key).resolve()
+
+        # for the bioasq challenge, we need to add our answers BACK into the dataset.
+        # provide the name of the file we want to write predictions to
+        write_predictions(path_to_original_file, path_to_prediction_file, value)

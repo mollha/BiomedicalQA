@@ -6,8 +6,8 @@ import pickle
 import torch
 
 base_path = Path(__file__).parent
-checkpoint_dir = (base_path / '../checkpoints/pretrain').resolve()
-graphs_path = (base_path / 'fine_tuning_graphs').resolve()
+checkpoint_dir = (base_path / '../checkpoints/finetune').resolve()
+graphs_path = (base_path / 'visualisations/fine_tuning_graphs').resolve()
 Path(graphs_path).mkdir(exist_ok=True, parents=True)
 
 
@@ -35,7 +35,7 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
     else:
         raise Exception("No training statistics to display.")
 
-    num_epochs = range(1, settings["current_epoch"]) # might need to add 1
+    num_epochs = range(1, settings["current_epoch"] + 1)  # might need to add 1
     losses = settings["losses"]
 
     if len(losses) == 0:
@@ -54,7 +54,7 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "small_9_6565"    # e.g. small_10_50
+    chckpt_name = "small_yesno_26_11229_1_374"    # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
