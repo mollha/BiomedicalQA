@@ -98,7 +98,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
 
             # convert the start and end positions to answers.
             for (s, e) in sub_start_end_positions:
-                print('s', s, 'e', e)
+                # print('s', s, 'e', e)
                 tokens = tokenizer.convert_ids_to_tokens(input_ids)
                 clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
                 predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
@@ -121,7 +121,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
 
         results_by_question_id[ex]["predictions"] = all_predictions
 
-        print(all_predictions)
+        # print(all_predictions)
         break
 
     # todo add in a max length for this prediction list
@@ -129,6 +129,11 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
     # todo evaluate factoid
 
     return results_by_question_id
+
+
+def evaluate_list(list_model, test_dataloader, tokenizer, k):
+    pass
+
 
 
 def evaluate(finetuned_model, test_dataloader, tokenizer):

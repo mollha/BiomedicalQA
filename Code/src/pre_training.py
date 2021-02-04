@@ -72,7 +72,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
         path_to_checkpoint = os.path.join(checkpoint_directory, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
             print(
-                "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+                "\nCheckpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
             # if the directory with the checkpoint name exists, we can retrieve the correct config from here
             valid_checkpoint = True
         else:
@@ -220,7 +220,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
 
-    sys.stderr.write("Selected checkpoint {} and model size {}".format(args.checkpoint, args.size))
+    sys.stderr.write("\nSelected checkpoint {} and model size {}".format(args.checkpoint, args.size))
     if args.checkpoint != "recent" and args.size not in args.checkpoint:
         raise Exception("If not using the most recent checkpoint, the checkpoint type must match model size."
                         "e.g. --checkpoint small_15_10230 --size small")

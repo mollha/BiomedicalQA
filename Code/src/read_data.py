@@ -280,8 +280,8 @@ def read_bioasq(path_to_file: Path, testing=False):
                 article = None
                 # the article did not exist
 
-            print(context)
-            print(answer)
+            # print(context)
+            # print(answer)
 
             if testing:
                 # create an example per match
@@ -382,33 +382,3 @@ dataset_to_fc = {
     "squad": read_squad,
     "bioasq": read_bioasq
 }
-
-# if __name__ == "__main__":
-    # # todo delete this section after testing
-    # base_path = Path(__file__).parent
-    # squad_dir = (base_path / '../datasets/squad/dev-v2.0.json').resolve()
-    # data = read_squad(squad_dir)
-    # print("length of data", len(data))
-
-    # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
-    # train_contexts = [d["context"] for d in data]
-    # train_questions = [d["question"] for d in data]
-    # train_answers = [d["answer"] for d in data]
-    #
-    # train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
-    # add_token_positions(train_encodings, train_answers)
-    # # print(train_encodings)
-
-    # base_path = Path(__file__).parent
-    # data_dir = (base_path / '../datasets/bioasq/training8b.json').resolve()
-    # data = read_bioasq(data_dir)
-    # print("length of data", len(data))
-
-    # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
-    # train_contexts = [d["context"] for d in data]
-    # train_questions = [d["question"] for d in data]
-    # train_answers = [d["answer"] for d in data]
-    #
-    # train_encodings = tokenizer(train_contexts, train_questions, truncation=True, padding=True)
-    # add_token_positions(train_encodings, train_answers)
-    # print(train_encodings)

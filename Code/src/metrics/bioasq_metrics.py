@@ -36,7 +36,7 @@ def yes_no_evaluation(predictions, ground_truth):
     for idx, prediction in enumerate(predictions):  # for every prediction
 
         # get the corresponding ground truth label
-        truth_value = ground_truth[idx]
+        truth_value = ground_truth[idx].lower()
 
         # ---------- Perform checks on the data first ----------
         if type(prediction) != type(truth_value):
@@ -51,7 +51,6 @@ def yes_no_evaluation(predictions, ground_truth):
             raise Exception("Prediction of the form {} is not a valid yes or no response. "
                             "Expected one of {} -> (yes) or {} -> (no)".format(truth_value, true_yes, true_no))
 
-        print(prediction, truth_value)
         # --- Evaluate answer ---
         if prediction in true_yes:  # predicted answer was yes
             if prediction == truth_value:   # ground truth answer was yes (true positive)

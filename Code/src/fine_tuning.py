@@ -111,13 +111,13 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             path_to_checkpoint = os.path.join(finetuned_checkpoint_dir, finetuned_checkpoint_name)
             if os.path.exists(path_to_checkpoint):
                 print(
-                    "Checkpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+                    "\nCheckpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
                 # if the directory with the checkpoint name exists, we can retrieve the correct config from here
                 valid_finetune_checkpoint = True
                 building_from_pretrained = False
             else:
                 print(
-                    "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
+                    "\nWARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
         if valid_finetune_checkpoint:
             # check if the question_type is yesno or factoid
