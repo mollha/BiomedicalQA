@@ -20,27 +20,29 @@ https://huggingface.co/transformers/task_summary.html#extractive-question-answer
 def evaluate_yesno(yes_no_model, test_dataloader):
     results_by_question_id = {}
 
-    for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
-        question_ids = batch.question_ids
+    yes_no_model.eval()  # switch to evaluation mode
+    with torch.no_grad():
+        for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
+            question_ids = batch.question_ids
 
-        inputs = {
-            "input_ids": batch.input_ids,
-            "attention_mask": batch.attention_mask,
-            "token_type_ids": batch.token_type_ids,
-        }
+            inputs = {
+                "input_ids": batch.input_ids,
+                "attention_mask": batch.attention_mask,
+                "token_type_ids": batch.token_type_ids,
+            }
 
-        outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
-        # treat outputs as if they correspond to a yes/no question
-        # dim=1 makes sure we produce an answer start for each x in batch
-        predicted_labels = torch.softmax(outputs.logits, dim=1)
-        for question_idx, question_id in enumerate(question_ids):
-            expected_answer = batch.answer_text[question_idx]
-            predicted_label = torch.argmax(predicted_labels[question_idx])
-            if question_idx in results_by_question_id:
-                results_by_question_id[question_id]["predictions"].append(predicted_label)
-            else:
-                results_by_question_id[question_id] = {"predictions": [predicted_label],
-                                                       "expected_answer": expected_answer}
+            outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
+            # treat outputs as if they correspond to a yes/no question
+            # dim=1 makes sure we produce an answer start for each x in batch
+            predicted_labels = torch.softmax(outputs.logits, dim=1)
+            for question_idx, question_id in enumerate(question_ids):
+                expected_answer = batch.answer_text[question_idx]
+                predicted_label = torch.argmax(predicted_labels[question_idx])
+                if question_idx in results_by_question_id:
+                    results_by_question_id[question_id]["predictions"].append(predicted_label)
+                else:
+                    results_by_question_id[question_id] = {"predictions": [predicted_label],
+                                                           "expected_answer": expected_answer}
 
     # iterate through predictions for each question
     # we need to combine these predictions to produce a final "yes" or "no" prediction.
@@ -66,50 +68,52 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
     results_by_question_id = {}
     special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
 
-    for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
-        # question_ids = batch.question_ids
+    factoid_model.eval()  # switch to evaluatation mode
+    with torch.no_grad():
+        for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
+            # question_ids = batch.question_ids
 
-        inputs = {
-            "input_ids": batch.input_ids,
-            "attention_mask": batch.attention_mask,
-            "token_type_ids": batch.token_type_ids,
-        }
+            inputs = {
+                "input_ids": batch.input_ids,
+                "attention_mask": batch.attention_mask,
+                "token_type_ids": batch.token_type_ids,
+            }
 
-        # model outputs are always tuples in transformers
-        outputs = factoid_model(**inputs)
+            # model outputs are always tuples in transformers
+            outputs = factoid_model(**inputs)
 
-        # print(outputs.start_logits)
-        # answer_start = torch.argmax(outputs.start_logits,
-        #                             dim=1)  # Get the most likely beginning of answer with the argmax of the score
-        answer_starts, start_indices = torch.topk(outputs.start_logits, k=k, dim=1)
-        answer_ends, end_indices = torch.topk(outputs.end_logits, k=k, dim=1)
+            # print(outputs.start_logits)
+            # answer_start = torch.argmax(outputs.start_logits,
+            #                             dim=1)  # Get the most likely beginning of answer with the argmax of the score
+            answer_starts, start_indices = torch.topk(outputs.start_logits, k=k, dim=1)
+            answer_ends, end_indices = torch.topk(outputs.end_logits, k=k, dim=1)
 
-        # print('answer_start', answer_start)
-        # print('indices', start_indices)
+            # print('answer_start', answer_start)
+            # print('indices', start_indices)
 
-        start_end_positions = [x for x in zip(start_indices, end_indices)]
+            start_end_positions = [x for x in zip(start_indices, end_indices)]
 
-        for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
-            sub_start_end_positions = zip(start_tensor, end_tensor)
-            input_ids = batch.input_ids[index]
-            expected_answer = batch.answer_text[index]
-            question_id = batch.question_ids[index]
+            for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
+                sub_start_end_positions = zip(start_tensor, end_tensor)
+                input_ids = batch.input_ids[index]
+                expected_answer = batch.answer_text[index]
+                question_id = batch.question_ids[index]
 
-            list_of_predictions = []
+                list_of_predictions = []
 
-            # convert the start and end positions to answers.
-            for (s, e) in sub_start_end_positions:
-                # print('s', s, 'e', e)
-                tokens = tokenizer.convert_ids_to_tokens(input_ids)
-                clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
-                predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
-                list_of_predictions.append(predicted_answer)
+                # convert the start and end positions to answers.
+                for (s, e) in sub_start_end_positions:
+                    # print('s', s, 'e', e)
+                    tokens = tokenizer.convert_ids_to_tokens(input_ids)
+                    clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
+                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+                    list_of_predictions.append(predicted_answer)
 
-            if question_id in results_by_question_id:
-                results_by_question_id[question_id]["predictions"].append(list_of_predictions)
-            else:
-                results_by_question_id[question_id] = {"predictions": [list_of_predictions],
-                                                       "expected_answer": expected_answer}
+                if question_id in results_by_question_id:
+                    results_by_question_id[question_id]["predictions"].append(list_of_predictions)
+                else:
+                    results_by_question_id[question_id] = {"predictions": [list_of_predictions],
+                                                           "expected_answer": expected_answer}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
     for ex in results_by_question_id:
