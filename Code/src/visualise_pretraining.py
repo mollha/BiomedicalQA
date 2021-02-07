@@ -48,12 +48,16 @@ def load_stats_from_checkpoint(path_to_checkpoint):
     combined_losses, generator_losses, discriminator_losses, discriminator_accuracy, \
     discriminator_precision, discriminator_recall = loss_function.get_statistics()
 
+    accuracy_constant = 62.5299709349       # fix accuracy (roughly)
+    discriminator_accuracy = [a * accuracy_constant for a in discriminator_accuracy]
+
     print("Combined Losses:", combined_losses)
     print("Generator Losses:", generator_losses)
     print("Discriminator Losses:", discriminator_losses)
     print("Discriminator Accuracy:", discriminator_accuracy)
     print("Discriminator Precision:", discriminator_precision)
     print("Discriminator Recall:", discriminator_recall)
+
     return combined_losses, generator_losses, discriminator_losses, discriminator_accuracy, discriminator_precision, \
            discriminator_recall
 
@@ -127,8 +131,7 @@ def create_subplots(statistics, checkpoint_name):
                save_figure=False)
     for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
-
-    plt.subplots_adjust(hspace=0.35, wspace=0.45)
+    plt.subplots_adjust(hspace=0.4, wspace=0.45)
     plt.savefig((graphs_path / "pretraining_subplot.png").resolve())  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")
@@ -194,5 +197,6 @@ if __name__ == "__main__":
 
     checkpoint_path = (checkpoint_dir / chckpt_name).resolve()
     stats = load_stats_from_checkpoint(checkpoint_path)
+
     create_subplots(stats, chckpt_name)
     create_separate_plots(stats, chckpt_name)

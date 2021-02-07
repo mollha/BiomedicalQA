@@ -76,6 +76,8 @@ class ELECTRALoss:
         true_positives, false_positives, \
         true_negatives, false_negatives = confusion_matrix(disc_predictions, is_replaced.float())
 
+        print(confusion_matrix(disc_predictions, is_replaced.float()))
+
         gen_loss = self.generator_loss_function(mlm_gen_logits.float(), targ_ids[is_mlm_applied])
         disc_loss = self.discriminator_loss_function(disc_logits.float(), is_replaced.float())
 
@@ -116,8 +118,7 @@ class ELECTRALoss:
         self.generator_losses.append(avg_gen_loss[0] / avg_gen_loss[1])
         self.discriminator_losses.append(avg_disc_loss[0] / avg_disc_loss[1])
         self.combined_losses.append(avg_combined_loss[0] / avg_combined_loss[1])
-
-        self.discriminator_accuracy.append((true_positives + false_positives) /
+        self.discriminator_accuracy.append((true_positives + true_negatives) /
                                            (true_positives + false_positives + true_negatives + false_negatives))
         self.discriminator_precision.append(true_positives / (true_positives + false_positives))
         self.discriminator_recall.append(true_positives / (true_positives + false_negatives))

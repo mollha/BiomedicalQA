@@ -356,13 +356,18 @@ def read_bioasq(path_to_file: Path, testing=False):
 
     combined_metrics = {}
 
+    for q in dataset.keys():
+        combined_metrics["{}_metrics".format(q)] = {"num_questions": 0}
+
     for data_point in bioasq_dict['questions']:
         question_type = data_point["type"]
-
         # todo remove all except summary from here - we only exclude the ones we can't handle for now.
         # we don't care about summary questions
         if question_type in ['summary', 'list']:
             continue
+
+        # count how many questions we have of each type
+        combined_metrics["{}_metrics".format(question_type)]["num_questions"] += 1
 
         try:
             fc = fc_map[question_type]

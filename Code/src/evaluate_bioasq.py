@@ -157,8 +157,6 @@ if __name__ == "__main__":
                 raise Exception("No other question types permitted except factoid, yesno and list.")
 
             metric_dictionary[dataset_file_name][question_type] = metric_results
-            break
-        break
 
     print(results_by_question_id_dictionary)
 

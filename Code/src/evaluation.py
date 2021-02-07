@@ -2,7 +2,8 @@ from datasets import load_metric
 import argparse
 from tqdm import tqdm
 from read_data import dataset_to_fc
-from fine_tuning import datasets, build_finetuned_from_checkpoint
+from fine_tuning import datasets
+from build_checkpoints import build_finetuned_from_checkpoint
 from models import *
 from utils import *
 from data_processing import convert_test_samples_to_features, QADataset, collate_testing_wrapper
@@ -17,14 +18,13 @@ https://huggingface.co/transformers/task_summary.html#extractive-question-answer
 """
 
 
-def evaluate_yesno(yes_no_model, test_dataloader):
+def evaluate_yesno(yes_no_model, test_dataloader, training=False):
     results_by_question_id = {}
 
+    # when .eval() is set, all dropout layers are removed.
     yes_no_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
-            question_ids = batch.question_ids
-
             inputs = {
                 "input_ids": batch.input_ids,
                 "attention_mask": batch.attention_mask,
@@ -34,10 +34,11 @@ def evaluate_yesno(yes_no_model, test_dataloader):
             outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
-            predicted_labels = torch.softmax(outputs.logits, dim=1)
-            for question_idx, question_id in enumerate(question_ids):
+            class_probabilities = torch.softmax(outputs.logits, dim=1)
+
+            for question_idx, question_id in enumerate(batch.question_ids):
                 expected_answer = batch.answer_text[question_idx]
-                predicted_label = torch.argmax(predicted_labels[question_idx])
+                predicted_label = torch.argmax(class_probabilities[question_idx])
                 if question_idx in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(predicted_label)
                 else:
@@ -56,19 +57,24 @@ def evaluate_yesno(yes_no_model, test_dataloader):
         results_by_question_id[q_id]["predictions"] = predicted_answer
         predictions_list.append(predicted_answer)
         ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
-
     # create a list of predictions and a list of ground_truth for evaluation
     evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
 
-    print(evaluation_metrics)
-    return results_by_question_id, evaluation_metrics   # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
+    if training:
+        return evaluation_metrics
+    else:
+        # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
+        return results_by_question_id, evaluation_metrics
 
 
-def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
+def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False):
+    # if training flag is set, we only care about the metrics
+    # this fc is being called from finetuning
+
     results_by_question_id = {}
     special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
 
-    factoid_model.eval()  # switch to evaluatation mode
+    factoid_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
             # question_ids = batch.question_ids
@@ -135,7 +141,10 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k):
 
     evaluation_metrics = {}
 
-    return results_by_question_id, evaluation_metrics
+    if training:
+        return evaluation_metrics
+    else:
+        return results_by_question_id, evaluation_metrics
 
 
 def evaluate_list(list_model, test_dataloader, tokenizer, k):
@@ -144,6 +153,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k):
 
 
 def evaluate(finetuned_model, test_dataloader, tokenizer):
+    k = 5
     results = []
 
     predictions = []
@@ -155,10 +165,7 @@ def evaluate(finetuned_model, test_dataloader, tokenizer):
     # metrics = squad_evaluation(predictions, ground_truths)
     # print(metrics)
 
-
-
     # return metrics
-
 
 if __name__ == "__main__":
     # Log the process ID
@@ -179,13 +186,28 @@ if __name__ == "__main__":
         type=str,
         help="The name of the dataset to use in evaluated e.g. squad",
     )
+    parser.add_argument(
+        "--k",
+        default="5",
+        type=int,
+        help="K-best predictions are selected for factoid and list questions (between 1 and 100)",
+    )
 
     args = parser.parse_args()
     split_name = args.f_checkpoint.split("_")
     model_size, question_type = split_name[0], split_name[1]
 
-    sys.stderr.write("\nEvaluating checkpoint {} - model size is {} and question type is {}\n"
-                     .format(args.f_checkpoint, model_size, question_type))
+    sys.stderr.write("--- ARGUMENTS ---")
+    sys.stderr.write("\nEvaluating checkpoint: {}\nQuestion type: {}\nModel Size: {}\nK: {}"
+                     .format(args.p_checkpoint, question_type, model_size, args.k))
+
+    # ------- Check the validity of the arguments passed via command line -------
+    try:  # check that the value of k is actually a number
+        k = int(args.k)
+        if k < 1 or k > 100:  # check that k is at least 1 and at most 100
+            raise ValueError
+    except ValueError:
+        raise Exception("k must be an integer between 1 and 100. Got {}".format(args.k))
 
     # -- Override general config with model specific config, for models of different sizes
     config = get_model_config(model_size, pretrain=False)
@@ -205,13 +227,6 @@ if __name__ == "__main__":
     finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
     dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
 
-    # config = {
-    #     "eval_batch_size": 12,
-    #     "n_best_size": 20,
-    #     # The total number of n-best predictions to generate in the nbest_predictions.json output file.
-    #     "max_answer_length": 30,  # maximum length of a generated answer
-    # }
-
     # Create the fine-tune directory if it doesn't exist already
     Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
@@ -228,7 +243,6 @@ if __name__ == "__main__":
     except KeyError:
         raise KeyError("The dataset '{}' in {} does not contain a 'test' key.".format(selected_dataset, datasets))
 
-    # todo should we put which datasets were used to fine-tune checkpoint
     try:
         dataset_function = dataset_to_fc[selected_dataset]
     except KeyError:
@@ -262,10 +276,9 @@ if __name__ == "__main__":
     set_seed(config["seed"])  # set seed for reproducibility
 
     # ------ START THE EVALUATION PROCESS ------
-    # todo for now we're only allowing factoid evals
+    if question_type == "factoid":
+        results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, k)
+    elif question_type == "yesno":
+        results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
 
-    #evaluate(electra_for_qa, data_loader, electra_tokenizer)
-    evaluate_yesno(electra_for_qa, data_loader)
-
-    #evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, 1)
     # todo what happens if we start from a checkpoint here (vs passing a checkpoint from fine-tuning)
