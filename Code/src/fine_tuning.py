@@ -26,25 +26,6 @@ config = {
     },
 }
 
-# ----------------------- SPECIFY DATASET PATHS -----------------------
-# the folder structure of bioasq is different to squad, as we need to download matching articles
-datasets = {
-    # "bioasq": {"train": ["raw_data/training8b.json"],
-    #            "test": ["8B1_golden.json", "8B2_golden.json", "8B3_golden.json", "8B4_golden.json", "8B5_golden.json"]
-    #            },
-    # "squad": {
-    #     "train": ["train-v2.0.json"],
-    #     "test": ["dev-v2.0.json"],
-    # }
-    "bioasq": {"train": "raw_data/training8b.json",
-               "test": "raw_data/8B1_golden.json",
-               },
-    "squad": {
-        "train": "train-v2.0.json",
-        "test": "dev-v2.0.json",
-    }
-}
-
 
 
 def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer, settings, checkpoint_dir):
