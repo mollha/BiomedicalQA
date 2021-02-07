@@ -18,14 +18,13 @@ config = {
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 20,  # set this really high for now.
-    "eval_steps": 200,  # steps before next evaluation
+    "update_steps": 15,  # set this really high for now.
+    "eval_steps": 5,  # steps before next evaluation
     "pretrained_settings": {
         "epochs": 0,
         "steps": 0,
     },
 }
-
 
 
 def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer, settings, checkpoint_dir):
@@ -95,11 +94,12 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
 
             settings["steps_trained"] = training_step
             settings["global_step"] += 1
+            sys.stderr.write('\nglobal step ' + str(settings["global_step"]))
 
             # Save checkpoint every settings["update_steps"] steps
             if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
                 "update_steps"] == 0:
-                print("{} steps trained in current epoch, {} steps trained overall."
+                sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall.\n"
                       .format(settings["steps_trained"], settings["global_step"]))
                 save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
@@ -115,11 +115,11 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
                 else:
                     raise Exception("Question type in config must be factoid, list or yesno.")
 
-                print("{} steps trained in current epoch, {} steps trained overall. Current evaluation metrics are {}"
+                sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall. Current evaluation metrics are {}"
                       .format(settings["steps_trained"], settings["global_step"], metric_results))
 
 
-    # todo update loss function statistics
+    # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
     settings["avg_loss"] = [0, 0]  # reset stats
     # ------------- SAVE FINE-TUNED MODEL -------------
@@ -136,9 +136,9 @@ if __name__ == "__main__":
                         help="The size of the electra model e.g. 'small', 'base' or 'large")
     parser.add_argument("--p-checkpoint", default="recent", type=str,
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
-    parser.add_argument("--f-checkpoint", default="recent", type=str,
+    parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list'], type=str,
+    parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list'], type=str,
                         help="Type of fine-tuned model should be created - factoid, list or yesno?")
     parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
@@ -245,6 +245,8 @@ if __name__ == "__main__":
     electra_for_qa, optimizer, scheduler, electra_tokenizer, \
     config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,
                                              finetune_checkpoint_dir, checkpoint_name, config["question_type"], config)
+
+    print(config)
 
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(train_data_loader, test_data_loader, electra_for_qa, scheduler, optimizer, config,
