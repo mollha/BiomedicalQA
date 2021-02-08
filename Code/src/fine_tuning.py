@@ -151,7 +151,7 @@ if __name__ == "__main__":
     args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
 
 
-    sys.stderr.write("--- ARGUMENTS ---")
+    sys.stderr.write("\n--- ARGUMENTS ---")
     sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nK: {}"
                      .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.k))
 

@@ -276,6 +276,7 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
 
     for example_number, example in enumerate(samples):
         short_context = example._short_context
+        print(short_context)
         question = example._question
 
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
