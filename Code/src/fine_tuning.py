@@ -14,12 +14,12 @@ config = {
     'losses': [],
     'avg_loss': [0, 0],
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    # "max_epochs": 2,  # can override the val in config
+    "max_epochs": 20,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 15,  # set this really high for now.
-    "eval_steps": 5,  # steps before next evaluation
+    "update_steps": 2000,  # set this really high for now.
+    "eval_steps": 100,  # steps before next evaluation
     "pretrained_settings": {
         "epochs": 0,
         "steps": 0,
@@ -150,8 +150,8 @@ if __name__ == "__main__":
     config["question_type"] = args.question_type
 
     sys.stderr.write("--- ARGUMENTS ---")
-    sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nK: {}"
-                     .format(args.p_checkpoint, args.f_checkpoint, args.size, args.k))
+    sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nK: {}"
+                     .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.k))
 
     # ------- Check the validity of the arguments passed via command line -------
     try:  # check that the value of k is actually a number
@@ -217,21 +217,21 @@ if __name__ == "__main__":
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
     raw_train_dataset, train_dataset_metrics = dataset_function(train_dataset_file_path)
-    raw_train_dataset_question_type = raw_train_dataset[config["question_type"]]
+    raw_train_dataset_by_question = raw_train_dataset[config["question_type"]]
 
     # todo use test and train dataset metrics
     print("Converting raw training text to features.")
-    train_features = convert_train_samples_to_features(raw_train_dataset_question_type, electra_tokenizer,
+    train_features = convert_train_samples_to_features(raw_train_dataset_by_question, electra_tokenizer,
                                                        config["max_length"])
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset for '{}'".format(selected_dataset))
-    raw_test_dataset, test_dataset_metrics = dataset_function(train_dataset_file_path)
-    raw_test_dataset_question_type = raw_test_dataset[config["question_type"]]
-    test_features = convert_test_samples_to_features(raw_test_dataset_question_type, electra_tokenizer,
-                                                     config["max_length"])
+    raw_test_dataset, test_dataset_metrics = dataset_function(test_dataset_file_path, testing=True)
+    raw_test_dataset_by_question = raw_test_dataset[config["question_type"]]
+    test_features = convert_test_samples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
+
     print("Created {} test features of length {}.".format(len(test_features), config["max_length"]))
     test_dataset = QADataset(test_features)
 

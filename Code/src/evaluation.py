@@ -278,5 +278,3 @@ if __name__ == "__main__":
         results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, k)
     elif question_type == "yesno":
         results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
-
-    # todo what happens if we start from a checkpoint here (vs passing a checkpoint from fine-tuning)
