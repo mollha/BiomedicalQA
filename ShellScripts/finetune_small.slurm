@@ -58,4 +58,4 @@ echo "DATASET = ${DATASET}"
 echo "MODEL SIZE = ${SIZE}"
 
 # Run your program (replace this with your program)
-stdbuf -oL python3 ../Code/src/pre_training.py --p-checkpoint ${PCHECKPOINT} --f-checkpoint ${FCHECKPOINT} --question-type ${QUESTIONTYPE} --dataset ${DATASET} --size ${SIZE}
+stdbuf -oL python3 ../Code/src/fine_tuning.py --p-checkpoint ${PCHECKPOINT} --f-checkpoint ${FCHECKPOINT} --question-type ${QUESTIONTYPE} --dataset ${DATASET} --size ${SIZE}
