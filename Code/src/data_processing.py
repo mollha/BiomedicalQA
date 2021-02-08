@@ -359,17 +359,17 @@ class BatchTrainingFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
 
         self.question_ids = list(transposed_data[0])
-        self.input_ids = torch.IntTensor(transposed_data[1], device=device)
-        self.attention_mask = torch.IntTensor(transposed_data[2], device=device)
-        self.token_type_ids = torch.IntTensor(transposed_data[3], device=device)
+        self.input_ids = torch.tensor(transposed_data[1], device=device)
+        self.attention_mask = torch.tensor(transposed_data[2], device=device)
+        self.token_type_ids = torch.tensor(transposed_data[3], device=device)
         self.answer_text = list(transposed_data[4])
 
         if len(transposed_data) == 8:  # assume fine-tuning factoid mode
-            self.answer_start = torch.IntTensor(transposed_data[5], device=device)
-            self.answer_end = torch.IntTensor(transposed_data[6], device=device)
-            self.is_impossible = torch.BoolTensor(transposed_data[7], device=device)
+            self.answer_start = torch.tensor(transposed_data[5], device=device)
+            self.answer_end = torch.tensor(transposed_data[6], device=device)
+            self.is_impossible = torch.tensor(transposed_data[7], device=device)  # bool
         elif len(transposed_data) == 6:  # assume fine-tuning factoid mode
-            self.labels = torch.IntTensor(transposed_data[5], device=device)
+            self.labels = torch.tensor(transposed_data[5], device=device)
 
 
 class BatchTestingFeatures:
