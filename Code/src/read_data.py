@@ -261,8 +261,9 @@ def read_bioasq(path_to_file: Path, testing=False):
         snippets = data["snippets"]
         examples_from_question = []
 
-        metrics = {
-            "impossible": 0,
+        metrics = {  # this dictionary is combined with metrics from previous questions
+            "impossible_examples": 0,
+            "num_questions": 1,
             "num_examples": 0,
         }
 
@@ -296,7 +297,7 @@ def read_bioasq(path_to_file: Path, testing=False):
                 if len(matches) == 0:  # there are no matches in the passage at all.
                     is_impossible = True
                     start_pos, end_pos = -1, -1
-                    metrics["impossible"] += 1
+                    metrics["impossible_examples"] += 1
                     metrics["num_examples"] += 1
                     examples_from_question.append(FactoidExample(question_id, question, context,
                                                                  context if article is None else article[section], "",
@@ -394,26 +395,31 @@ def read_bioasq(path_to_file: Path, testing=False):
         if len(qt_metrics) == 0:
             print("No metrics available for question type '{}'".format(qt))
 
+        # compute this for all metric types
+        num_examples = qt_metrics["num_examples"]
+        num_questions = qt_metrics["num_questions"]
+        print("Created {} examples from {} questions".format(num_examples, num_questions))
+
         if qt == "yesno":
-            num_examples = qt_metrics["num_examples"]
-            num_questions = qt_metrics["num_questions"]
-            print("Created {} examples from {} questions".format(num_examples, num_questions))
-
             percentage_yes_questions = 0 if num_questions == 0 else round(100 * qt_metrics["num_yes_questions"] / num_questions, 2)
-            percentage_yes_examples = 0 if num_questions == 0 else round(100 * qt_metrics["num_yes_examples"] / num_examples, 2)
+            percentage_yes_examples = 0 if num_examples == 0 else round(100 * qt_metrics["num_yes_examples"] / num_examples, 2)
             percentage_no_questions = 0 if num_questions == 0 else round(100 * qt_metrics["num_no_questions"] / num_questions, 2)
-            percentage_no_examples = 0 if num_questions == 0 else round(100 * qt_metrics["num_no_examples"] / num_examples, 2)
+            percentage_no_examples = 0 if num_examples == 0 else round(100 * qt_metrics["num_no_examples"] / num_examples, 2)
 
-            print("- Positive Instances: {} questions ({}%), {} samples ({}%)"
+            print("- Positive Instances: {} questions ({}%), {} examples ({}%)"
                   .format(qt_metrics["num_yes_questions"], percentage_yes_questions, qt_metrics["num_yes_examples"],
                           percentage_yes_examples))
-            print("- Negative Instances: {} questions ({}%), {} samples ({}%)"
+            print("- Negative Instances: {} questions ({}%), {} examples ({}%)"
                   .format(qt_metrics["num_no_questions"], percentage_no_questions, qt_metrics["num_no_examples"],
                           percentage_no_examples))
 
         elif qt == "factoid":
-            pass
+            percentage_impossible_examples = 0 if num_examples == 0 else round(100 * qt_metrics["impossible_examples"] / num_examples, 2)
 
+            print("- Impossible Examples: {} examples ({}%)"
+                  .format(qt_metrics["impossible_examples"], percentage_impossible_examples))
+            print("- Non-Impossible Examples: {} examples ({}%)"
+                  .format(num_examples - qt_metrics["impossible_examples"], 100 - percentage_impossible_examples))
 
 
 
