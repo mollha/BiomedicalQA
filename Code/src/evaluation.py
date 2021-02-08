@@ -30,9 +30,11 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
             }
 
             outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
+            loss, logits = outputs
+
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
-            class_probabilities = torch.softmax(outputs.logits, dim=1)
+            class_probabilities = torch.softmax(logits, dim=1)
 
             for question_idx, question_id in enumerate(batch.question_ids):
                 expected_answer = batch.answer_text[question_idx]
@@ -89,6 +91,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             # print(outputs.start_logits)
             # answer_start = torch.argmax(outputs.start_logits,
             #                             dim=1)  # Get the most likely beginning of answer with the argmax of the score
+            # todo outputs cant be indexed like this anymore (see yes no)
             answer_starts, start_indices = torch.topk(outputs.start_logits, k=k, dim=1)
             answer_ends, end_indices = torch.topk(outputs.end_logits, k=k, dim=1)
 
