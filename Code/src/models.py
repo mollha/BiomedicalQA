@@ -49,7 +49,7 @@ small_finetune_config = {
     "layerwise_lr_decay": 0.8,
     "max_epochs": 2,  # this is the number of epochs typical for squad
     "warmup_fraction": 0.1,
-    "batch_size": 32,
+    "batch_size": 128,
     "attention_dropout": 0.1,  # default value is this, so it's not really necessary
     "dropout": 0.1,  # default value is this, so it's not really necessary
     "max_length": 128,

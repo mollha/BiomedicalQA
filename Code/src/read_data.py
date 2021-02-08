@@ -346,7 +346,6 @@ def read_bioasq(path_to_file: Path, testing=False):
         examples_from_question = []
         for snippet in snippets:
             snippet_text = snippet['text']
-            metrics["num_examples"] += 1
             example = BinaryExample(question_id=question_id,
                                     question=question,
                                     short_context=snippet_text,
