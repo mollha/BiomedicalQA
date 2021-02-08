@@ -5,14 +5,14 @@
 # QOS: debug | short | long-high-prio | long-low-prio | long-cpu
 # t - TIME
 
+#SBATCH --job-name=sm_language
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH --job-name=sm_language
-#SBATCH -p gpu-bigmem
-#SBATCH --qos=long-high-prio
-#SBATCH -t 7-0:0:0
-#SBATCH --mem=56g
+#SBATCH -p ug-gpu-small
+#SBATCH --qos=debug
+#SBATCH -t 2:0:0
+#SBATCH --mem=24g
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
 

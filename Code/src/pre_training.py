@@ -23,7 +23,7 @@ config = {
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 20000,
+    "update_steps": 500,
 }
 
 
@@ -57,7 +57,6 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                    mlm_probability=config["mask_prob"],
                    replace_prob=0.0,
                    original_prob=0.15)
-
 
     # resume training
     steps_trained = settings["steps_trained"]
