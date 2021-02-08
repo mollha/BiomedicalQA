@@ -378,9 +378,9 @@ class BatchTestingFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
 
         self.question_ids = list(transposed_data[0])
-        self.input_ids = torch.LongTensor(transposed_data[1], device=device)
-        self.attention_mask = torch.LongTensor(transposed_data[2], device=device)
-        self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
+        self.input_ids = torch.tensor(transposed_data[1], device=device)
+        self.attention_mask = torch.tensor(transposed_data[2], device=device)
+        self.token_type_ids = torch.tensor(transposed_data[3], device=device)
         self.answer_text = list(transposed_data[4])
 
 
