@@ -61,6 +61,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
         predictions_list.append(predicted_answer)
         ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
     # create a list of predictions and a list of ground_truth for evaluation
+    print(predictions_list, ground_truth_list)
     evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
 
     if training:
