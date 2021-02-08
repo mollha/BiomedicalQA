@@ -30,9 +30,9 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
             }
 
             outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
-            try:
+            try:  # indexing outputs on CPU
                 logits = outputs.logits
-            except Exception:
+            except Exception:  # indexing outputs on CUDA
                 logits = outputs[0]
 
             # treat outputs as if they correspond to a yes/no question
@@ -50,12 +50,13 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
 
     # iterate through predictions for each question
     # we need to combine these predictions to produce a final "yes" or "no" prediction.
-    predictions_list = []
-    ground_truth_list = []
+    predictions_list, ground_truth_list = [], []
     for q_id in results_by_question_id:
-        # results_by_question_id[q_id] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
+        # results_by_question_id[q_id]["predictions"] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
         pred_tensor = torch.Tensor(results_by_question_id[q_id]["predictions"])
         best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
+
+        print(best_pred)
         predicted_answer = "yes" if best_pred == 1 else "no"  # convert 1s to yes and 0s to no
         results_by_question_id[q_id]["predictions"] = predicted_answer
         predictions_list.append(predicted_answer)

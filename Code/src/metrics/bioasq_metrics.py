@@ -53,13 +53,13 @@ def yes_no_evaluation(predictions, ground_truth):
 
         # --- Evaluate answer ---
         if prediction in true_yes:  # predicted answer was yes
-            if prediction == truth_value:   # ground truth answer was yes (true positive)
+            if prediction == truth_value:   # ground truth answer was yes as well (true positive)
                 tp += 1
             else:   # ground truth answer was no (false positive)
                 fp += 1
         else:  # predicted answer was no
-            if prediction == truth_value:   # ground truth answer was no (true negative)
-                fp += 1
+            if prediction == truth_value:   # ground truth answer was also no (true negative)
+                tn += 1
             else:   # ground truth answer was yes (false negative)
                 fn += 1
 
