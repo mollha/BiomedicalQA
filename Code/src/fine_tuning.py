@@ -78,7 +78,8 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
                 raise Exception("Question type must be factoid, list or yesno.")
 
             outputs = qa_model(**inputs)  # put inputs through the model and get outputs
-            loss = outputs.loss  # Collect loss from outputs
+            print(outputs)
+            loss = outputs[0]  # Collect loss from outputs
             loss.backward()  # back-propagate
 
             # update the average loss statistics
