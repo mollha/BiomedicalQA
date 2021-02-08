@@ -282,8 +282,7 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
         tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
                                     max_length=max_length)  # only truncate the second sequence
-        # todo might be good to add a docstride idk
-        tokenized_context = tokenizer.tokenize(short_context)
+
         # print(len(tokenized_input["input_ids"]))
 
         # prepare the input_ids, attention_mask and token_type_ids as tensors
@@ -301,6 +300,8 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
             #     # raise Exception("Skipping question with answer {}".format(squad_example._answer))
             #     unhandled_questions += 1
             #     continue
+            # todo might be good to add a docstride idk
+            tokenized_context = tokenizer.tokenize(short_context)
 
             start_pos = example._answer_start
             end_pos = example._answer_end
