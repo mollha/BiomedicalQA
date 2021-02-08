@@ -19,7 +19,6 @@ config = {
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
     "update_steps": 2000,  # set this really high for now.
-    "eval_steps": 100,  # steps before next evaluation
     "pretrained_settings": {
         "epochs": 0,
         "steps": 0,
@@ -102,20 +101,19 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
                       .format(settings["steps_trained"], settings["global_step"]))
                 save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
-            # Evaluate checkpoint every settings["eval_steps"] steps
-            if settings["eval_steps"] > 0 and settings["global_step"] % settings["eval_steps"] == 0:
-                # don't evaluate during training if settings["eval_steps"] == 0
-                if settings["question_type"] == "factoid":
-                    metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
-                elif settings["question_type"] == "list":
-                    metric_results = {}  # todo do nothing for now - need to add list qs
-                elif settings["question_type"] == "yesno":
-                    metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
-                else:
-                    raise Exception("Question type in config must be factoid, list or yesno.")
+        # just look at the statistics at the end of an epoch
+        if settings["question_type"] == "factoid":
+            metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
+        elif settings["question_type"] == "list":
+            metric_results = {}  # todo do nothing for now - need to add list qs
+        elif settings["question_type"] == "yesno":
+            metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
+        else:
+            raise Exception("Question type in config must be factoid, list or yesno.")
 
-                sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall. Current evaluation metrics are {}"
-                      .format(settings["steps_trained"], settings["global_step"], metric_results))
+        sys.stderr.write(
+            "\n{} steps trained in current epoch, {} steps trained overall. Current evaluation metrics are {}"
+            .format(settings["steps_trained"], settings["global_step"], metric_results))
 
 
     # update loss function statistics
@@ -123,6 +121,7 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
     settings["avg_loss"] = [0, 0]  # reset stats
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
+
 
 
 if __name__ == "__main__":
