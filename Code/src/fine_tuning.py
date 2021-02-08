@@ -148,7 +148,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
     config["question_type"] = args.question_type
-    args.f_checkpoint = args.f_checkpoint.strip()  # remove whitespace added by slurm script
+    args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
 
 
     sys.stderr.write("--- ARGUMENTS ---")
