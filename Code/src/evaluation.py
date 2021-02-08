@@ -32,7 +32,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
             outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
             try:  # indexing outputs on CPU
                 logits = outputs.logits
-            except Exception:  # indexing outputs on CUDA
+            except AttributeError:  # indexing outputs on CUDA
                 logits = outputs[0]
 
             # treat outputs as if they correspond to a yes/no question

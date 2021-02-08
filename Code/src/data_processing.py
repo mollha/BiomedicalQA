@@ -78,7 +78,6 @@ class BinaryFeature:
             self._label = 0
         else:
             raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
-        print(self._label)
 
     def get_features(self):
         return (
