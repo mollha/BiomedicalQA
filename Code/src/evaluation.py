@@ -30,7 +30,9 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
             }
 
             outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
-            loss, logits = outputs
+
+            print(outputs)
+            logits = outputs
 
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
