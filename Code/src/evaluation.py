@@ -36,7 +36,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
 
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
-            class_probabilities = torch.softmax(logits, dim=1)
+            class_probabilities = torch.nn.Softmax(dim=1)(logits)
 
             for question_idx, question_id in enumerate(batch.question_ids):
                 expected_answer = batch.answer_text[question_idx]
