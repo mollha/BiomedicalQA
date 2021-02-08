@@ -331,11 +331,23 @@ def read_bioasq(path_to_file: Path, testing=False):
         question_id = data["id"]
         question = data["body"]
         snippets = data["snippets"]
-        answer = data["exact_answer"]
+        answer = data["exact_answer"].lower()
 
         metrics = {
-            "num_examples": 0
+            "num_examples": 0,
+            "num_questions": 0,
+            "num_yes_questions": 0,
+            "num_yes_examples": 0,
+            "num_no_questions": 0,
+            "num_no_examples": 0,
         }
+
+        if answer == "yes":
+            metrics["num_yes_questions"] += 1
+            metrics["num_yes_examples"] += len(snippets)
+        elif answer == "no":
+            metrics["num_no_questions"] += 1
+            metrics["num_no_examples"] += len(snippets)
 
         examples_from_question = []
         for snippet in snippets:
@@ -354,10 +366,7 @@ def read_bioasq(path_to_file: Path, testing=False):
         "list": process_list_question,
     }
 
-    combined_metrics = {}
-
-    for q in dataset.keys():
-        combined_metrics["{}_metrics".format(q)] = {"num_questions": 0}
+    combined_metrics = {q: {} for q in dataset.keys()}
 
     for data_point in bioasq_dict['questions']:
         question_type = data_point["type"]
@@ -366,8 +375,6 @@ def read_bioasq(path_to_file: Path, testing=False):
         if question_type in ['summary', 'list']:
             continue
 
-        # count how many questions we have of each type
-        combined_metrics["{}_metrics".format(question_type)]["num_questions"] += 1
 
         try:
             fc = fc_map[question_type]
@@ -377,8 +384,38 @@ def read_bioasq(path_to_file: Path, testing=False):
             raise KeyError("Question type {} is not in fc_map".format_map(question_type))
 
         example_list, question_metrics = fc(data_point)  # apply the right function for the question type
-        combined_metrics = update_dataset_metrics(combined_metrics, question_metrics)
+        combined_metrics = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples
+
+    # ------ DISPLAY METRICS -------
+    for qt in combined_metrics.keys():  # iterate over each question type
+        print('\n------- {} METRICS -------'.format(qt.upper()))
+        qt_metrics = combined_metrics[qt]  # get the metrics for that question type
+        if len(qt_metrics) == 0:
+            print("No metrics available for question type '{}'".format(qt))
+
+        if qt == "yesno":
+            num_examples = qt_metrics["num_examples"]
+            num_questions = qt_metrics["num_questions"]
+            print("Created {} examples from {} questions".format(num_examples, num_questions))
+
+            percentage_yes_questions = 0 if num_questions == 0 else round(100 * qt_metrics["num_yes_questions"] / num_questions, 2)
+            percentage_yes_examples = 0 if num_questions == 0 else round(100 * qt_metrics["num_yes_examples"] / num_examples, 2)
+            percentage_no_questions = 0 if num_questions == 0 else round(100 * qt_metrics["num_no_questions"] / num_questions, 2)
+            percentage_no_examples = 0 if num_questions == 0 else round(100 * qt_metrics["num_no_examples"] / num_examples, 2)
+
+            print("- Positive Instances: {} questions ({}%), {} samples ({}%)"
+                  .format(qt_metrics["num_yes_questions"], percentage_yes_questions, qt_metrics["num_yes_examples"],
+                          percentage_yes_examples))
+            print("- Negative Instances: {} questions ({}%), {} samples ({}%)"
+                  .format(qt_metrics["num_no_questions"], percentage_no_questions, qt_metrics["num_no_examples"],
+                          percentage_no_examples))
+
+        elif qt == "factoid":
+            pass
+
+
+
 
     return dataset, combined_metrics
 

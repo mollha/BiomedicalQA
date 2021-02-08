@@ -57,6 +57,8 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
         pred_tensor = torch.Tensor(results_by_question_id[q_id]["predictions"])
         best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
 
+        # todo best prediction always seems to be 1 / yes
+        # batch labels are varied
         print('best prediction', best_pred)
         predicted_answer = "yes" if best_pred == 1 else "no"  # convert 1s to yes and 0s to no
         results_by_question_id[q_id]["predictions"] = predicted_answer
