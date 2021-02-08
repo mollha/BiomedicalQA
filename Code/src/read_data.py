@@ -389,6 +389,11 @@ def read_bioasq(path_to_file: Path, testing=False):
         dataset[question_type].extend(example_list)  # collate examples
 
     # ------ DISPLAY METRICS -------
+    total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
+    total_examples = sum([combined_metrics[qt]["num_examples"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
+    print('\n------- COLLATING {}-SET METRICS -------'.format("TEST" if testing else "TRAIN"))
+    print("Across all question types, there are {} questions and {} examples".format(total_questions, total_examples))
+
     for qt in combined_metrics.keys():  # iterate over each question type
         print('\n------- {} METRICS -------'.format(qt.upper()))
         qt_metrics = combined_metrics[qt]  # get the metrics for that question type
@@ -400,7 +405,12 @@ def read_bioasq(path_to_file: Path, testing=False):
         # compute this for all metric types
         num_examples = qt_metrics["num_examples"]
         num_questions = qt_metrics["num_questions"]
+        percentage_num_examples = 0 if total_examples == 0 else round(100 * num_examples / total_examples, 2)
+        percentage_num_questions = 0 if total_questions == 0 else round(100 * num_questions / total_questions, 2)
+
         print("Created {} examples from {} questions".format(num_examples, num_questions))
+        print("{}-type questions account for {}% of total questions and {}% of total examples"
+              .format(qt, percentage_num_questions, percentage_num_examples))
 
         if qt == "yesno":
             percentage_yes_questions = 0 if num_questions == 0 else round(100 * qt_metrics["num_yes_questions"] / num_questions, 2)
@@ -408,7 +418,7 @@ def read_bioasq(path_to_file: Path, testing=False):
             percentage_no_questions = 0 if num_questions == 0 else round(100 * qt_metrics["num_no_questions"] / num_questions, 2)
             percentage_no_examples = 0 if num_examples == 0 else round(100 * qt_metrics["num_no_examples"] / num_examples, 2)
 
-            print("- Positive Instances: {} questions ({}%), {} examples ({}%)"
+            print("\n- Positive Instances: {} questions ({}%), {} examples ({}%)"
                   .format(qt_metrics["num_yes_questions"], percentage_yes_questions, qt_metrics["num_yes_examples"],
                           percentage_yes_examples))
             print("- Negative Instances: {} questions ({}%), {} examples ({}%)"
@@ -418,7 +428,7 @@ def read_bioasq(path_to_file: Path, testing=False):
         elif qt == "factoid":
             percentage_impossible_examples = 0 if num_examples == 0 else round(100 * qt_metrics["impossible_examples"] / num_examples, 2)
 
-            print("- Impossible Examples: {} examples ({}%)"
+            print("\n- Impossible Examples: {} examples ({}%)"
                   .format(qt_metrics["impossible_examples"], percentage_impossible_examples))
             print("- Non-Impossible Examples: {} examples ({}%)"
                   .format(num_examples - qt_metrics["impossible_examples"], 100 - percentage_impossible_examples))

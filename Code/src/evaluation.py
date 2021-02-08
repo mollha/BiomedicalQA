@@ -42,7 +42,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
             for question_idx, question_id in enumerate(batch.question_ids):
                 expected_answer = batch.answer_text[question_idx]
                 predicted_label = torch.argmax(class_probabilities[question_idx])
-                print(predicted_label)
+                # print(predicted_label)
                 if question_idx in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(predicted_label)
                 else:
@@ -59,15 +59,15 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
 
         # todo best prediction always seems to be 1 / yes
         # batch labels are varied
-        print('best prediction', best_pred)
+        # print('best prediction', best_pred)
         predicted_answer = "yes" if best_pred == 1 else "no"  # convert 1s to yes and 0s to no
         results_by_question_id[q_id]["predictions"] = predicted_answer
         predictions_list.append(predicted_answer)
         ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
 
     # create a list of predictions and a list of ground_truth for evaluation
-    print('predictions list', predictions_list)
-    print('ground truth list', ground_truth_list)
+    # print('predictions list', predictions_list)
+    # print('ground truth list', ground_truth_list)
     evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
 
     if training:
