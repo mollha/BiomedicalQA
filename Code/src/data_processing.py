@@ -70,8 +70,14 @@ class BinaryFeature:
         self._input_ids = input_ids
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
-        self._answer_text = answer_text
-        self._label = 1 if answer_text else 0
+        self._answer_text = answer_text.lower()
+
+        if self._answer_text == "yes":
+            self._label = 1
+        elif self._answer_text == "no":
+            self._label = 0
+        else:
+            raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
 
     def get_features(self):
         return (
