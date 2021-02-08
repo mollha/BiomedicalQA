@@ -335,20 +335,13 @@ def read_bioasq(path_to_file: Path, testing=False):
         answer = data["exact_answer"].lower()
 
         metrics = {
-            "num_examples": 0,
-            "num_questions": 0,
-            "num_yes_questions": 0,
-            "num_yes_examples": 0,
-            "num_no_questions": 0,
-            "num_no_examples": 0,
+            "num_examples": len(snippets),
+            "num_questions": 1,
+            "num_yes_questions": 1 if answer == "yes" else 0,
+            "num_yes_examples": len(snippets) if answer == "yes" else 0,
+            "num_no_questions": 1 if answer == "no" else 0,
+            "num_no_examples": len(snippets) if answer == "no" else 0,
         }
-
-        if answer == "yes":
-            metrics["num_yes_questions"] += 1
-            metrics["num_yes_examples"] += len(snippets)
-        elif answer == "no":
-            metrics["num_no_questions"] += 1
-            metrics["num_no_examples"] += len(snippets)
 
         examples_from_question = []
         for snippet in snippets:
