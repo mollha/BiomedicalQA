@@ -385,8 +385,8 @@ class ELECTRAModel(nn.Module):
 
 # Copy of the usual ElectraForSequenceClassification forward fc with weighted CSE loss
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
-    def __init__(self, class_weights, config):
-        super().__init__(config=config)
+    def __init__(self, class_weights, config, *args, **kwargs):
+        super().__init__(config=config, *args, **kwargs)
         self.class_weights = class_weights
 
     def forward(
