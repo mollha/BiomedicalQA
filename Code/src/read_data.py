@@ -384,7 +384,7 @@ def read_bioasq(path_to_file: Path, testing=False):
             raise KeyError("Question type {} is not in fc_map".format_map(question_type))
 
         example_list, question_metrics = fc(data_point)  # apply the right function for the question type
-        combined_metrics = update_dataset_metrics(combined_metrics[question_type], question_metrics)
+        combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples
 
     # ------ DISPLAY METRICS -------
