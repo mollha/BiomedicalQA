@@ -63,11 +63,11 @@ def yes_no_evaluation(predictions, ground_truth):
             else:   # ground truth answer was yes (false negative)
                 fn += 1
 
-    accuracy = round((tp + tn) / (tp + tn + fp + fn), 3)
-    precision_y = round(tp / (tp + fp), 3)
-    recall_y = round(tp / (tp + fn), 3)
-    precision_n = round(tn / (tn + fn), 3)
-    recall_n = round(tn / (tn + fp), 3)
+    accuracy = 0 if (tp + tn + fp + fn) == 0 else round((tp + tn) / (tp + tn + fp + fn), 3)
+    precision_y = 0 if (tp + fp) == 0 else round(tp / (tp + fp), 3)
+    recall_y = 0 if (tp + fn) == 0 else round(tp / (tp + fn), 3)
+    precision_n = 0 if (tn + fn) == 0 else round(tn / (tn + fn), 3)
+    recall_n = 0 if (tn + fp) == 0 else round(tn / (tn + fp), 3)
 
     try:  # try this with the caveat that precision_y + recall_y could be zero
         f1_y = round(2 * ((precision_y * recall_y) / (precision_y + recall_y)), 3)
