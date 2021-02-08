@@ -148,6 +148,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
     config["question_type"] = args.question_type
+    args.f_checkpoint = args.f_checkpoint.strip()  # remove whitespace added by slurm script
+
 
     sys.stderr.write("--- ARGUMENTS ---")
     sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nK: {}"
