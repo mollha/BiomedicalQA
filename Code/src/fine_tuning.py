@@ -78,7 +78,6 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
                 raise Exception("Question type must be factoid, list or yesno.")
 
             outputs = qa_model(**inputs)  # put inputs through the model and get outputs
-            print(outputs)
             loss = outputs[0]  # Collect loss from outputs
             loss.backward()  # back-propagate
 
@@ -95,7 +94,6 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
 
             settings["steps_trained"] = training_step
             settings["global_step"] += 1
-            sys.stderr.write('\nglobal step ' + str(settings["global_step"]))
 
             # Save checkpoint every settings["update_steps"] steps
             if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[

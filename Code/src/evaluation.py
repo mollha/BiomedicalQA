@@ -30,8 +30,6 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
             }
 
             outputs = yes_no_model(**inputs)  # model outputs are always tuples in transformers
-
-            print(outputs)
             try:
                 logits = outputs.logits
             except Exception:
