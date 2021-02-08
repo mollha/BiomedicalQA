@@ -282,14 +282,11 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
 
     for example_number, example in enumerate(samples):
         short_context = example._short_context
-        print(short_context)
         question = example._question
 
         # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
         tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
                                     max_length=max_length)  # only truncate the second sequence
-
-        # print(len(tokenized_input["input_ids"]))
 
         # prepare the input_ids, attention_mask and token_type_ids as tensors
         input_ids = tokenized_input["input_ids"]
@@ -362,17 +359,17 @@ class BatchTrainingFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
 
         self.question_ids = list(transposed_data[0])
-        self.input_ids = torch.LongTensor(transposed_data[1], device=device)
-        self.attention_mask = torch.LongTensor(transposed_data[2], device=device)
-        self.token_type_ids = torch.LongTensor(transposed_data[3], device=device)
+        self.input_ids = torch.IntTensor(transposed_data[1], device=device)
+        self.attention_mask = torch.IntTensor(transposed_data[2], device=device)
+        self.token_type_ids = torch.IntTensor(transposed_data[3], device=device)
         self.answer_text = list(transposed_data[4])
 
         if len(transposed_data) == 8:  # assume fine-tuning factoid mode
-            self.answer_start = torch.LongTensor(transposed_data[5], device=device)
-            self.answer_end = torch.LongTensor(transposed_data[6], device=device)
+            self.answer_start = torch.IntTensor(transposed_data[5], device=device)
+            self.answer_end = torch.IntTensor(transposed_data[6], device=device)
             self.is_impossible = torch.BoolTensor(transposed_data[7], device=device)
         elif len(transposed_data) == 6:  # assume fine-tuning factoid mode
-            self.labels = torch.LongTensor(transposed_data[5], device=device)
+            self.labels = torch.IntTensor(transposed_data[5], device=device)
 
 
 class BatchTestingFeatures:
