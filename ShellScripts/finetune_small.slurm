@@ -22,6 +22,8 @@ source /etc/profile
 # activate venv
 source ../../venv/bin/activate
 
+python -m spacy download en_core_web_sm
+
 # parse arguments
 while [[ $# -gt 0 ]]
 do
