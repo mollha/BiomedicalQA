@@ -3,7 +3,10 @@ import torch
 import os
 from pathlib import Path
 from torch import nn
-from transformers import ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM, ElectraForPreTraining
+from torch.nn import MSELoss, CrossEntropyLoss
+from transformers import (ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM,
+                          ElectraForPreTraining, ElectraForSequenceClassification)
+from transformers.modeling_outputs import SequenceClassifierOutput
 import torch.nn.functional
 import datetime
 import pickle
@@ -247,30 +250,8 @@ def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):
     return {n: lr * (decay_rate ** get_depth(n)) for n, p in parameters}
 
 
-
-
-# def _get_layer_lrs(learning_rate, layer_decay, n_layers):
-#     """Have lower learning rates for layers closer to the input.
-#     https://github.com/google-research/electra/blob/79111328070e491b287c307906701ebc61091eb2/model/optimization.py#L188-L193
-#
-#     Following the issue opened here:
-#     https://github.com/google-research/electra/issues/51
-#
-#     I have decided to implement the fix instead by reducing the layers added to n_layers.
-#
-#     """
-#
-#     key_to_depths = collections.OrderedDict({
-#         "/embeddings/": 0,
-#         "/embeddings_project/": 0,
-#         "task_specific/": n_layers + 1,
-#     })
-#     for layer in range(n_layers):
-#         key_to_depths["encoder/layer_" + str(layer) + "/"] = layer + 1
-#     return {
-#         key: learning_rate * (layer_decay ** (n_layers + 1 - depth))
-#         for key, depth in key_to_depths.items()
-#     }
+def cost_sensitive_cross_entropy_loss():
+    pass
 
 
 # ------- HELPER FUNCTION FOR BUILDING THE ELECTRA MODEL FOR PRETRAINING --------
@@ -400,3 +381,78 @@ class ELECTRAModel(nn.Module):
         :return:
         """
         return (logits.float() + self.gumbel_dist.sample(logits.shape)).argmax(dim=-1)
+
+
+# Copy of the usual ElectraForSequenceClassification forward fc with weighted CSE loss
+class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
+    def __init__(self, class_weights, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.class_weights = class_weights
+
+    def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            position_ids=None,
+            head_mask=None,
+            inputs_embeds=None,
+            labels=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+    ):
+        r"""
+        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
+            Labels for computing the sequence classification/regression loss. Indices should be in :obj:`[0, ...,
+            config.num_labels - 1]`. If :obj:`config.num_labels == 1` a regression loss is computed (Mean-Square loss),
+            If :obj:`config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        discriminator_hidden_states = self.electra(
+            input_ids,
+            attention_mask,
+            token_type_ids,
+            position_ids,
+            head_mask,
+            inputs_embeds,
+            output_attentions,
+            output_hidden_states,
+            return_dict,
+        )
+
+        sequence_output = discriminator_hidden_states[0]
+        logits = self.classifier(sequence_output)
+
+        loss = None
+        if labels is not None:
+            if self.num_labels == 1:
+                #  We are doing regression
+                loss_fct = MSELoss()
+                loss = loss_fct(logits.view(-1), labels.view(-1))
+            else:
+                loss_fct = CrossEntropyLoss()
+                class_weights = None
+                try:
+                    class_weights = self.class_weights
+                except AttributeError:
+                    pass
+                if not class_weights is None:
+                    loss_fct = CrossEntropyLoss(weight=class_weights)
+
+
+
+
+                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+
+        if not return_dict:
+            output = (logits,) + discriminator_hidden_states[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=discriminator_hidden_states.hidden_states,
+            attentions=discriminator_hidden_states.attentions,
+        )

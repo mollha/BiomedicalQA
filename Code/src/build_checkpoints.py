@@ -2,7 +2,6 @@ from transformers import (
     AdamW,
     get_linear_schedule_with_warmup,
     ElectraForQuestionAnswering,
-    ElectraForSequenceClassification
 )
 from models import *
 from loss_functions import *
@@ -144,7 +143,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             if question_type == "factoid" or question_type == "list":
                 qa_model = ElectraForQuestionAnswering(config=discriminator_config)
             elif question_type == "yesno":
-                qa_model = ElectraForSequenceClassification(config=discriminator_config)
+                qa_model = CostSensitiveSequenceClassification(class_weights=(1, 4), config=discriminator_config)
             else:
                 raise Exception("Question type must be factoid, list or yesno.")
 
@@ -176,7 +175,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                                                          state_dict=discriminator.state_dict(),
                                                                          config=discriminator_config)
         elif question_type == "yesno":
-            electra_for_qa = ElectraForSequenceClassification.from_pretrained(pretrained_model_name_or_path=None,
+            electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None,
                                                                               state_dict=discriminator.state_dict(),
                                                                               config=discriminator_config)
         else:

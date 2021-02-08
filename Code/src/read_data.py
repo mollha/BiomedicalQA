@@ -368,7 +368,6 @@ def read_bioasq(path_to_file: Path, testing=False):
         if question_type in ['summary', 'list']:
             continue
 
-
         try:
             fc = fc_map[question_type]
         except KeyError:

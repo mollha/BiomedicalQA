@@ -131,6 +131,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
         print("ELECTRA CONTAINED STATISTICS after external save...")
         print(loss_function.mid_epoch_stats)
 
+
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
 if __name__ == "__main__":
     # Log Process ID
