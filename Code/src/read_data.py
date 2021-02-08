@@ -392,8 +392,10 @@ def read_bioasq(path_to_file: Path, testing=False):
     for qt in combined_metrics.keys():  # iterate over each question type
         print('\n------- {} METRICS -------'.format(qt.upper()))
         qt_metrics = combined_metrics[qt]  # get the metrics for that question type
+        print(qt_metrics)
         if len(qt_metrics) == 0:
             print("No metrics available for question type '{}'".format(qt))
+            continue
 
         # compute this for all metric types
         num_examples = qt_metrics["num_examples"]
