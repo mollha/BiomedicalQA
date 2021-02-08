@@ -250,9 +250,6 @@ def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):
     return {n: lr * (decay_rate ** get_depth(n)) for n, p in parameters}
 
 
-def cost_sensitive_cross_entropy_loss():
-    pass
-
 
 # ------- HELPER FUNCTION FOR BUILDING THE ELECTRA MODEL FOR PRETRAINING --------
 def build_electra_model(model_size: str, get_config=False):
@@ -386,7 +383,7 @@ class ELECTRAModel(nn.Module):
 # Copy of the usual ElectraForSequenceClassification forward fc with weighted CSE loss
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, class_weights, config, *args, **kwargs):
-        super().__init__(config=config, *args, **kwargs)
+        super().__init__(config, *args, **kwargs)
         self.class_weights = class_weights
 
     def forward(

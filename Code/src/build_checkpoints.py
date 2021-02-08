@@ -63,7 +63,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
                 "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        electra_model, optimizer, scheduler, loss_function,\
+        electra_model, optimizer, scheduler, loss_function, \
         new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
 
         config = update_settings(config, new_config, exceptions=["update_steps", "device"])
@@ -175,9 +175,10 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                                                          state_dict=discriminator.state_dict(),
                                                                          config=discriminator_config)
         elif question_type == "yesno":
-            electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None,
-                                                                              state_dict=discriminator.state_dict(),
-                                                                              config=discriminator_config)
+            electra_for_qa = CostSensitiveSequenceClassification(class_weights=(1, 4), config=discriminator_config)
+            electra_for_qa = electra_for_qa.from_pretrained(pretrained_model_name_or_path=None,
+                                                            state_dict=discriminator.state_dict(),
+                                                            config=discriminator_config)
         else:
             raise Exception("Question type must be factoid, list or yesno.")
 
