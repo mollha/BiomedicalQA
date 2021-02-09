@@ -385,6 +385,12 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, class_weights, config, *args, **kwargs):
         super().__init__(config, *args, **kwargs)
         self.class_weights = class_weights
+        
+    def from_pretrained(self, pretrained_model_name_or_path, state_dict, config):
+        super(CostSensitiveSequenceClassification, self).from_pretrained(pretrained_model_name_or_path=pretrained_model_name_or_path,
+                                                                         state_dict=state_dict,
+                                                                         config=config
+                                                                         )
 
     def forward(
             self,
