@@ -5,7 +5,7 @@ from pathlib import Path
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss
 from transformers import (ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM,
-                          ElectraForPreTraining, ElectraForSequenceClassification)
+                          ElectraForPreTraining, ElectraForSequenceClassification, ElectraModel, ElectraPreTrainedModel)
 from transformers.modeling_outputs import SequenceClassifierOutput
 import torch.nn.functional
 import datetime
@@ -14,6 +14,7 @@ import sys
 
 # ------------------ DEFINE PRETRAIN CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
 # i.e. Vanilla ELECTRA Model settings are outlined in the paper: https://arxiv.org/abs/2003.10555
+from transformers.models.electra.modeling_electra import ElectraClassificationHead
 
 small_pretrain_config = {
     "mask_prob": 0.15,
@@ -381,23 +382,27 @@ class ELECTRAModel(nn.Module):
 
 
 # Copy of the usual ElectraForSequenceClassification forward fc with weighted CSE loss
-class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
-    def __init__(self, class_weights, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class CostSensitiveSequenceClassification(ElectraPreTrainedModel):
+    def __init__(self, config, class_weights):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.electra = ElectraModel(config)
+        self.classifier = ElectraClassificationHead(config)
         self.class_weights = class_weights
+        self.init_weights()
 
     def forward(
-            self,
-            input_ids=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            labels=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -435,11 +440,9 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                     class_weights = self.class_weights
                 except AttributeError:
                     pass
+
                 if not class_weights is None:
                     loss_fct = CrossEntropyLoss(weight=class_weights)
-
-
-
 
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 

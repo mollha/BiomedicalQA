@@ -175,8 +175,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                                                          state_dict=discriminator.state_dict(),
                                                                          config=discriminator_config)
         elif question_type == "yesno":
-            electra_for_qa = CostSensitiveSequenceClassification(class_weights=(1, 4), config=discriminator_config)
-            electra_for_qa = electra_for_qa.from_pretrained(pretrained_model_name_or_path=None,
+            electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None,
                                                             state_dict=discriminator.state_dict(),
                                                             config=discriminator_config)
         else:
