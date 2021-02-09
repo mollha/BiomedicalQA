@@ -1,4 +1,3 @@
-import collections
 import torch
 import os
 from pathlib import Path
@@ -436,7 +435,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 except AttributeError:
                     pass
                 if not class_weights is None:
-                    loss_fct = CrossEntropyLoss(weight=class_weights)
+                    loss_fct = CrossEntropyLoss(weight=torch.tensor(class_weights))
 
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
