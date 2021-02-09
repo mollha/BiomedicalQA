@@ -383,7 +383,7 @@ class ELECTRAModel(nn.Module):
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.class_weights = (1, 4)
+        self.class_weights = [1, 4]
 
     def forward(
             self,
