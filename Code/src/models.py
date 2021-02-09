@@ -436,7 +436,6 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                     pass
                 if not class_weights is None:
                     loss_fct = CrossEntropyLoss(weight=torch.tensor(class_weights, device="cuda" if torch.cuda.is_available() else "cpu"))
-
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
