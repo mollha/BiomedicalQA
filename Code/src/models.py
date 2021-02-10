@@ -383,7 +383,7 @@ class ELECTRAModel(nn.Module):
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.class_weights = [4., 1.]
+        self.class_weights = torch.tensor([1., 0.25], device="cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(
             self,
@@ -435,7 +435,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 except AttributeError:
                     pass
                 if not class_weights is None:
-                    loss_fct = CrossEntropyLoss(weight=torch.tensor(class_weights, device="cuda" if torch.cuda.is_available() else "cpu"))
+                    loss_fct = CrossEntropyLoss(weight=class_weights)
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
