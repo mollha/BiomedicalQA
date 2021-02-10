@@ -383,7 +383,7 @@ class ELECTRAModel(nn.Module):
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.class_weights = torch.tensor([1., 0.25], device="cuda" if torch.cuda.is_available() else "cpu")
+        self.class_weights = torch.tensor([1., 0.02], device="cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(
             self,
