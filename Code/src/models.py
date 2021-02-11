@@ -28,8 +28,8 @@ base_pretrain_config = {
     "mask_prob": 0.15,
     "lr": 2e-4,
     "batch_size": 32,
-    # "batch_size": 12,
-    "max_steps": 766 * 1000,
+    # "batch_size": 256,
+    "max_steps": 766 * 1000 * 8, # we multiply by 8 as we decreased batch size by 8
     "max_length": 256,
     "generator_size_divisor": 3,
     'adam_bias_correction': False

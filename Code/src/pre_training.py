@@ -178,6 +178,9 @@ if __name__ == "__main__":
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
     config = build_pretrained_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
+    for param_group in optimizer.param_groups:
+        print(param_group['lr'])
+
     # ------ PREPARE DATA ------
     data_pre_processor = ELECTRADataProcessor(tokenizer=electra_tokenizer, max_length=config["max_length"])
     csv_data_dir = (base_path / '../datasets/PubMed/processed_data').resolve()

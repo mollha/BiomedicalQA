@@ -64,6 +64,7 @@ datasets = {
 }
 
 
+# ------------- DEFINE TRAINING FEATURE CLASSES ------------
 class BinaryFeature:
     def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_text):
         self._question_id = question_id
