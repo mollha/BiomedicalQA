@@ -54,7 +54,7 @@ datasets = {
     #     "train": ["train-v2.0.json"],
     #     "test": ["dev-v2.0.json"],
     # }
-    "bioasq": {"train": "raw_data/training8b.json",
+    "bioasq": {"train": "raw_data/training9b.json",
                "test": "raw_data/8B1_golden.json",
                },
     "squad": {
