@@ -20,7 +20,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
     results_by_question_id = {}
 
     # when .eval() is set, all dropout layers are removed.
-    yes_no_model.eval()  # switch to evaluation mode
+    # yes_no_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
             inputs = {

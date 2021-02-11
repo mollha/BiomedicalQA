@@ -47,7 +47,7 @@ large_pretrain_config = {
 
 # ------------------ DEFINE FINETUNE CONFIG FOR ELECTRA MODELS AS SPECIFIED IN PAPER ------------------
 small_finetune_config = {
-    "lr": 1e-4,
+    "lr": 3e-4,
     "layerwise_lr_decay": 0.8,
     "max_epochs": 2,  # this is the number of epochs typical for squad
     "warmup_fraction": 0.1,
