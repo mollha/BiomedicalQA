@@ -21,6 +21,7 @@ source /etc/profile
 
 # activate venv
 source ../../venv/bin/activate
+python -m nltk.downloader punkt
 
 # parse arguments
 while [[ $# -gt 0 ]]
