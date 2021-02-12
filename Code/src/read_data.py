@@ -15,6 +15,14 @@ from spacy.lang.en.stop_words import STOP_WORDS
 
 nlp = spacy.load('en_core_web_sm')
 
+def update_dataset_metrics(total_metrics, additional_metrics):
+    for key in additional_metrics:
+        if key in total_metrics:
+            total_metrics[key] += additional_metrics[key]
+        else:
+            total_metrics[key] = additional_metrics[key]
+    return total_metrics
+
 
 class BinaryExample:
     def __init__(self, question_id, question, short_context, answer):
@@ -103,6 +111,11 @@ def read_squad(path_to_file: Path, testing=False):
         squad_dict = json.load(f)
 
     dataset = []
+    metrics = {
+        "impossible_examples": 0,
+        "num_questions": 0,
+        "num_examples": 0,
+    }
 
     for group in tqdm(squad_dict['data']):
         for passage in group['paragraphs']:
@@ -152,6 +165,8 @@ def read_squad(path_to_file: Path, testing=False):
                 question = qa['question']
                 question_id = qa['id']
                 is_impossible = qa['is_impossible']
+                metrics["impossible_examples"] += 1 if is_impossible else 0
+                metrics["num_questions"] += 1
 
                 for answer in qa['answers']:
                     add_end_idx(answer, full_context)
@@ -161,21 +176,13 @@ def read_squad(path_to_file: Path, testing=False):
                     normalised_answer_start = answer['answer_start'] - sum(context_sent_lengths[:sentence_number])
                     normalised_answer_end = normalised_answer_start + answer['answer_end'] - answer['answer_start']
 
+                    metrics["num_examples"] += 1
+
                     short_context = context_sentences[sentence_number]
                     dataset.append(FactoidExample(question_id, question, short_context, full_context, answer_text,
                                                 normalised_answer_start, normalised_answer_end, is_impossible))
 
-            break  # todo remove
-    return dataset
-
-
-def update_dataset_metrics(total_metrics, additional_metrics):
-    for key in additional_metrics:
-        if key in total_metrics:
-            total_metrics[key] += additional_metrics[key]
-        else:
-            total_metrics[key] = additional_metrics[key]
-    return total_metrics
+    return dataset, metrics
 
 
 def read_bioasq(path_to_file: Path, testing=False):
