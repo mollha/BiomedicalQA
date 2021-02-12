@@ -197,7 +197,7 @@ def read_squad(path_to_file: Path, testing=False):
     print("- Non-Impossible Examples: {} examples ({}%)"
           .format(total_examples - metrics["impossible_examples"], 100 - percentage_impossible_examples))
 
-    return dataset, metrics
+    return {"factoid": dataset}, {"factoid": metrics}
 
 
 def read_bioasq(path_to_file: Path, testing=False):
