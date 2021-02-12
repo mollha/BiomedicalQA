@@ -165,11 +165,12 @@ def read_squad(path_to_file: Path, testing=False):
             for qa in passage['qas']:
                 question = qa['question']
                 question_id = qa['id']
-                is_impossible = qa['is_impossible']
+                is_impossible = bool(qa['is_impossible'])
                 metrics["impossible_questions"] += 1 if is_impossible else 0
                 metrics["num_questions"] += 1
 
                 for answer in qa['answers']:
+
                     add_end_idx(answer, full_context)
                     answer_text = answer['text']
 
@@ -332,6 +333,7 @@ def read_bioasq(path_to_file: Path, testing=False):
                     examples_from_question.append(FactoidExample(question_id, question, context,
                                                                  context if article is None else article[section], "",
                                                                  start_pos, end_pos, is_impossible))
+
                 else:
                     is_impossible = False
 
