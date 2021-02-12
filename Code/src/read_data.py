@@ -182,6 +182,21 @@ def read_squad(path_to_file: Path, testing=False):
                     dataset.append(FactoidExample(question_id, question, short_context, full_context, answer_text,
                                                 normalised_answer_start, normalised_answer_end, is_impossible))
 
+    # ------ DISPLAY METRICS -------
+    total_questions = metrics["num_questions"]
+    total_examples = metrics["num_examples"]
+
+    print('\n------- COLLATING {}-SET METRICS -------'.format("TEST" if testing else "TRAIN"))
+    print("There are {} questions and {} examples".format(total_questions, total_examples))
+
+    percentage_impossible_examples = 0 if total_examples == 0 else round(
+        100 * metrics["impossible_examples"] / total_examples, 2)
+
+    print("\n- Impossible Examples: {} examples ({}%)"
+          .format(metrics["impossible_examples"], percentage_impossible_examples))
+    print("- Non-Impossible Examples: {} examples ({}%)"
+          .format(total_examples - metrics["impossible_examples"], 100 - percentage_impossible_examples))
+
     return dataset, metrics
 
 
