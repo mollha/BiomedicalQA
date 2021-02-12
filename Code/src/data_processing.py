@@ -305,8 +305,11 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
             #     unhandled_questions += 1
             #     continue
             # todo might be good to add a docstride idk
-            print("short context", short_context)
-            tokenized_context = tokenizer.tokenize(short_context)
+            try:
+                tokenized_context = tokenizer.tokenize(short_context)
+            except Exception:
+                print("short context", short_context)
+                quit()
 
             start_pos = example._answer_start
             end_pos = example._answer_end
