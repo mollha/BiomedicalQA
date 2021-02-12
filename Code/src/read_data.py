@@ -113,6 +113,7 @@ def read_squad(path_to_file: Path, testing=False):
     dataset = []
     metrics = {
         "impossible_examples": 0,
+        "impossible_questions": 0,
         "num_questions": 0,
         "num_examples": 0,
     }
