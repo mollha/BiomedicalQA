@@ -18,7 +18,7 @@ small_pretrain_config = {
     "mask_prob": 0.15,
     "lr": 5e-4,
     "batch_size": 128,
-    "max_steps": 10 ** 6,
+    "max_steps": 1450000,
     "max_length": 128,
     "generator_size_divisor": 4,
     'adam_bias_correction': False
@@ -27,9 +27,8 @@ small_pretrain_config = {
 base_pretrain_config = {
     "mask_prob": 0.15,
     "lr": 2e-4,
-    "batch_size": 32,
-    # "batch_size": 256,
-    "max_steps": 766 * 1000 * 8, # we multiply by 8 as we decreased batch size by 8
+    "batch_size": 32,  # "batch_size": 256,
+    "max_steps": (10 ** 6) * 8,  # we multiply by 8 as we decreased batch size by 8
     "max_length": 256,
     "generator_size_divisor": 3,
     'adam_bias_correction': False

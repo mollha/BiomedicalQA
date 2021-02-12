@@ -32,9 +32,6 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
     """ Train the model """
     model.to(settings["device"])
 
-    print("ELECTRA CONTAINED STATISTICS before loop...")
-    print(loss_function.mid_epoch_stats)
-
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     sys.stderr.write("\n---------- BEGIN PRE-TRAINING ----------")
     sys.stderr.write("\nDevice = {}\nModel Size = {}\nTotal Epochs = {}\nStart training from Epoch = {}\nStart training from Step = {}\nBatch size = {}\nCheckpoint Steps = {}\nMax Sample Length = {}\n\n"
@@ -120,16 +117,9 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
                 # Save model checkpoint
                 save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, loss_function=loss_function)
 
-        print("ELECTRA CONTAINED STATISTICS... before update")
-        print(loss_function.mid_epoch_stats)
-
         save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, loss_function=loss_function)
         loss_function.update_statistics()  # update the loss function statistics before saving loss fc with checkpoint
-        print("ELECTRA CONTAINED STATISTICS after update...")
-        print(loss_function.mid_epoch_stats)
 
-        print("ELECTRA CONTAINED STATISTICS after external save...")
-        print(loss_function.mid_epoch_stats)
 
 
 # ---------- PREPARE OBJECTS AND SETTINGS FOR MAIN PRE-TRAINING LOOP ----------
@@ -141,7 +131,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Overwrite default settings.')
     parser.add_argument(
         "--size",
-        default="small",
+        default="base",
         choices=['small', 'base', 'large'],
         type=str,
         help="The size of the electra model e.g. 'small', 'base' or 'large",
