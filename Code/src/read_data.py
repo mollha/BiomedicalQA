@@ -46,8 +46,8 @@ class FactoidExample:
         self._question_type = "factoid"
         self._question_id = question_id
         self._question = question
-        self._short_context = short_context
-        self._full_context = full_context
+        self._short_context = short_context  # the sentence(s) containing the answer
+        self._full_context = full_context  # the remaining context containing all sentences provided
         self._answer = answer
         self._answer_start = answer_start
         self._answer_end = answer_end
@@ -165,7 +165,7 @@ def read_squad(path_to_file: Path, testing=False):
             for qa in passage['qas']:
                 question = qa['question']
                 question_id = qa['id']
-                is_impossible = bool(qa['is_impossible'])
+                is_impossible = qa['is_impossible']
                 metrics["impossible_questions"] += 1 if is_impossible else 0
                 metrics["num_questions"] += 1
 
@@ -184,6 +184,7 @@ def read_squad(path_to_file: Path, testing=False):
                     short_context = context_sentences[sentence_number]
                     dataset.append(FactoidExample(question_id, question, short_context, full_context, answer_text,
                                                 normalised_answer_start, normalised_answer_end, is_impossible))
+        break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = metrics["num_questions"]
@@ -203,8 +204,8 @@ def read_squad(path_to_file: Path, testing=False):
                   percentage_impossible_examples))
 
     print("- Non-Impossible Instances: {} questions ({}%), {} examples ({}%)"
-          .format(total_questions - metrics["impossible_questions"], 100 - percentage_impossible_questions,
-                  total_examples - metrics["impossible_examples"], 100 - percentage_impossible_examples))
+          .format(total_questions - metrics["impossible_questions"], 100.0 - percentage_impossible_questions,
+                  total_examples - metrics["impossible_examples"], 100.0 - percentage_impossible_examples))
 
     return {"factoid": dataset}, {"factoid": metrics}
 

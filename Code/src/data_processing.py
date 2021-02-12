@@ -92,7 +92,8 @@ class BinaryFeature:
 
 
 class FactoidFeature:
-    def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end, answer_text):
+    def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
+                 answer_text):
         self._question_id = question_id
         self._is_impossible = is_impossible
         self._input_ids = input_ids
@@ -116,7 +117,7 @@ class FactoidFeature:
 
 
 def find_tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> tuple:
-        """
+    """
         The tokenizer removes some characters from text when creating tokens e.g.  ̃
         We need to correct for it being out by 1 or 2 characters
         :param tokenizer:
@@ -126,106 +127,106 @@ def find_tokenized_start_end_pos(tokenizer, text: str, start: int, end: int) -> 
         :return:
         """
 
-        def handle_unk(raw_word: str, tokenized_word: list, unk_idx: int, char_in_raw: int) -> tuple:
-            # given an unk token, we need to find what character's it represents
-            last_token_idx = len(tokenized_word) - 1
-            tokens_handled = 1
+    def handle_unk(raw_word: str, tokenized_word: list, unk_idx: int, char_in_raw: int) -> tuple:
+        # given an unk token, we need to find what character's it represents
+        last_token_idx = len(tokenized_word) - 1
+        tokens_handled = 1
 
-            for tok_idx, tok_word in enumerate(tokenized_word):
-                if tok_idx < unk_idx:
+        for tok_idx, tok_word in enumerate(tokenized_word):
+            if tok_idx < unk_idx:
+                continue
+
+            if tok_word == tokenizer.unk_token:
+                # found right unk token (there could be multiple)
+                # can't take it's length at face val
+                if tok_idx == last_token_idx:
+                    # print('skipping this many ->', len(raw_word[char_in_raw:]))
+                    return len(raw_word[char_in_raw:]), tokens_handled
+
+                if tokenized_word[tok_idx + 1] == tokenizer.unk_token:
+                    # defer for this round by moving to next token, but increment tokens_handled
+                    tokens_handled += 1
                     continue
 
-                if tok_word == tokenizer.unk_token:
-                    # found right unk token (there could be multiple)
-                    # can't take it's length at face val
-                    if tok_idx == last_token_idx:
-                        # print('skipping this many ->', len(raw_word[char_in_raw:]))
-                        return len(raw_word[char_in_raw:]), tokens_handled
+                # need to find the start position of the first char of next token
+                for next_tok_char in tokenized_word[tok_idx + 1]:
+                    if next_tok_char != "#":
+                        # this is the next char to look for
+                        # print("looking for {} in {}".format(next_tok_char, raw_word[char_in_raw:]))
+                        start_idx_next = raw_word[char_in_raw:].lower().index(next_tok_char)
 
-                    if tokenized_word[tok_idx + 1] == tokenizer.unk_token:
-                        # defer for this round by moving to next token, but increment tokens_handled
-                        tokens_handled += 1
-                        continue
+                        # print('skipping', start_idx_next)
+                        return start_idx_next, tokens_handled
 
-                    # need to find the start position of the first char of next token
-                    for next_tok_char in tokenized_word[tok_idx + 1]:
-                        if next_tok_char != "#":
-                            # this is the next char to look for
-                            # print("looking for {} in {}".format(next_tok_char, raw_word[char_in_raw:]))
-                            start_idx_next = raw_word[char_in_raw:].lower().index(next_tok_char)
+            else:
+                num_non_hash_chars = len(tok_word) - tok_word.count('#')
+                char_in_raw += num_non_hash_chars
 
-                            # print('skipping', start_idx_next)
-                            return start_idx_next, tokens_handled
+    # iterate through each of the words (i.e. split by whitespace)
+    words_by_whitespace = text.split(" ")
 
-                else:
-                    num_non_hash_chars = len(tok_word) - tok_word.count('#')
-                    char_in_raw += num_non_hash_chars
+    # keep a count of the num of characters looked at
+    char_count = 0
+    num_tokens = 0
+    new_s, new_e = None, None
 
-        # iterate through each of the words (i.e. split by whitespace)
-        words_by_whitespace = text.split(" ")
+    for word in words_by_whitespace:
+        # tokenize each word individually
+        tokens_in_words = tokenizer.tokenize(word)
+        word_char_count = 0
+        skip_tokens = 0
 
-        # keep a count of the num of characters looked at
-        char_count = 0
-        num_tokens = 0
-        new_s, new_e = None, None
+        for token_idx, token_in_word in enumerate(tokens_in_words):
+            if skip_tokens > 0:
+                skip_tokens -= 1
+                continue
 
-        for word in words_by_whitespace:
-            # tokenize each word individually
-            tokens_in_words = tokenizer.tokenize(word)
-            word_char_count = 0
-            skip_tokens = 0
+            if token_in_word == tokenizer.unk_token:
+                num_chars, tokens_handled = handle_unk(word, tokens_in_words, token_idx, word_char_count)
+                skip_tokens += tokens_handled - 1
+                new_char_count = char_count + num_chars
+                word_char_count += num_chars
+            else:
+                # get the num of non-hash characters
+                num_non_hashes = len(token_in_word) - token_in_word.count("#")
+                new_char_count = char_count + num_non_hashes
+                word_char_count += num_non_hashes
 
-            for token_idx, token_in_word in enumerate(tokens_in_words):
-                if skip_tokens > 0:
-                    skip_tokens -= 1
-                    continue
+            # print("char count {}, n_char count {}, char {}, tok {}".format(char_count, new_char_count, text[char_count], token_in_word))
 
-                if token_in_word == tokenizer.unk_token:
-                    num_chars, tokens_handled = handle_unk(word, tokens_in_words, token_idx, word_char_count)
-                    skip_tokens += tokens_handled - 1
-                    new_char_count = char_count + num_chars
-                    word_char_count += num_chars
-                else:
-                    # get the num of non-hash characters
-                    num_non_hashes = len(token_in_word) - token_in_word.count("#")
-                    new_char_count = char_count + num_non_hashes
-                    word_char_count += num_non_hashes
+            if char_count <= start <= new_char_count and new_s is None:
+                new_s = num_tokens
+                # print('SETTING START AS {}'.format(num_tokens))
 
-                # print("char count {}, n_char count {}, char {}, tok {}".format(char_count, new_char_count, text[char_count], token_in_word))
+            # if end >= new_char_count and new_e is None:
+            # todo handle mid token ends
+            if char_count <= end <= new_char_count and new_e is None:
+                new_e = num_tokens
+                # print('SETTING END AS {}'.format(num_tokens))
 
-                if char_count <= start <= new_char_count and new_s is None:
-                    new_s = num_tokens
-                    # print('SETTING START AS {}'.format(num_tokens))
+                # # break token down further until we find the ACTUAL end
+                # sub_tokens = tokenizer.tokenize(token_in_word[token_in_word.count("#"):])
+                # cumulative_char_count = char_count
+                #
+                # for sub_char in sub_tokens:
+                #     nnh = len(token_in_word) - token_in_word.count("#")
+                #     cumulative_char_count += nnh
+                #
+                #     if cumulative_char_count == end:
+                #         pass
+                #     elif cumulative_char_count < end:
+                #         continue
+                #
+                #     pass
 
-                # if end >= new_char_count and new_e is None:
-                # todo handle mid token ends
-                if char_count <= end <= new_char_count and new_e is None:
-                    new_e = num_tokens
-                    # print('SETTING END AS {}'.format(num_tokens))
+            char_count = new_char_count
+            num_tokens += 1
 
-                    # # break token down further until we find the ACTUAL end
-                    # sub_tokens = tokenizer.tokenize(token_in_word[token_in_word.count("#"):])
-                    # cumulative_char_count = char_count
-                    #
-                    # for sub_char in sub_tokens:
-                    #     nnh = len(token_in_word) - token_in_word.count("#")
-                    #     cumulative_char_count += nnh
-                    #
-                    #     if cumulative_char_count == end:
-                    #         pass
-                    #     elif cumulative_char_count < end:
-                    #         continue
-                    #
-                    #     pass
+        char_count += 1  # account for whitespace between words
 
-                char_count = new_char_count
-                num_tokens += 1
-
-            char_count += 1  # account for whitespace between words
-
-        if new_e is None:
-            new_e = num_tokens  # last token if not set
-        return new_s, new_e + 1  # +1 means we don't cut off too early
+    if new_e is None:
+        new_e = num_tokens  # last token if not set
+    return new_s, new_e + 1  # +1 means we don't cut off too early
 
 
 def convert_test_samples_to_features(samples, tokenizer, max_length):
@@ -257,6 +258,232 @@ def convert_test_samples_to_features(samples, tokenizer, max_length):
 
     return feature_list
 
+
+def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absolute_start, match_position):
+    """
+    Given that we know which token is found at a given position in the original context, we need to break this
+    token into sub-tokens if the goal position is not somewhere in the middle of the token.
+
+    :param match_position: the position we want to find the matching token for
+    :param pre_token: the pre-token that was created by splitting the original context on whitespace
+    :param tokenizer: the tokenizer used to tokenize text
+    :param sub_tokens: the sub_tokens created when pre_token is tokenized
+    :return:
+    """
+
+    # Pass over the sub_tokens and condense multiple [UNK] tokens in a row into a single [UNK]
+    sub_tokens_condensed = []
+    for idx in range(len(sub_tokens)):
+        sub_token = sub_tokens[idx]
+
+        # If sub-token is an unk token, we need to put it in the condensed list if the previous token was not also unk
+        if sub_token == tokenizer.unk_token and (
+                len(sub_tokens_condensed) == 0 or sub_tokens_condensed[-1] != tokenizer.unk_token):
+            sub_tokens_condensed.append(sub_token)
+        elif sub_token != tokenizer.unk_token:
+            sub_tokens_condensed.append(sub_token)
+
+    # Pass over the condensed sub_tokens and find their start and end positions
+    sub_position_relative_mapping = []  # a list containing [token, [start_pos, end_pos]]
+    pre_token_relative_position = 0
+    for sub_token in sub_tokens_condensed:
+        if sub_token == tokenizer.unk_token:  # we have found an unknown token
+            sub_position_relative_mapping.append([sub_token, None])
+        else:
+            text_sub_token = tokenizer.convert_tokens_to_string(sub_token)
+            position_of_sub_token = pre_token.find(pre_token_relative_position, text_sub_token)
+            sub_position_relative_mapping.append(
+                [sub_token, [position_of_sub_token, position_of_sub_token + len(text_sub_token)]])
+            pre_token_relative_position = position_of_sub_token + len(text_sub_token) + 1  # add one to skip past end
+
+    # Fill in the blanks for the unknown tokens that we had to skip on the first pass
+    for idx in range(len(sub_position_relative_mapping)):
+        # current_pair is a tuple of sub_token and start_end_pair (start and end positions)
+        current_pair = sub_position_relative_mapping[idx]
+        last_pair = None if idx == 0 else sub_position_relative_mapping[idx - 1]
+
+        if current_pair[1] is None:  # need to populate the start position of the current pair
+            if last_pair is None:  # current_pair represents the first token
+                current_pair[1] = [pre_token_absolute_start, None]
+            else:
+                # the position where the previous token ended is 1 behind the start position of the current token
+                current_pair[1] = [last_pair[1] + 1,
+                                   None if idx < len(sub_position_relative_mapping) - 1 else pre_token_absolute_start + len(pre_token)]
+
+        # need to populate the end position of the last pair
+        if last_pair is not None and last_pair[0] == tokenizer.unk_token:
+            # the position where the current token started is 1 ahead the end position of the last token
+            last_pair[1][1] = current_pair[1][0] - 1
+
+    # At this stage, we should have a mapping of every sub_token to its start and end positions
+    for idx, (sub_token, (st_start_pos, st_end_pos)) in enumerate(sub_position_relative_mapping):
+        if st_start_pos == match_position or st_end_pos == match_position:  # start position begins at the start of the current token, not in the middle
+            # we can keep this token intact
+            return sub_position_relative_mapping
+
+        elif st_start_pos < match_position < st_end_pos:  # start position in the middle of the current token
+            # we need to repeat this process to break down the current token further
+            new_pre_token = tokenizer.convert_tokens_to_string(sub_token)
+            num_sub_tokens = tokenizer.tokenize(new_pre_token)
+
+            # recursive call to further break down sub-token
+            sub_mapping = sub_tokenize_answer_tokens(tokenizer, new_pre_token, num_sub_tokens, st_start_pos,
+                                                     match_position)
+
+            return sub_position_relative_mapping[0:idx] + sub_mapping + sub_position_relative_mapping[idx + 1:]
+
+
+def convert_examples_to_features(examples, tokenizer, max_length):
+    # todo what happens with tokenization if we don't know the answer?
+    # we could do something interesting with these sorts of predictions, where we sub-tokenize around the predicted answer
+    # and ask for the predictions again - let's look at this for making predictions
+
+    feature_list = []
+    for example_number, example in enumerate(examples):
+        short_context = example._short_context
+        question = example._question
+
+        # check the type of the example.
+        if example._question_type == "yesno":
+            # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
+            tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
+                                        max_length=max_length)  # only truncate the second sequence
+
+            # prepare the input_ids, attention_mask and token_type_ids as tensors
+            input_ids = tokenized_input["input_ids"]
+            attention_mask = tokenized_input["attention_mask"]
+            token_type_ids = tokenized_input["token_type_ids"]
+            feature = BinaryFeature(example._question_id, input_ids, attention_mask,
+                                    token_type_ids, example._answer)
+            feature_list.append(feature)
+            continue
+
+        # If question type is factoid or list
+        # Given start and end positions in the text, we now need to find the tokenized start and end positions
+        text_start_pos = example._answer_start
+        text_end_pos = example._answer_end
+
+        # todo verify that the start and end positions actually point to the answer
+        # todo also make sure that short_context contains the answer if question !impossible
+        # todo check in the reading dataset part that there is no leading and trailing whitespace
+
+        # In the BioELECTRA tokenizer that we trained specifically on PubMed vocabulary, the pre-tokenisation steps
+        # include removing whitespace, stripping accents and converting to lowercase
+
+        # Lets create a mapping of characters in the original context to the position in the tokenized context.
+        # This will help us to find the tokens that correspond to the answer.
+        accent_stripped_context = unidecode.unidecode(short_context)  # todo this should not affect the start and end positions, but check
+        pre_tokenized_context = accent_stripped_context.lower().split()  # reduce to lower case and split on whitespace
+
+        char_pos_in_original_context = 0
+        context_position_mapping = []
+        for pre_token in pre_tokenized_context:
+            # find the range of character positions (from original context) that are contained within this pre-token
+            char_range = (char_pos_in_original_context, char_pos_in_original_context + len(pre_token))
+            context_position_mapping.append((pre_token, char_range))  # put this mapping in our list of mappings
+            char_pos_in_original_context += len(pre_token) + 2  # add two to skip over the next whitespace
+
+        # Verify that we haven't lost any tokens and have counted through correctly.
+        num_pre_token_chars = sum([len(pt) for pt, rge in context_position_mapping]) + len(pre_tokenized_context) - 1
+        num_original_chars = len(short_context)
+        if num_pre_token_chars != num_original_chars:
+            raise Exception("There are {} characters in the pre-tokenized context '{}'\n"
+                            "There are {} characters in the original context '{}'"
+                            .format(num_pre_token_chars, pre_tokenized_context, num_original_chars, short_context))
+
+        # It is important for us to define the context position mapping before we tokenize.
+        # After tokenization, we will have some [UNK] tokens which cannot be directly mapped to our original context.
+
+        # Now we need to scan through our mapping and tokenize each of our pre-tokens
+        # We need to find the tokenized versions of the original start and end positions
+        input_ids = []
+        start_token_position, end_token_position = None, None
+        for pre_token, char_range in context_position_mapping:
+            pre_token_start_pos, pre_token_end_pos = char_range
+
+            token_sub_tokens = tokenizer.tokenize(short_context)
+            mapping = None
+
+            # If we have found the token containing the start or end positions, then we need to do more with the token
+            if pre_token_start_pos <= pre_token_start_pos <= pre_token_end_pos:  # found the start
+                mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens,
+                                                     pre_token_start_pos, text_start_pos)
+                token_sub_tokens = [t[0] for t in mapping]
+
+            if pre_token_start_pos <= text_end_pos <= pre_token_end_pos:  # found the end
+                mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens,
+                                                     pre_token_start_pos, text_end_pos)
+                token_sub_tokens = [t[0] for t in mapping]
+
+            if mapping is not None:
+                # see if the start position or end position are in here
+                for idx, (sub_token, (s, e)) in enumerate(mapping):
+                    if start_token_position is None and s == pre_token_start_pos:
+                        start_token_position = idx + len(input_ids)  # add tokens that came prior
+                    if end_token_position is None and e == pre_token_end_pos:
+                        end_token_position = idx + len(input_ids) + 1  # add tokens that came prior
+
+            token_input_ids = tokenizer.convert_tokens_to_ids(token_sub_tokens)
+            input_ids.extend(token_input_ids)  # add the sub-token ids to our input_ids list
+
+        # The attention mask indicates which tokens should be attended to (1) for yes and (0) for no.
+        # For instance, padding tokens should not be attended to, but we don't add these until later
+        # Hence, attention mask at this stage should just be a list of 1s
+        attention_mask = len(input_ids) * [1]
+
+        # Token type ids are used when distinguishing between the context and the question
+        # Since we're tokenizing the context, we need to set all values to zero
+        token_type_ids = len(input_ids) * [0]
+
+        # At this point, we have the tokenized start and end position of the answer, input ids, attention mask,
+        # token_type_ids question etc. We need to combine these components into actual features.
+        tokenized_question = tokenizer.tokenize(question)
+        question_input_ids = tokenizer.convert_tokens_to_ids(tokenized_question)
+        question_attention_mask = len(question_input_ids) * [1]
+        question_token_type_ids = len(question_input_ids) * [1]
+
+        num_question_tokens = len(tokenized_question)  # tokenize the question
+        print("Num question tokens", num_question_tokens)  # todo remove if this number looks sensible
+        num_additional_tokens = 3  # refers to the [CLS] tokens and [SEP] tokens used when combining question & context
+        num_context_tokens = max_length - num_question_tokens - num_additional_tokens
+
+        # We need to take "doc strides" of the context paragraph of lengths up to num_context_tokens
+        # These strides must centre around the tokenized start and end positions
+        # Hence, the stride can begin as late as start_token_position and end as early as end_token_position
+        # We also perform padding here and create our features.
+
+        num_answer_tokens = end_token_position - start_token_position
+        for left_stride in range(0, num_context_tokens - num_answer_tokens):
+            right_stride = num_context_tokens - num_answer_tokens - left_stride
+            left_clip = max(0, start_token_position - left_stride)
+            right_clip = min(end_token_position + right_stride, len(input_ids))
+
+            clipped_input_ids = input_ids[left_clip: right_clip]
+            clipped_attention_mask = attention_mask[left_clip: right_clip]
+            clipped_token_type_ids = token_type_ids[left_clip: right_clip]
+
+            # concatenate the question, special tokens and context to make features
+            # [CLS] and first [SEP] are considered part of the context for token_type_ids.
+            # we attend over special tokens like [CLS] and [SEP] - just NOT PADDING
+
+            # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
+            all_input_ids = [tokenizer.cls_token_id] + question_input_ids + [tokenizer.sep_token_id] + clipped_input_ids + [tokenizer.sep_token_id]
+            all_attention_mask = [1] + question_attention_mask + [1] + clipped_attention_mask + [1]
+            all_token_type_ids = [0] + question_token_type_ids + [0] + clipped_token_type_ids + [1]
+
+            # pad the end with zeros if we have shorter length
+            all_input_ids.extend([tokenizer.pad_token_id] * (max_length - len(all_input_ids)))  # add the padding token
+            all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
+            all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
+
+            # Now we're ready to create a feature
+            feature = FactoidFeature(example._question_id, example._is_impossible, all_input_ids,
+                                     all_attention_mask, all_token_type_ids, start_token_position,
+                                     end_token_position, example._answer)
+            feature_list.append(feature)
+
+
+    return feature_list
 
 def convert_train_samples_to_features(samples, tokenizer, max_length):
     # keep track of the number of questions we had to skip.
@@ -297,7 +524,7 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
         # check the type of the example.
         if example._question_type == "yesno":
             feature = BinaryFeature(example._question_id, input_ids, attention_mask,
-                                     token_type_ids, example._answer)
+                                    token_type_ids, example._answer)
 
         elif example._question_type == "factoid" or example._question_type == "list":
             # if example._question_id in skip_squad_question_ids:
@@ -305,11 +532,8 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
             #     unhandled_questions += 1
             #     continue
             # todo might be good to add a docstride idk
-            try:
-                tokenized_context = tokenizer.tokenize(short_context)
-            except Exception:
-                print("short context", short_context)
-                quit()
+            print("\nshort context", short_context)
+            tokenized_context = tokenizer.tokenize(short_context)
 
             start_pos = example._answer_start
             end_pos = example._answer_end
@@ -323,7 +547,8 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
                 # print("Official Answer: {}, Predicted Answer: {}".format(example._answer, tokenized_context[tok_start: tok_end]))
 
                 if tokenizer.unk_token not in tokenized_context:
-                    corrected_positions = correct_for_unaccounted(tokenized_context, example._answer, tok_start,tok_end)
+                    corrected_positions = correct_for_unaccounted(tokenized_context, example._answer, tok_start,
+                                                                  tok_end)
 
                     if corrected_positions is None:
                         # need to split into subtokens to handle these questions
@@ -345,14 +570,13 @@ def convert_train_samples_to_features(samples, tokenizer, max_length):
                 new_end = tok_end + 1
 
             feature = FactoidFeature(example._question_id, example._is_impossible, input_ids, attention_mask,
-                                   token_type_ids, new_start, new_end, example._answer)
+                                     token_type_ids, new_start, new_end, example._answer)
 
         else:
-            raise Exception("Question type of example '{}' should be either list, factoid or yesno.".format(example.get_features()))
+            raise Exception(
+                "Question type of example '{}' should be either list, factoid or yesno.".format(example.get_features()))
 
         feature_list.append(feature)
-
-
 
     return feature_list
 
@@ -466,7 +690,7 @@ class IterableCSVDataset(IterableDataset):
             try:
                 batch = next(self._current_iterator)
 
-                if self._resume:    # skip all the extra processing
+                if self._resume:  # skip all the extra processing
                     return
 
                 num_samples_in_batch = len(batch)
@@ -515,8 +739,6 @@ class IterableCSVDataset(IterableDataset):
         self._resume = False
         sys.stderr.write("\nTook {} seconds to resume from training step {}".format(round(time.time() - start_time, 2),
                                                                                     training_step))
-
-
 
         sys.stderr.write("\nResuming training from csv {} ({})\n".format(self._current_csv_idx, str(
             self._list_paths_to_csv[self._current_csv_idx])[-11:]))
