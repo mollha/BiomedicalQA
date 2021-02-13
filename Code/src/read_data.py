@@ -43,9 +43,10 @@ class BinaryExample:
 
 
 class FactoidExample:
-    def __init__(self, question_id, question, short_context, full_context, answer, answer_start, answer_end,
+    def __init__(self, question_id, question_type, question, short_context, full_context, answer, answer_start, answer_end,
                  is_impossible):
         self._question_id = question_id
+        self._question_type = question_type
         self._question = question
         self._short_context = short_context  # the sentence(s) containing the answer
         self._full_context = full_context  # the remaining context containing all sentences provided
@@ -164,7 +165,7 @@ def read_squad(path_to_file: Path, testing=False):
 
                     # impossible questions have an empty list for "answers"
                     # the answer is None, and its start and end positions are negative 1
-                    dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
+                    dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, pre_processed_context,
                                                   None, -1, -1, is_impossible))
                     continue
 
@@ -196,7 +197,7 @@ def read_squad(path_to_file: Path, testing=False):
                     metrics["impossible_examples"] += 1 if is_impossible else 0
 
                     # todo should we have a short context, or not?
-                    dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context, answer['text'],
+                    dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, pre_processed_context, answer['text'],
                                                   answer_start, answer_end, is_impossible))
         break  # todo remove later
 
@@ -295,9 +296,10 @@ def read_bioasq(path_to_file: Path, testing=False):
 
         return []  # answer does not appear in passage
 
-    def process_factoid_question(data):
+    def process_factoid_or_list_question(data):
         question_id = data["id"]
         question = data["body"]
+        q_type = data["type"]
         answer_list = data["exact_answer"]
         snippets = data["snippets"]
         examples_from_question = []
@@ -311,6 +313,9 @@ def read_bioasq(path_to_file: Path, testing=False):
 
         for snippet in snippets:
             context = snippet['text']
+            snippet_start_pos = snippet["offsetInBeginSection"]
+            snippet_end_pos = snippet["offsetInEndSection"]
+
             article_id = snippet["document"].split('/').pop()
             section = snippet["beginSection"] if snippet["beginSection"] != "sections.0" else "abstract"
 
@@ -323,21 +328,19 @@ def read_bioasq(path_to_file: Path, testing=False):
                 article = None
                 # the article did not exist
 
-            # if testing:
-            #     # create an example per match
-            #     metrics["num_examples"] += 1
-            #     examples_from_question.append(
-            #         FactoidExample(question_id, question, context, context if article is None else article[section],
-            #                        answer, None, None, None)
-            #     )
+            # We need to centre our snippet in this article and find it's position.
+            # Verify that the snippet is actually extracted from the claimed position in the article (if one exists)
+            if article is not None:
+                if article[section][snippet_start_pos:snippet_end_pos] != context:
+                    print(article[section].find(context))
 
-            # todo also make sure that short_context contains the answer if question !impossible
+                    print("{}\n{}".format(article[section][snippet_start_pos:snippet_end_pos], context))
+
+
             # todo check in the reading dataset part that there is no leading and trailing whitespace
 
-            # todo do this for every potential answer and snippet
-            for answer in answer_list:
+            for answer in answer_list:  # for each of our candidate answers
                 answer = unidecode.unidecode(answer.lower())  # normalize the answer
-
                 matches = match_answer_to_passage("".join(answer), context)
 
                 if len(matches) == 0:  # there are no matches in the passage and the question is impossible
@@ -346,9 +349,9 @@ def read_bioasq(path_to_file: Path, testing=False):
                     metrics["impossible_examples"] += 1
                     metrics["num_examples"] += 1
                     # the answer is None, and its start and end positions are negative 1
-                    examples_from_question.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
+                    examples_from_question.append(FactoidExample(question_id, q_type, question, pre_processed_context, pre_processed_context,
                                                   None, -1, -1, True))
-                    # examples_from_question.append(FactoidExample(question_id, question, context,
+                    # examples_from_question.append(FactoidExample(question_id, q_type, question, context,
                     #                                              context if article is None else article[section], "",
                     #                                              start_pos, end_pos, is_impossible))
                     continue
@@ -359,18 +362,22 @@ def read_bioasq(path_to_file: Path, testing=False):
                 for start_pos, end_pos in matches:
                     # pre-tokenize and correct answer start and end if necessary
                     pre_processed_context, answer_start, answer_end = pre_tokenize(context, start_pos, end_pos)
-                    matching_text = pre_processed_context[answer_start:answer_end]
 
                     metrics["num_examples"] += 1
 
                     # We need to verify that the start and end positions actually point to the answer before we
                     # expect our feature creation code to find the correctly tokenized positions.
-
+                    matching_text = pre_processed_context[answer_start:answer_end]
                     if answer != matching_text:
                         print('Answer "{}" from example does not match the spliced context "{}"'
                               .format(answer, matching_text))
                         metrics["num_skipped_examples"] += 1
                         continue
+
+                    # todo also make sure that short_context contains the answer if question !impossible
+                    # in this case, we know it does because we take our answer from there. kinda useful.
+
+
 
 
                     # create an example per match
@@ -378,25 +385,16 @@ def read_bioasq(path_to_file: Path, testing=False):
                     # we could alter the start and end positions to be the start and end positions from the beginning of the article
                     # this would now be handled correctly by our code. NOTE: this will work for factoid and list but not yes no.
                     examples_from_question.append(
-                        FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
+                        FactoidExample(question_id, q_type, question, pre_processed_context, pre_processed_context,
                                        matching_text, start_pos, end_pos, is_impossible)
                     )
                     # examples_from_question.append(
-                    #     FactoidExample(question_id, question, pre_processed_context,
+                    #     FactoidExample(question_id, q_type, question, pre_processed_context,
                     #                    pre_processed_context if article is None else article[section],
                     #                    matching_text, start_pos, end_pos, is_impossible)
                     # )
 
         return examples_from_question, metrics
-
-    def process_list_question(data):
-        print(data)
-        question_id = data["id"]
-        question = data["body"]
-        snippets = data["snippets"]
-        answer = data["exact_answer"]
-
-        pass
 
     def process_yesno_question(data):
         question_id = data["id"]
@@ -424,9 +422,9 @@ def read_bioasq(path_to_file: Path, testing=False):
         return examples_from_question, metrics
 
     fc_map = {
-        "factoid": process_factoid_question,
+        "factoid": process_factoid_or_list_question,
         "yesno": process_yesno_question,
-        "list": process_list_question,
+        "list": process_factoid_or_list_question,
     }
 
     combined_metrics = {q: {} for q in dataset.keys()}
@@ -493,6 +491,8 @@ def read_bioasq(path_to_file: Path, testing=False):
                   .format(qt_metrics["impossible_examples"], percentage_impossible_examples))
             print("- Non-Impossible Examples: {} examples ({}%)"
                   .format(num_examples - qt_metrics["impossible_examples"], 100 - percentage_impossible_examples))
+
+            print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
 
 
 
