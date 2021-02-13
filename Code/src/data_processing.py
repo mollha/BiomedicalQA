@@ -270,10 +270,6 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
     :param sub_tokens: the sub_tokens created when pre_token is tokenized
     :return:
     """
-    # print('Pretoken', pre_token)
-    # print('Pretoken absolute start', pre_token_absolute_start)
-    # print('Match position', match_position)
-    # print('Sub-tokens', sub_tokens)
 
     # Pass over the sub_tokens and condense multiple [UNK] tokens in a row into a single [UNK]
     sub_tokens_condensed = []
@@ -287,9 +283,6 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
         elif sub_token != tokenizer.unk_token:
             sub_tokens_condensed.append(sub_token)
 
-    # if tokenizer.unk_token in sub_tokens:  # we only want to see this if it will be different that sub_tokens
-    #     print('\n\nSub-tokens condensed', sub_tokens_condensed)
-
     # Pass over the condensed sub_tokens and find their start and end positions
     sub_position_relative_mapping = []  # a list containing [token, [start_pos, end_pos]]
     pre_token_relative_position = 0
@@ -298,20 +291,14 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             sub_position_relative_mapping.append([sub_token, None])
         else:
             text_sub_token = sub_token.lstrip('#')  # remove leading hash-tags to convert token to string
-            # print('Sub token', sub_token, "text_sub_token", text_sub_token)
-            # print('Search start position', pre_token_relative_position)
             try:
                 position_of_sub_token = pre_token.index(text_sub_token, pre_token_relative_position)
-            except ValueError:
-                # print('Substring {} not found in {}'.format(text_sub_token, pre_token))
+            except ValueError:  # Substring text_sub_token not found in pre_token
                 continue
-            # print('Position of sub token', position_of_sub_token)
 
             sub_position_relative_mapping.append(
                 [sub_token, [pre_token_absolute_start + position_of_sub_token, pre_token_absolute_start + position_of_sub_token + len(text_sub_token)]])
             pre_token_relative_position = position_of_sub_token + len(text_sub_token)  # skip past end of current token
-
-    # print('sub_position_relative_mapping', sub_position_relative_mapping)
 
     # Fill in the blanks for the unknown tokens that we had to skip on the first pass
     for idx in range(len(sub_position_relative_mapping)):
@@ -331,8 +318,6 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
         if last_pair is not None and last_pair[0] == tokenizer.unk_token:
             # the position where the current token started is 1 ahead the end position of the last token
             last_pair[1][1] = current_pair[1][0] - 1
-
-    # print('Mapping after filling in blanks', sub_position_relative_mapping)
 
     # At this stage, we should have a mapping of every sub_token to its start and end positions
     for idx, (sub_token, (st_start_pos, st_end_pos)) in enumerate(sub_position_relative_mapping):
@@ -356,9 +341,10 @@ def convert_examples_to_features(examples, tokenizer, max_length):
     # we could do something interesting with these sorts of predictions, where we sub-tokenize around the predicted answer
     # and ask for the predictions again - let's look at this for making predictions
     # Assumes that the start and end positions actually point to the answer
+
     metrics = {
         "non_match_gt": 0,
-        "non_match_pt": 1
+        "non_match_pt": 1,
         "substring_not_found": 0,
     }
 
@@ -387,9 +373,6 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         text_start_pos = example._answer_start
         text_end_pos = example._answer_end
         answer = example._answer
-        # print('start position', text_start_pos)
-        # print('end position', text_end_pos)
-
 
         # Lets create a mapping of characters in the original context to the position in the tokenized context.
         # This will help us to find the tokens that correspond to the answer.
@@ -405,17 +388,13 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             context_position_mapping.append((pre_token, char_range))  # put this mapping in our list of mappings
             char_pos_in_original_context += len(pre_token) + 1  # add one to skip over the next whitespace
 
-        # print(context_position_mapping)
-
         # Verify that we haven't lost any tokens and have counted through correctly.
         # This will happen if we have double whitespaces - but we assume we don't have these.
         num_pre_token_chars = sum([pt for pt, rge in context_position_mapping]) + len(pre_tokenized_context) - 1
         num_original_chars = len(short_context)
         if num_pre_token_chars != num_original_chars:
             metrics["non_match_pt"] += 1
-            # print("There are {} characters in the pre-tokenized context '{}'\n"
-            #       "There are {} characters in the original context '{}'"
-            #        .format(num_pre_token_chars, pre_tokenized_context, num_original_chars, short_context))
+            # Number of characters in the pre-tokenized context does not match num in original context
             continue
 
         # Now we need to scan through our mapping and tokenize each of our pre-tokens
@@ -423,28 +402,22 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         input_ids = []
         start_token_position, end_token_position = None, None
         for pre_token, char_range in context_position_mapping:
-            # char_range is a tuple of the form (start_position, end_position)
-            # where end_position is non-inclusive
+            # char_range is a tuple of the form (start_position, end_position) where end_position is non-inclusive
             pre_token_start_pos, pre_token_end_pos = char_range
-
             token_sub_tokens = tokenizer.tokenize(pre_token)  # tokenize the pre-tokenized word
             mapping = None
 
             # If we have found the token containing the start position, then we need to find the corresponding (sub)tok
             if pre_token_start_pos <= text_start_pos < pre_token_end_pos:  # found the token corresponding to start
-                # print('Start position found in pre_token:', pre_token)
                 # We receive a mapping of the sub_tokens that we passed to this function
                 mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens,
                                                      pre_token_start_pos, text_start_pos)
                 if mapping is None:
                     metrics["empty_mapping"] += 1
                     continue
-
                 token_sub_tokens = [t[0] for t in mapping]
 
             if pre_token_start_pos <= text_end_pos <= pre_token_end_pos:  # found the token corresponding to end
-                # print('End position found in pre_token:', pre_token)
-
                 # We receive a mapping of the sub_tokens that we passed to this function
                 mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens,
                                                      pre_token_start_pos, text_end_pos)
@@ -456,29 +429,22 @@ def convert_examples_to_features(examples, tokenizer, max_length):
                 token_sub_tokens = [t[0] for t in mapping]
 
             if mapping is not None:
-                # print('final mapping', mapping)
                 # see if the start position or end position are in here
                 for idx, (sub_token, (s, e)) in enumerate(mapping):
                     if start_token_position is None and s == text_start_pos:
                         # we need to find the absolute tokenized position, this is the combination of
                         # all tokens already added to input ids and the sub-tokens that came before.
                         start_token_position = idx + len(input_ids)  # add tokens that came prior
-                        # print('start token position', start_token_position)
-                        # print('chosen start token', sub_token)
                     if end_token_position is None and e == text_end_pos:
                         end_token_position = idx + len(input_ids) + 1  # add tokens that came prior (and 1 for non-inc)
-                        # print('end token position', end_token_position)
-                        # print('chosen end token', sub_token)
 
             token_input_ids = tokenizer.convert_tokens_to_ids(token_sub_tokens)
             input_ids.extend(token_input_ids)  # add the sub-token ids to our input_ids list
 
-        p = tokenizer.convert_ids_to_tokens(input_ids[start_token_position:end_token_position])
-        clean_p = tokenizer.convert_tokens_to_string(p).replace(" ", "").lstrip('#')
-        # print(p, tokenizer.convert_tokens_to_string(p))
-        if answer.replace(" ", "") != clean_p:
-            # print("Ground truth answer '{}' does not match constructed token answer '{}'"
-            #                 .format(answer, clean_p))
+        # Combine the characters from our tokens and compare with the answer -> did we build is correctly?
+        test_tokenization = tokenizer.convert_ids_to_tokens(input_ids[start_token_position:end_token_position])
+        clean_test_tokenization = tokenizer.convert_tokens_to_string(test_tokenization).replace(" ", "").lstrip('#')
+        if answer.replace(" ", "") != clean_test_tokenization:  # Ground truth answer does not match joined token answer
             metrics["non_match_gt"] += 1
             continue
 
@@ -537,8 +503,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
                                      end_token_position, example._answer)
             feature_list.append(feature)
 
-
     return feature_list
+
 
 def convert_train_samples_to_features(samples, tokenizer, max_length):
     # keep track of the number of questions we had to skip.
