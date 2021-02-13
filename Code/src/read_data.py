@@ -234,8 +234,8 @@ def read_bioasq(path_to_file: Path, testing=False):
     :return: a list containing a dictionary for each context, question and answer triple.
     """
 
-    # todo also make sure that short_context contains the answer if question !impossible
-    # todo check in the reading dataset part that there is no leading and trailing whitespace
+    # todo why don't we just train list and factoid questions together - it makes more sense???
+    # we will have a better model this way since they both predict in the same way.
 
     dataset = {
         "list": [],
@@ -243,14 +243,9 @@ def read_bioasq(path_to_file: Path, testing=False):
         "yesno": []
     }
 
+    # todo - read and combine multiple dictionaries here to allow reading multiple dataset files.
     with open(path_to_file, 'rb') as f:
         bioasq_dict = json.load(f)
-
-    articles_file_name = "pubmed_{}".format(str(path_to_file).split('/').pop())
-    articles_file_path = Path(path_to_file / '../../processed_data/{}'.format(articles_file_name)).resolve()
-
-    with open(articles_file_path, 'rb') as f:
-        articles_dict = json.load(f)
 
     def match_answer_to_passage(answer: str, passage: str) -> list:
         #
@@ -394,7 +389,7 @@ def read_bioasq(path_to_file: Path, testing=False):
 
     combined_metrics = {q: {} for q in dataset.keys()}
 
-    for data_point in bioasq_dict['questions']:
+    for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
         # todo remove all except summary from here - we only exclude the ones we can't handle for now.
         # we don't care about summary questions
