@@ -99,7 +99,7 @@ def pre_tokenize(short_context, start_position, end_position):
 
 
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------
-def read_squad(path_to_file: Path, testing=False):
+def read_squad(paths_to_files: list, testing=False):
     """
     Read the squad data into three categories of contexts, questions and answers
 
@@ -127,7 +127,8 @@ def read_squad(path_to_file: Path, testing=False):
             answer['answer_start'] = start_idx - 2
             answer['answer_end'] = end_idx - 2  # When the gold label is off by two characters
 
-    path = Path(path_to_file)
+    # Note: the only reason paths_to_files is a list is for consistency as this is needed for reading bioasq.
+    path = Path(paths_to_files.pop())
     with open(path, 'rb') as f:
         squad_dict = json.load(f)
 
@@ -226,7 +227,7 @@ def read_squad(path_to_file: Path, testing=False):
     return {"factoid": dataset}, {"factoid": metrics}
 
 
-def read_bioasq(path_to_file: Path, testing=False):
+def read_bioasq(paths_to_files: list, testing=False):
     """
     Read the bioasq data into three categories of contexts, questions and answers.
     BioASQ contexts are different than SQuAD, as they are a combination of articles and snippets.
@@ -244,8 +245,11 @@ def read_bioasq(path_to_file: Path, testing=False):
     }
 
     # todo - read and combine multiple dictionaries here to allow reading multiple dataset files.
-    with open(path_to_file, 'rb') as f:
-        bioasq_dict = json.load(f)
+    bioasq_dict = {"questions": []}
+    for path_to_file in paths_to_files:  # iterate over the different bioasq
+        with open(path_to_file, 'rb') as f:
+            bioasq_sub_dict = json.load(f)
+            bioasq_dict["questions"].extend(bioasq_sub_dict["questions"])
 
     def match_answer_to_passage(answer: str, passage: str) -> list:
         #
@@ -299,6 +303,13 @@ def read_bioasq(path_to_file: Path, testing=False):
         snippets = data["snippets"]
         examples_from_question = []
 
+        flattened_answer_list = []
+        for answer in answer_list:  # flatten list of lists
+            if type(answer) == list:
+                flattened_answer_list.extend([sub_answer for sub_answer in answer])
+            else:
+                flattened_answer_list.append(answer)
+
         metrics = {  # this dictionary is combined with metrics from previous questions
             "impossible_examples": 0,
             "num_questions": 1,
@@ -312,6 +323,7 @@ def read_bioasq(path_to_file: Path, testing=False):
             context = context.strip()
 
             for answer in answer_list:  # for each of our candidate answers
+                print('answer', answer)
                 answer = unidecode.unidecode(answer.lower())  # normalize the answer
                 matches = match_answer_to_passage("".join(answer), context)
 

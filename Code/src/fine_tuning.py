@@ -216,7 +216,7 @@ if __name__ == "__main__":
 
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
-    raw_train_dataset, train_dataset_metrics = dataset_function(train_dataset_file_path)
+    raw_train_dataset, train_dataset_metrics = dataset_function([train_dataset_file_path])
     raw_train_dataset_by_question = raw_train_dataset[config["question_type"]]
 
     # todo use test and train dataset metrics
@@ -229,7 +229,7 @@ if __name__ == "__main__":
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset for '{}'".format(selected_dataset))
-    raw_test_dataset, test_dataset_metrics = dataset_function(test_dataset_file_path, testing=True)
+    raw_test_dataset, test_dataset_metrics = dataset_function([test_dataset_file_path], testing=True)
     raw_test_dataset_by_question = raw_test_dataset[config["question_type"]]
 
     test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
