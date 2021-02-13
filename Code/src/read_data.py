@@ -17,6 +17,7 @@ from spacy.lang.en.stop_words import STOP_WORDS
 
 nlp = spacy.load('en_core_web_sm')
 
+
 def update_dataset_metrics(total_metrics, additional_metrics):
     for key in additional_metrics:
         if key in total_metrics:
@@ -152,8 +153,8 @@ def read_squad(path_to_file: Path, testing=False):
             num_leading_whitespaces = len(full_context) - len(full_context.lstrip())
             full_context = full_context.lstrip()
 
-            if num_leading_whitespaces > 0:
-                print("Context '{}' has {} leading whitespaces".format(full_context[:20] + '...', num_leading_whitespaces))
+            # if num_leading_whitespaces > 0:
+            #     print("Context '{}' has {} leading whitespaces".format(full_context[:20] + '...', num_leading_whitespaces))
 
             for qa in passage['qas']:
                 question = qa['question']
@@ -161,6 +162,17 @@ def read_squad(path_to_file: Path, testing=False):
                 is_impossible = qa['is_impossible']
                 metrics["impossible_questions"] += 1 if is_impossible else 0
                 metrics["num_questions"] += 1
+
+                if is_impossible:
+                    # still need to pre-tokenized the text
+                    pre_processed_context = unidecode.unidecode(full_context.lower())
+
+                    # impossible questions have an empty list for "answers"
+                    # the answer and its start and end positions are None
+                    # todo how do we cope with this in the converting to features stage
+                    dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
+                                                  None, None, None, is_impossible))
+                    continue
 
                 for answer in qa['answers']:
                     answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
@@ -181,8 +193,8 @@ def read_squad(path_to_file: Path, testing=False):
                         answer_end += length_original - (answer_end - answer_start)
 
                     if answer['text'] != pre_processed_context[answer_start:answer_end]:
-                        print('Answer "{}" from example does not match the spliced context "{}"'
-                              .format(answer['text'], pre_processed_context[answer_start:answer_end]))
+                        # print('Answer "{}" from example does not match the spliced context "{}"'
+                        #       .format(answer['text'], pre_processed_context[answer_start:answer_end]))
                         metrics["num_skipped_examples"] += 1
                         continue
 
@@ -192,7 +204,7 @@ def read_squad(path_to_file: Path, testing=False):
                     # todo should we have a short context, or not?
                     dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context, answer['text'],
                                                   answer_start, answer_end, is_impossible))
-        # break  # todo remove later
+        break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = metrics["num_questions"]
@@ -215,7 +227,7 @@ def read_squad(path_to_file: Path, testing=False):
           .format(total_questions - metrics["impossible_questions"], 100.0 - percentage_impossible_questions,
                   total_examples - metrics["impossible_examples"], 100.0 - percentage_impossible_examples))
 
-    print('-', metrics["num_skipped_examples"], 'examples were skipped.')
+    print('-', metrics["num_skipped_examples"], 'examples were skipped.\n')
     return {"factoid": dataset}, {"factoid": metrics}
 
 

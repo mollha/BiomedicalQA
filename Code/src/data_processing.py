@@ -344,8 +344,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
 
     metrics = {
         "non_match_gt": 0,
-        "non_match_pt": 1,
-        "substring_not_found": 0,
+        "non_match_pt": 0,
+        "empty_mapping": 0,
     }
 
     feature_list = []
@@ -390,7 +390,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
 
         # Verify that we haven't lost any tokens and have counted through correctly.
         # This will happen if we have double whitespaces - but we assume we don't have these.
-        num_pre_token_chars = sum([pt for pt, rge in context_position_mapping]) + len(pre_tokenized_context) - 1
+        num_pre_token_chars = sum([len(pt) for pt, rge in context_position_mapping]) + len(pre_tokenized_context) - 1
         num_original_chars = len(short_context)
         if num_pre_token_chars != num_original_chars:
             metrics["non_match_pt"] += 1
@@ -474,7 +474,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         # We also perform padding here and create our features.
 
         num_answer_tokens = end_token_position - start_token_position
-        for left_stride in range(0, num_context_tokens - num_answer_tokens):
+        # Shift the doc stride in intervals of 10 so that we don't create way too many features
+        for left_stride in range(0, num_context_tokens - num_answer_tokens, 10):
             right_stride = num_context_tokens - num_answer_tokens - left_stride
             left_clip = max(0, start_token_position - left_stride)
             right_clip = min(end_token_position + right_stride, len(input_ids))
@@ -503,6 +504,26 @@ def convert_examples_to_features(examples, tokenizer, max_length):
                                      end_token_position, example._answer)
             feature_list.append(feature)
 
+    print('\n------- COLLATING FEATURE METRICS -------')
+    total_examples = len(examples)
+    total_features = len(feature_list)
+    print("Created {} features from {} examples".format(total_features, total_examples))
+
+    total_examples_skipped = sum([metrics[key] for key in metrics.keys()])
+    percentage_non_match_gt = 0 if total_examples_skipped == 0 else round(
+        100 * metrics["non_match_gt"] / total_examples_skipped, 2)
+    percentage_non_match_pt = 0 if total_examples_skipped == 0 else round(
+        100 * metrics["non_match_pt"] / total_examples_skipped, 2)
+    percentage_empty_mapping = 0 if total_examples_skipped == 0 else round(
+        100 * metrics["empty_mapping"] / total_examples_skipped, 2)
+
+    print('{} examples were skipped in total due to the following errors:'.format(total_examples_skipped))
+    print("- {} errors ({}%): Ground truth answer does not match joined token answer"
+          .format(metrics["non_match_gt"], percentage_non_match_gt))
+    print("- {} errors ({}%): Length of pre-tokenized context does not match length of original context"
+          .format(metrics["non_match_pt"], percentage_non_match_pt))
+    print("- {} errors ({}%): Map returned by sub-tokenize was empty"
+          .format(metrics["empty_mapping"], percentage_empty_mapping))
     return feature_list
 
 
