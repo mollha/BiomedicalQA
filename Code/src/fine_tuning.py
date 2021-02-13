@@ -137,7 +137,7 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list'], type=str,
+    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list'], type=str,
                         help="Type of fine-tuned model should be created - factoid, list or yesno?")
     parser.add_argument("--dataset", default="squad", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
@@ -151,8 +151,8 @@ if __name__ == "__main__":
 
 
     sys.stderr.write("\n--- ARGUMENTS ---")
-    sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nK: {}"
-                     .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.k))
+    sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nDataset: {}\nK: {}"
+                     .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.dataset, args.k))
 
     # ------- Check the validity of the arguments passed via command line -------
     try:  # check that the value of k is actually a number
@@ -222,8 +222,12 @@ if __name__ == "__main__":
 
     # todo use test and train dataset metrics
     print("Converting raw training text to features.")
-    train_features = convert_train_samples_to_features(raw_train_dataset_by_question, electra_tokenizer,
+    # train_features = convert_train_samples_to_features(raw_train_dataset_by_question, electra_tokenizer,
+    #                                                    config["max_length"])
+
+    train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer,
                                                        config["max_length"])
+
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
 

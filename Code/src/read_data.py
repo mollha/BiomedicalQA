@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 import re
+
+import unidecode
 from transformers import DistilBertTokenizerFast
 from spacy.lang.en import English
 import spacy
@@ -65,6 +67,37 @@ class FactoidExample:
         print("Is Impossible:", self._is_impossible)
 
 
+def pre_tokenize(short_context, start_position, end_position):
+    # In the BioELECTRA tokenizer that we trained specifically on PubMed vocabulary, the pre-tokenisation steps
+    # include removing whitespace, stripping accents and converting to lowercase
+    short_context = short_context.lower()
+    accent_stripped_context = unidecode.unidecode(short_context)
+    start_pos, end_pos = None, None
+
+    # We need to check that removing accents has not affected our start and end answer positions.
+    # we need to ensure that the start and end positions will remain valid.
+    char_position_in_as_context = 0
+    char_position_in_sc_context = 0
+
+    while char_position_in_sc_context <= len(short_context):
+        if char_position_in_sc_context == start_position:
+            start_pos = char_position_in_as_context  # adjust start position to start position - accents
+
+        if char_position_in_sc_context == end_position:
+            end_pos = char_position_in_as_context
+            break
+
+        sc_char = short_context[char_position_in_sc_context]
+        char_position_in_sc_context += len(sc_char)   # this is > 1 for weird characters
+        char_position_in_as_context += len(unidecode.unidecode(sc_char)) - len(sc_char) + 1
+
+    if start_pos is None or end_pos is None:
+        raise Exception("Either start position '{}' or end position '{}' is None. This is not allowed."
+                        .format(start_pos, end_pos))
+
+    return accent_stripped_context, start_pos, end_pos
+
+
 # ------------ READ DATASETS INTO THEIR CORRECT FORMAT ------------
 def read_squad(path_to_file: Path, testing=False):
     """
@@ -76,25 +109,13 @@ def read_squad(path_to_file: Path, testing=False):
     :return: a list containing a dictionary for each context, question and answer triple.
     """
 
-    def find_sentence(token_pos: int, sentence_lengths: list) -> int:
-        """
-        This function assumes that the whole token is in a single sentence.
-        :param token_pos: int
-        :param sentence_lengths: list of sentences lengths (e.g. [166, 207, 195, 171])
-        :return: int
-        """
-        if token_pos > sum(sentence_lengths) - 1:
-            raise Exception('Token position provided cannot exist in any of these sentences (too large)')
-
-        for idx, length in enumerate(sentence_lengths):
-            if token_pos < length:
-                return idx
-            token_pos -= length
-
     def add_end_idx(answer, context):
         gold_text = answer['text']
         start_idx = answer['answer_start']
         end_idx = start_idx + len(gold_text)
+        #
+        # print('clip con', context[start_idx:end_idx])
+        # print('gold_text', gold_text)
 
         # sometimes squad answers are off by a character or two – fix this
         if context[start_idx:end_idx] == gold_text:
@@ -116,51 +137,23 @@ def read_squad(path_to_file: Path, testing=False):
         "impossible_questions": 0,
         "num_questions": 0,
         "num_examples": 0,
+        "num_skipped_examples": 0,
     }
 
-    for group in tqdm(squad_dict['data']):
+    # todo verify that the start and end positions actually point to the answer
+    # todo also make sure that short_context contains the answer if question !impossible
+    # todo check in the reading dataset part that there is no leading and trailing whitespace
+
+    for group in tqdm(squad_dict['data'], desc="SQuAD Data \u2b62 Examples"):
         for passage in group['paragraphs']:
             full_context = passage['context'].rstrip()  # remove trailing whitespace
 
-            context_sentences = [sent for sent in sent_tokenize(full_context)]
+            # remove leading whitespace if it exists and adjust start and end positions
+            num_leading_whitespaces = len(full_context) - len(full_context.lstrip())
+            full_context = full_context.lstrip()
 
-            # combine sentences when they are suspiciously short
-            # the nltk sentence tokenizer is not very advanced - it interprets almost
-            # every full-stop as the end of a sentence which sometimes cuts an answer in half
-            #
-            # combined_context_sentences = []
-            # for context_sentences_idx in range(len(context_sentences)):
-            #     if context_sentences_idx > 0:
-            #         if len(context_sentences[context_sentences_idx]) < 10:
-            #             # combine with previous sentence
-            #             context_sentences[context_sentences_idx]
-
-            # context_sentences = [sent.string.strip() for sent in nlp(full_context).sents]
-            # start_sentences = [(full_context.find(sent), len(sent)) for sent in context_sentences]
-
-            last_sentence = (0, 0)
-            cumulative_length = 0
-            for sent_idx in range(len(context_sentences)):
-                sent = context_sentences[sent_idx]
-                sentence_length = len(sent)
-
-                # skip first sentence
-                if sent_idx == 0:
-                    cumulative_length += sentence_length
-                    last_sentence = (0, sentence_length)
-                    continue
-
-                start_position_of_sent_in_context = full_context.find(sent, cumulative_length)
-                num_whitespaces_to_add = start_position_of_sent_in_context - (last_sentence[0] + last_sentence[1])
-                context_sentences[sent_idx - 1] = context_sentences[sent_idx - 1] + (" " * num_whitespaces_to_add)
-
-                cumulative_length += sentence_length + num_whitespaces_to_add
-                last_sentence = (start_position_of_sent_in_context, sentence_length)
-
-            context_sent_lengths = [len(sent) for sent in context_sentences]
-
-            if sum(context_sent_lengths) != len(full_context):
-                raise Exception('length no match')
+            if num_leading_whitespaces > 0:
+                print("Context '{}' has {} leading whitespaces".format(full_context[:20] + '...', num_leading_whitespaces))
 
             for qa in passage['qas']:
                 question = qa['question']
@@ -170,21 +163,36 @@ def read_squad(path_to_file: Path, testing=False):
                 metrics["num_questions"] += 1
 
                 for answer in qa['answers']:
+                    answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
+                    add_end_idx(answer, full_context)  # set the end index - this will also be adjusted by leading ws
 
-                    add_end_idx(answer, full_context)
-                    answer_text = answer['text']
+                    # When the answer contains special characters, if we pre-tokenize then we will lose some characters
+                    answer['text'] = unidecode.unidecode(answer['text'].lower())  # normalize the answer
 
-                    sentence_number = find_sentence(answer['answer_start'], context_sent_lengths)
-                    normalised_answer_start = answer['answer_start'] - sum(context_sent_lengths[:sentence_number])
-                    normalised_answer_end = normalised_answer_start + answer['answer_end'] - answer['answer_start']
+                    # pre-tokenize and correct answer start and end if necessary
+                    pre_processed_context, answer_start, answer_end = pre_tokenize('{}'.format(full_context), answer['answer_start'],
+                                                                                   answer['answer_end'])
+
+                    # Correct differences relating to special characters in the answer
+                    # Length of the answer in original context
+                    length_original = len('{}'.format(full_context[answer['answer_start']:answer['answer_end']]))
+
+                    if length_original - (answer_end - answer_start) > 0:
+                        answer_end += length_original - (answer_end - answer_start)
+
+                    if answer['text'] != pre_processed_context[answer_start:answer_end]:
+                        print('Answer "{}" from example does not match the spliced context "{}"'
+                              .format(answer['text'], pre_processed_context[answer_start:answer_end]))
+                        metrics["num_skipped_examples"] += 1
+                        continue
 
                     metrics["num_examples"] += 1
                     metrics["impossible_examples"] += 1 if is_impossible else 0
 
-                    short_context = context_sentences[sentence_number]
-                    dataset.append(FactoidExample(question_id, question, short_context, full_context, answer_text,
-                                                normalised_answer_start, normalised_answer_end, is_impossible))
-        break  # todo remove later
+                    # todo should we have a short context, or not?
+                    dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context, answer['text'],
+                                                  answer_start, answer_end, is_impossible))
+        # break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = metrics["num_questions"]
@@ -207,6 +215,7 @@ def read_squad(path_to_file: Path, testing=False):
           .format(total_questions - metrics["impossible_questions"], 100.0 - percentage_impossible_questions,
                   total_examples - metrics["impossible_examples"], 100.0 - percentage_impossible_examples))
 
+    print('-', metrics["num_skipped_examples"], 'examples were skipped.')
     return {"factoid": dataset}, {"factoid": metrics}
 
 
