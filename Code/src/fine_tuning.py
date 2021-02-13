@@ -210,6 +210,9 @@ if __name__ == "__main__":
     train_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["train"]]
     test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["test"]]
 
+    sys.stderr.write("\nTraining files are '{}'\nEvaluation files are '{}'"
+                     .format(train_dataset_file_paths, test_dataset_file_paths))
+
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
     raw_train_dataset = dataset_function(train_dataset_file_paths)

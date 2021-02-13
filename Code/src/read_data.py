@@ -464,9 +464,6 @@ def read_bioasq(paths_to_files: list, testing=False):
                   .format(num_examples - qt_metrics["impossible_examples"], 100 - percentage_impossible_examples))
 
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
-
-
-
     return dataset
 
 
