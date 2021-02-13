@@ -404,7 +404,7 @@ def read_bioasq(paths_to_files: list, testing=False):
         question_type = data_point["type"]
         # todo remove all except summary from here - we only exclude the ones we can't handle for now.
         # we don't care about summary questions
-        if question_type in ['summary', 'list']:
+        if question_type in ['summary']:
             continue
 
         try:

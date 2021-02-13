@@ -15,19 +15,13 @@ import random
 # the folder structure of bioasq is different to squad, as we need to download matching articles
 datasets = {
     "bioasq": {"train": ["raw_data/training9b.json"],
-               "test": ["8B1_golden.json", "8B2_golden.json", "8B3_golden.json", "8B4_golden.json", "8B5_golden.json"]
+               "test": ["raw_data/8B1_golden.json", "raw_data/8B2_golden.json", "raw_data/8B3_golden.json",
+                        "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"]
                },
     "squad": {
         "train": ["train-v2.0.json"],
         "test": ["dev-v2.0.json"],
     }
-#     "bioasq": {"train": "raw_data/training9b.json",
-#                "test": "raw_data/8B1_golden.json",
-#                },
-#     "squad": {
-#         "train": "train-v2.0.json",
-#         "test": "dev-v2.0.json",
-#     }
 }
 
 
@@ -59,7 +53,6 @@ class BinaryFeature:
 
 
 class FactoidFeature:
-
     def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
                  answer_text):
         self._question_id = question_id
@@ -82,7 +75,6 @@ class FactoidFeature:
             self._answer_end,
             self._is_impossible,
         )
-
 
 
 def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absolute_start, match_position):
@@ -163,7 +155,7 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
 
 
 def convert_examples_to_features(examples, tokenizer, max_length):
-    # todo what happens with tokenization if we don't know the answer?
+    # What happens with evaluation if we don't know the answer?
     # we could do something interesting with these sorts of predictions, where we sub-tokenize around the predicted answer
     # and ask for the predictions again - let's look at this for making predictions
     # Assumes that the start and end positions actually point to the answer
@@ -194,9 +186,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             # todo handle impossible yes no questions / ones without the answer.
             continue
 
-        # If question type is factoid or list (i.e. not a yes/no question)
-        # Given start and end positions in the text, we now need to find the tokenized start and end positions
-        # of the answer(s)
+        # If question type is factoid or list (i.e. not a yes/no question). Given start and end positions in the text,
+        # we now need to find the tokenized start and end positions of the answer(s)
         text_start_pos = example._answer_start
         text_end_pos = example._answer_end
         answer = example._answer
