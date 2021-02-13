@@ -222,9 +222,6 @@ if __name__ == "__main__":
 
     # todo use test and train dataset metrics
     print("Converting raw training text to features.")
-    # train_features = convert_train_samples_to_features(raw_train_dataset_by_question, electra_tokenizer,
-    #                                                    config["max_length"])
-
     train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer,
                                                        config["max_length"])
 
@@ -235,15 +232,16 @@ if __name__ == "__main__":
     sys.stderr.write("\nReading raw test dataset for '{}'".format(selected_dataset))
     raw_test_dataset, test_dataset_metrics = dataset_function(test_dataset_file_path, testing=True)
     raw_test_dataset_by_question = raw_test_dataset[config["question_type"]]
-    test_features = convert_test_samples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
+
+    test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
 
     print("Created {} test features of length {}.".format(len(test_features), config["max_length"]))
     test_dataset = QADataset(test_features)
 
     # Random Sampler used during training.
     train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
-                                   collate_fn=collate_training_wrapper)
-    test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_testing_wrapper)
+                                   collate_fn=collate_wrapper)
+    test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
     config["num_warmup_steps"] = len(train_data_loader) // config["max_epochs"]
 

@@ -80,6 +80,8 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
 def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False):
     # if training flag is set, we only care about the metrics
     # this fc is being called from finetuning
+    # todo handle impossible questions in evaluation and in batch wrapper
+
 
     results_by_question_id = {}
     special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
