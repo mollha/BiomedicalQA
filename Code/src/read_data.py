@@ -153,9 +153,6 @@ def read_squad(path_to_file: Path, testing=False):
             num_leading_whitespaces = len(full_context) - len(full_context.lstrip())
             full_context = full_context.lstrip()
 
-            # if num_leading_whitespaces > 0:
-            #     print("Context '{}' has {} leading whitespaces".format(full_context[:20] + '...', num_leading_whitespaces))
-
             for qa in passage['qas']:
                 question = qa['question']
                 question_id = qa['id']
@@ -168,10 +165,10 @@ def read_squad(path_to_file: Path, testing=False):
                     pre_processed_context = unidecode.unidecode(full_context.lower())
 
                     # impossible questions have an empty list for "answers"
-                    # the answer and its start and end positions are None
+                    # the answer is None, and its start and end positions are negative 1
                     # todo how do we cope with this in the converting to features stage
                     dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
-                                                  None, None, None, is_impossible))
+                                                  None, -1, -1, is_impossible))
                     continue
 
                 for answer in qa['answers']:

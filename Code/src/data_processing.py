@@ -365,6 +365,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             feature = BinaryFeature(example._question_id, input_ids, attention_mask,
                                     token_type_ids, example._answer)
             feature_list.append(feature)
+            # todo handle impossible yes no questions / ones without the answer.
             continue
 
         # If question type is factoid or list (i.e. not a yes/no question)
@@ -373,6 +374,19 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         text_start_pos = example._answer_start
         text_end_pos = example._answer_end
         answer = example._answer
+
+        # if text_start_pos and text_end_pos are -1, then we have an impossible question.
+        if text_end_pos == -1 and text_end_pos == -1:
+            # todo handle impossible question - we still need to tokenize the question
+            tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
+                                        max_length=max_length)  # only truncate the second sequence
+
+            feature = FactoidFeature(example._question_id, example._is_impossible, tokenized_input["input_ids"],
+                                     tokenized_input["attention_mask"], tokenized_input["token_type_ids"],
+                                     -1, -1, None)
+            feature_list.append(feature)
+
+            pass
 
         # Lets create a mapping of characters in the original context to the position in the tokenized context.
         # This will help us to find the tokens that correspond to the answer.
@@ -455,14 +469,14 @@ def convert_examples_to_features(examples, tokenizer, max_length):
 
         # Token type ids are used when distinguishing between the context and the question
         # Since we're tokenizing the context, we need to set all values to zero
-        token_type_ids = len(input_ids) * [0]
+        token_type_ids = len(input_ids) * [1]
 
         # At this point, we have the tokenized start and end position of the answer, input ids, attention mask,
         # token_type_ids question etc. We need to combine these components into actual features.
         tokenized_question = tokenizer.tokenize(question)
         question_input_ids = tokenizer.convert_tokens_to_ids(tokenized_question)
         question_attention_mask = len(question_input_ids) * [1]
-        question_token_type_ids = len(question_input_ids) * [1]
+        question_token_type_ids = len(question_input_ids) * [0]
 
         num_question_tokens = len(tokenized_question)  # tokenize the question
         num_additional_tokens = 3  # refers to the [CLS] tokens and [SEP] tokens used when combining question & context
@@ -472,6 +486,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         # These strides must centre around the tokenized start and end positions
         # Hence, the stride can begin as late as start_token_position and end as early as end_token_position
         # We also perform padding here and create our features.
+
+        # Note: the question token type ids are 0s, the context token type ids are 1s
 
         num_answer_tokens = end_token_position - start_token_position
         # Shift the doc stride in intervals of 10 so that we don't create way too many features
@@ -488,7 +504,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             # [CLS] and first [SEP] are considered part of the context for token_type_ids.
             # we attend over special tokens like [CLS] and [SEP] - just NOT PADDING
 
-            # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
+            # concatenate context with question - [CLS] QUESTION [SEP] SHORT_CONTEXT [SEP]
             all_input_ids = [tokenizer.cls_token_id] + question_input_ids + [tokenizer.sep_token_id] + clipped_input_ids + [tokenizer.sep_token_id]
             all_attention_mask = [1] + question_attention_mask + [1] + clipped_attention_mask + [1]
             all_token_type_ids = [0] + question_token_type_ids + [0] + clipped_token_type_ids + [1]
@@ -497,6 +513,18 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             all_input_ids.extend([tokenizer.pad_token_id] * (max_length - len(all_input_ids)))  # add the padding token
             all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
             all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
+
+
+
+            print('input ids', all_input_ids)
+            print('attention mask', all_attention_mask)
+            print('token type ids', all_token_type_ids)
+
+            print('length input ids', len(all_input_ids))
+            print('length attention mask', len(all_attention_mask))
+            print('length token type ids', len(all_token_type_ids))
+
+            quit()
 
             # Now we're ready to create a feature
             feature = FactoidFeature(example._question_id, example._is_impossible, all_input_ids,
