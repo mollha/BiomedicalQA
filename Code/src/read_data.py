@@ -224,7 +224,7 @@ def read_squad(paths_to_files: list, testing=False):
                   total_examples - metrics["impossible_examples"], 100.0 - percentage_impossible_examples))
 
     print('-', metrics["num_skipped_examples"], 'examples were skipped.\n')
-    return {"factoid": dataset}, {"factoid": metrics}
+    return {"factoid": dataset}
 
 
 def read_bioasq(paths_to_files: list, testing=False):
@@ -467,7 +467,7 @@ def read_bioasq(paths_to_files: list, testing=False):
 
 
 
-    return dataset, combined_metrics
+    return dataset
 
 
 dataset_to_fc = {
