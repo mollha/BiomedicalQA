@@ -313,31 +313,8 @@ def read_bioasq(path_to_file: Path, testing=False):
 
         for snippet in snippets:
             context = snippet['text']
-            snippet_start_pos = snippet["offsetInBeginSection"]
-            snippet_end_pos = snippet["offsetInEndSection"]
-
-            article_id = snippet["document"].split('/').pop()
-            section = snippet["beginSection"] if snippet["beginSection"] != "sections.0" else "abstract"
-
-            if snippet["beginSection"] != snippet["endSection"]:
-                raise Exception('{} is not {}'.format(snippet["beginSection"], snippet["endSection"]))
-
-            try:
-                article = articles_dict[article_id]
-            except KeyError:
-                article = None
-                # the article did not exist
-
-            # We need to centre our snippet in this article and find it's position.
-            # Verify that the snippet is actually extracted from the claimed position in the article (if one exists)
-            if article is not None:
-                if article[section][snippet_start_pos:snippet_end_pos] != context:
-                    print(article[section].find(context))
-
-                    print("{}\n{}".format(article[section][snippet_start_pos:snippet_end_pos], context))
-
-
-            # todo check in the reading dataset part that there is no leading and trailing whitespace
+            # As we match to the context paragraph ourselves, we can remove whitespace without affecting start/end pos'
+            context = context.strip()
 
             for answer in answer_list:  # for each of our candidate answers
                 answer = unidecode.unidecode(answer.lower())  # normalize the answer
@@ -369,31 +346,19 @@ def read_bioasq(path_to_file: Path, testing=False):
                     # expect our feature creation code to find the correctly tokenized positions.
                     matching_text = pre_processed_context[answer_start:answer_end]
                     if answer != matching_text:
-                        print('Answer "{}" from example does not match the spliced context "{}"'
-                              .format(answer, matching_text))
+                        # print('Answer "{}" from example does not match the spliced context "{}"'
+                        #       .format(answer, matching_text))
                         metrics["num_skipped_examples"] += 1
                         continue
 
-                    # todo also make sure that short_context contains the answer if question !impossible
-                    # in this case, we know it does because we take our answer from there. kinda useful.
+                    # In the case where we match answers to the context, we know that context contains the answer
+                    # if the question is not impossible. We don't need to check this like in SQuAD.
 
-
-
-
-                    # create an example per match
-                    # todo we may aswell use the context from the article to supplement our sequences? right?
-                    # we could alter the start and end positions to be the start and end positions from the beginning of the article
-                    # this would now be handled correctly by our code. NOTE: this will work for factoid and list but not yes no.
+                    # Create an example for every match
                     examples_from_question.append(
                         FactoidExample(question_id, q_type, question, pre_processed_context, pre_processed_context,
                                        matching_text, start_pos, end_pos, is_impossible)
                     )
-                    # examples_from_question.append(
-                    #     FactoidExample(question_id, q_type, question, pre_processed_context,
-                    #                    pre_processed_context if article is None else article[section],
-                    #                    matching_text, start_pos, end_pos, is_impossible)
-                    # )
-
         return examples_from_question, metrics
 
     def process_yesno_question(data):
