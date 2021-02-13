@@ -205,18 +205,14 @@ if __name__ == "__main__":
     # -- Load the data and prepare it in squad format
     dataset_function = dataset_to_fc[selected_dataset]
 
-    # for dataset_file_name in dataset_file_names: # iterate through in the case where we have multiple files
-
-    # TODO DEAL WITH HAVING MULTIPLE DATASETS
-
-    # ---- Find the path to the dataset file ----
+    # ---- Find the path(s) to the dataset file(s) ----
     dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
-    train_dataset_file_path = (dataset_dir / (selected_dataset + "/" + datasets[selected_dataset]["train"])).resolve()
-    test_dataset_file_path = (dataset_dir / (selected_dataset + "/" + datasets[selected_dataset]["test"])).resolve()
+    train_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["train"]]
+    test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["test"]]
 
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
-    raw_train_dataset, train_dataset_metrics = dataset_function([train_dataset_file_path])
+    raw_train_dataset, train_dataset_metrics = dataset_function(train_dataset_file_paths)
     raw_train_dataset_by_question = raw_train_dataset[config["question_type"]]
 
     # todo use test and train dataset metrics
@@ -229,7 +225,7 @@ if __name__ == "__main__":
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset for '{}'".format(selected_dataset))
-    raw_test_dataset, test_dataset_metrics = dataset_function([test_dataset_file_path], testing=True)
+    raw_test_dataset, test_dataset_metrics = dataset_function(test_dataset_file_paths, testing=True)
     raw_test_dataset_by_question = raw_test_dataset[config["question_type"]]
 
     test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])

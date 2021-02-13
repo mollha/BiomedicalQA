@@ -322,8 +322,7 @@ def read_bioasq(paths_to_files: list, testing=False):
             # As we match to the context paragraph ourselves, we can remove whitespace without affecting start/end pos'
             context = context.strip()
 
-            for answer in answer_list:  # for each of our candidate answers
-                print('answer', answer)
+            for answer in flattened_answer_list:  # for each of our candidate answers
                 answer = unidecode.unidecode(answer.lower())  # normalize the answer
                 matches = match_answer_to_passage("".join(answer), context)
 
