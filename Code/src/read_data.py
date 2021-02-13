@@ -166,7 +166,6 @@ def read_squad(path_to_file: Path, testing=False):
 
                     # impossible questions have an empty list for "answers"
                     # the answer is None, and its start and end positions are negative 1
-                    # todo how do we cope with this in the converting to features stage
                     dataset.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
                                                   None, -1, -1, is_impossible))
                     continue
@@ -232,18 +231,13 @@ def read_bioasq(path_to_file: Path, testing=False):
     """
     Read the bioasq data into three categories of contexts, questions and answers.
     BioASQ contexts are different than SQuAD, as they are a combination of articles and snippets.
-
-    Need to create question-passage pairs
-    {
-        "id": ,
-        "question": ,
-        "context": ,
-        "answer": ,
-    }
-
     :param path_to_file: path to file containing squad data
     :return: a list containing a dictionary for each context, question and answer triple.
     """
+
+    # todo verify that the start and end positions actually point to the answer
+    # todo also make sure that short_context contains the answer if question !impossible
+    # todo check in the reading dataset part that there is no leading and trailing whitespace
 
     dataset = {
         "list": [],
@@ -307,9 +301,11 @@ def read_bioasq(path_to_file: Path, testing=False):
     def process_factoid_question(data):
         question_id = data["id"]
         question = data["body"]
-        answer = data["exact_answer"]
+        answer_list = data["exact_answer"]
         snippets = data["snippets"]
         examples_from_question = []
+
+        print('answer list', answer_list)
 
         metrics = {  # this dictionary is combined with metrics from previous questions
             "impossible_examples": 0,
@@ -331,42 +327,53 @@ def read_bioasq(path_to_file: Path, testing=False):
                 article = None
                 # the article did not exist
 
-            # print(context)
-            # print(answer)
+            # if testing:
+            #     # create an example per match
+            #     metrics["num_examples"] += 1
+            #     examples_from_question.append(
+            #         FactoidExample(question_id, question, context, context if article is None else article[section],
+            #                        answer, None, None, None)
+            #     )
 
-            if testing:
-                # create an example per match
-                metrics["num_examples"] += 1
-                examples_from_question.append(
-                    FactoidExample(question_id, question, context, context if article is None else article[section],
-                                   answer, None, None, None)
-                )
-            else:
+            # todo do this for every potential answer and snippet
+            for answer in answer_list:
                 matches = match_answer_to_passage("".join(answer), context)
 
-                if len(matches) == 0:  # there are no matches in the passage at all.
-                    is_impossible = True
-                    start_pos, end_pos = -1, -1
+                if len(matches) == 0:  # there are no matches in the passage and the question is impossible
+                    # still need to pre-tokenized the text
+                    pre_processed_context = unidecode.unidecode(context.lower())
                     metrics["impossible_examples"] += 1
                     metrics["num_examples"] += 1
-                    examples_from_question.append(FactoidExample(question_id, question, context,
-                                                                 context if article is None else article[section], "",
-                                                                 start_pos, end_pos, is_impossible))
+                    # the answer is None, and its start and end positions are negative 1
+                    examples_from_question.append(FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
+                                                  None, -1, -1, True))
+                    # examples_from_question.append(FactoidExample(question_id, question, context,
+                    #                                              context if article is None else article[section], "",
+                    #                                              start_pos, end_pos, is_impossible))
+                    continue
 
-                else:
-                    is_impossible = False
+                is_impossible = False
+                # we have at least one match, iterate through each match
+                # and create an example for each get the matching text
+                for start_pos, end_pos in matches:
+                    # pre-tokenize and correct answer start and end if necessary
+                    pre_processed_context, answer_start, answer_end = pre_tokenize(context, start_pos, end_pos)
+                    matching_text = pre_processed_context[answer_start:answer_end]
+                    metrics["num_examples"] += 1
 
-                    # we have at least one match, iterate through each match
-                    # and create an example for each get the matching text
-                    for start_pos, end_pos in matches:
-                        matching_text = context[start_pos:end_pos]
-                        metrics["num_examples"] += 1
-
-                        # create an example per match
-                        examples_from_question.append(
-                            FactoidExample(question_id, question, context, context if article is None else article[section],
-                                           matching_text, start_pos, end_pos, is_impossible)
-                        )
+                    # create an example per match
+                    # todo we may aswell use the context from the article to supplement our sequences? right?
+                    # we could alter the start and end positions to be the start and end positions from the beginning of the article
+                    # this would now be handled correctly by our code. NOTE: this will work for factoid and list but not yes no.
+                    examples_from_question.append(
+                        FactoidExample(question_id, question, pre_processed_context, pre_processed_context,
+                                       matching_text, start_pos, end_pos, is_impossible)
+                    )
+                    # examples_from_question.append(
+                    #     FactoidExample(question_id, question, pre_processed_context,
+                    #                    pre_processed_context if article is None else article[section],
+                    #                    matching_text, start_pos, end_pos, is_impossible)
+                    # )
 
         return examples_from_question, metrics
 

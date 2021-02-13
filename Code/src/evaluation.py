@@ -5,7 +5,7 @@ from read_data import dataset_to_fc
 from build_checkpoints import build_finetuned_from_checkpoint
 from models import *
 from utils import *
-from data_processing import convert_test_samples_to_features, QADataset, collate_testing_wrapper, datasets
+from data_processing import convert_examples_to_features, QADataset, collate_wrapper, datasets
 from torch.utils.data import DataLoader
 from metrics.bioasq_metrics import yes_no_evaluation, factoid_evaluation
 from metrics.squad_metrics import squad_evaluation

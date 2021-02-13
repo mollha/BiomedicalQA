@@ -139,7 +139,7 @@ if __name__ == "__main__":
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
     parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list'], type=str,
                         help="Type of fine-tuned model should be created - factoid, list or yesno?")
-    parser.add_argument("--dataset", default="squad", choices=['squad', 'bioasq'], type=str,
+    parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
     parser.add_argument("--k", default="5", type=int,
                         help="K-best predictions are selected for factoid and list questions (between 1 and 100)")
@@ -148,7 +148,6 @@ if __name__ == "__main__":
     config['size'] = args.size
     config["question_type"] = args.question_type
     args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
-
 
     sys.stderr.write("\n--- ARGUMENTS ---")
     sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nDataset: {}\nK: {}"
