@@ -303,7 +303,7 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             try:
                 position_of_sub_token = pre_token.index(text_sub_token, pre_token_relative_position)
             except ValueError:
-                print('Substring {} not found in {}'.format(text_sub_token, pre_token))
+                # print('Substring {} not found in {}'.format(text_sub_token, pre_token))
                 continue
             # print('Position of sub token', position_of_sub_token)
 
@@ -356,6 +356,11 @@ def convert_examples_to_features(examples, tokenizer, max_length):
     # we could do something interesting with these sorts of predictions, where we sub-tokenize around the predicted answer
     # and ask for the predictions again - let's look at this for making predictions
     # Assumes that the start and end positions actually point to the answer
+    metrics = {
+        "non_match_gt": 0,
+        "non_match_pt": 1
+        "substring_not_found": 0,
+    }
 
     feature_list = []
     for example_number in trange(len(examples), desc="Examples \u2b62 Features"):
@@ -407,6 +412,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         num_pre_token_chars = sum([pt for pt, rge in context_position_mapping]) + len(pre_tokenized_context) - 1
         num_original_chars = len(short_context)
         if num_pre_token_chars != num_original_chars:
+            metrics["non_match_pt"] += 1
             # print("There are {} characters in the pre-tokenized context '{}'\n"
             #       "There are {} characters in the original context '{}'"
             #        .format(num_pre_token_chars, pre_tokenized_context, num_original_chars, short_context))
@@ -431,6 +437,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
                 mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens,
                                                      pre_token_start_pos, text_start_pos)
                 if mapping is None:
+                    metrics["empty_mapping"] += 1
                     continue
 
                 token_sub_tokens = [t[0] for t in mapping]
@@ -443,6 +450,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
                                                      pre_token_start_pos, text_end_pos)
 
                 if mapping is None:
+                    metrics["empty_mapping"] += 1
                     continue
 
                 token_sub_tokens = [t[0] for t in mapping]
@@ -462,7 +470,6 @@ def convert_examples_to_features(examples, tokenizer, max_length):
                         # print('end token position', end_token_position)
                         # print('chosen end token', sub_token)
 
-
             token_input_ids = tokenizer.convert_tokens_to_ids(token_sub_tokens)
             input_ids.extend(token_input_ids)  # add the sub-token ids to our input_ids list
 
@@ -470,12 +477,10 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         clean_p = tokenizer.convert_tokens_to_string(p).replace(" ", "").lstrip('#')
         # print(p, tokenizer.convert_tokens_to_string(p))
         if answer.replace(" ", "") != clean_p:
-            print("Ground truth answer '{}' does not match constructed token answer '{}'"
-                            .format(answer, clean_p))
-            continue
-            # raise Exception("Ground truth answer '{}' does not match constructed token answer '{}'"
+            # print("Ground truth answer '{}' does not match constructed token answer '{}'"
             #                 .format(answer, clean_p))
-        # print()
+            metrics["non_match_gt"] += 1
+            continue
 
         # The attention mask indicates which tokens should be attended to (1) for yes and (0) for no.
         # For instance, padding tokens should not be attended to, but we don't add these until later
