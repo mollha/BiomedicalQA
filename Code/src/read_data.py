@@ -29,7 +29,6 @@ def update_dataset_metrics(total_metrics, additional_metrics):
 
 class BinaryExample:
     def __init__(self, question_id, question, short_context, answer):
-        self._question_type = "yesno"
         self._question_id = question_id
         self._question = question
         self._short_context = short_context
@@ -46,7 +45,6 @@ class BinaryExample:
 class FactoidExample:
     def __init__(self, question_id, question, short_context, full_context, answer, answer_start, answer_end,
                  is_impossible):
-        self._question_type = "factoid"
         self._question_id = question_id
         self._question = question
         self._short_context = short_context  # the sentence(s) containing the answer
@@ -235,7 +233,6 @@ def read_bioasq(path_to_file: Path, testing=False):
     :return: a list containing a dictionary for each context, question and answer triple.
     """
 
-    # todo verify that the start and end positions actually point to the answer
     # todo also make sure that short_context contains the answer if question !impossible
     # todo check in the reading dataset part that there is no leading and trailing whitespace
 
@@ -305,12 +302,11 @@ def read_bioasq(path_to_file: Path, testing=False):
         snippets = data["snippets"]
         examples_from_question = []
 
-        print('answer list', answer_list)
-
         metrics = {  # this dictionary is combined with metrics from previous questions
             "impossible_examples": 0,
             "num_questions": 1,
             "num_examples": 0,
+            "num_skipped_examples": 0
         }
 
         for snippet in snippets:
@@ -335,8 +331,13 @@ def read_bioasq(path_to_file: Path, testing=False):
             #                        answer, None, None, None)
             #     )
 
+            # todo also make sure that short_context contains the answer if question !impossible
+            # todo check in the reading dataset part that there is no leading and trailing whitespace
+
             # todo do this for every potential answer and snippet
             for answer in answer_list:
+                answer = unidecode.unidecode(answer.lower())  # normalize the answer
+
                 matches = match_answer_to_passage("".join(answer), context)
 
                 if len(matches) == 0:  # there are no matches in the passage and the question is impossible
@@ -359,7 +360,18 @@ def read_bioasq(path_to_file: Path, testing=False):
                     # pre-tokenize and correct answer start and end if necessary
                     pre_processed_context, answer_start, answer_end = pre_tokenize(context, start_pos, end_pos)
                     matching_text = pre_processed_context[answer_start:answer_end]
+
                     metrics["num_examples"] += 1
+
+                    # We need to verify that the start and end positions actually point to the answer before we
+                    # expect our feature creation code to find the correctly tokenized positions.
+
+                    if answer != matching_text:
+                        print('Answer "{}" from example does not match the spliced context "{}"'
+                              .format(answer, matching_text))
+                        metrics["num_skipped_examples"] += 1
+                        continue
+
 
                     # create an example per match
                     # todo we may aswell use the context from the article to supplement our sequences? right?
