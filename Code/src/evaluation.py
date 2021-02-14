@@ -98,14 +98,16 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
 
 def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
     """
+    Given an extractive question answering model and some test data, perform evaluation.
 
-    :param factoid_model:
-    :param test_dataloader:
-    :param tokenizer:
-    :param k:
-    :param training:
-    :param dataset:
-    :return:
+    We need to handle impossible questions in evaluation.
+
+    :param factoid_model: Pytorch model trained on factoid (and list) questions
+    :param test_dataloader: Dataloader iterable containing test data on which to evaluate
+    :param tokenizer: The tokenizer used for converting text to tokens.
+    :param k: Top k (best) predictions are chosen for factoid questions.
+    :param training: Flag indicating whether we are calling this from fine-tuning or evaluation
+    :param dataset: Name of the dataset we are using determines the metrics we are using.
     """
 
     # If the training flag is set, we only care about the metrics, this fc is being called from fine-tuning
@@ -167,9 +169,14 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
 
-                    clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
-                    clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids)
-                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
+                    if e == 0 and s == 0:  # this is an impossible prediction
+                        predicted_answer = None
+                    else:
+                        clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
+                        clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
+                        # make sure we don't end up with special characters in our predicted
+                        predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
+
                     list_of_predictions.append(predicted_answer)
 
                 if question_id in results_by_question_id:
@@ -210,7 +217,13 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         predictions_list.append(predicted_answer)
         ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
-    evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
+    if dataset == "bioasq":
+        evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
+    elif dataset == "squad":
+        # todo can this evaluation handle lists of lists of ground truth values.
+        evaluation_metrics = squad_evaluation(predictions_list, ground_truth_list)
+    else:
+        raise Exception('Only squad and bioasq are acceptable dataset names to be passed to evaluation functions.')
 
     if training:
         return evaluation_metrics
@@ -233,22 +246,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
 
     return
 
-
-
-def evaluate(finetuned_model, test_dataloader, tokenizer):
-    k = 5
-    results = []
-
-    predictions = []
-    ground_truths = []
-
-
-    # todo now we have predicted and expected answers, we need to turn these into metrics
-
-    # metrics = squad_evaluation(predictions, ground_truths)
-    # print(metrics)
-
-    # return metrics
 
 if __name__ == "__main__":
     # Log the process ID

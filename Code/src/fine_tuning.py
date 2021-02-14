@@ -58,7 +58,7 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
 
             qa_model.train()  # make sure we are in .train() mode
 
-            if settings["question_type"] == "factoid" or settings["question_type"] == "list":
+            if "factoid" in settings["question_type"] or "list" in settings["question_type"]:
                 inputs = {
                     "input_ids": batch.input_ids,
                     "attention_mask": batch.attention_mask,
@@ -66,7 +66,7 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
                     "start_positions": batch.answer_start,
                     "end_positions": batch.answer_end,
                 }
-            elif settings["question_type"] == "yesno":
+            elif "yesno" in settings["question_type"]:
                 inputs = {
                     "input_ids": batch.input_ids,
                     "attention_mask": batch.attention_mask,
@@ -75,7 +75,7 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
                 }
                 # print('batch labels', batch.labels)
             else:
-                raise Exception("Question type must be factoid, list or yesno.")
+                raise Exception("Question type list must be contain factoid, list or yesno.")
 
             outputs = qa_model(**inputs)  # put inputs through the model and get outputs
             loss = outputs[0]  # Collect loss from outputs
@@ -99,33 +99,33 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
             if settings["global_step"] > 0 and settings["update_steps"] > 0 and settings["global_step"] % settings[
                 "update_steps"] == 0:
                 sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall.\n"
-                      .format(settings["steps_trained"], settings["global_step"]))
+                                 .format(settings["steps_trained"], settings["global_step"]))
                 save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
+        # TODO our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
         # just look at the statistics at the end of an epoch
         if settings["question_type"] == "factoid":
             metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
         elif settings["question_type"] == "list":
             metric_results = {}  # todo do nothing for now - need to add list qs
 
-
-
         elif settings["question_type"] == "yesno":
             metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
         else:
             raise Exception("Question type in config must be factoid, list or yesno.")
 
-        sys.stderr.write(
-            "\n{} steps trained in current epoch, {} steps trained overall. Current evaluation metrics are {}"
-            .format(settings["steps_trained"], settings["global_step"], metric_results))
+        sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
+                         .format(settings["steps_trained"], settings["global_step"]))
 
+        if len(metric_results) > 0:
+            # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
+            sys.stderr.write("\nCurrent evaluation metrics are {}".format(metric_results))
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
     settings["avg_loss"] = [0, 0]  # reset stats
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
-
 
 
 if __name__ == "__main__":
@@ -140,8 +140,8 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list'], type=str,
-                        help="Type of fine-tuned model should be created - factoid, list or yesno?")
+    parser.add_argument("--question-type", default=["factoid", "list"], choices=[['factoid'], ['yesno'], ['list'], ["factoid", "list"]], type=list,
+                        help="Types supported by fine-tuned model - e.g. choose one of [['factoid'], ['yesno'], ['list'], ['factoid', 'list']]")
     parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
     parser.add_argument("--k", default="5", type=int,
@@ -151,10 +151,12 @@ if __name__ == "__main__":
     config['size'] = args.size
     config["question_type"] = args.question_type
     args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
+    args.question_type = ".".join(args.question_type)
 
     sys.stderr.write("\n--- ARGUMENTS ---")
-    sys.stderr.write("\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nDataset: {}\nK: {}"
-                     .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.dataset, args.k))
+    sys.stderr.write(
+        "\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nDataset: {}\nK: {}"
+        .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.dataset, args.k))
 
     # ------- Check the validity of the arguments passed via command line -------
     try:  # check that the value of k is actually a number
@@ -210,8 +212,10 @@ if __name__ == "__main__":
 
     # ---- Find the path(s) to the dataset file(s) ----
     dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
-    train_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["train"]]
-    test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["test"]]
+    train_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in
+                                datasets[selected_dataset]["train"]]
+    test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in
+                               datasets[selected_dataset]["test"]]
 
     sys.stderr.write("\nTraining files are '{}'\nEvaluation files are '{}'"
                      .format(datasets[selected_dataset]["train"], datasets[selected_dataset]["test"]))
@@ -219,31 +223,46 @@ if __name__ == "__main__":
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
     raw_train_dataset = dataset_function(train_dataset_file_paths)
-    raw_train_dataset_by_question = raw_train_dataset[config["question_type"]]
 
-    train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer,
-                                                       config["max_length"])
+    # combine the features from these datasets.
+    train_features = []
+    for qt in config["question_type"]:  # iterate through our chosen question types
+        raw_train_dataset_by_question = raw_train_dataset[qt]
+        sub_train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer,
+                                                          config["max_length"])
+        train_features.extend(sub_train_features)
 
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
 
-    # ----- PREPARE THE EVALUATION DATASET -----
-    sys.stderr.write("\nReading raw test dataset for '{}'".format(selected_dataset))
-    raw_test_dataset = dataset_function(test_dataset_file_paths, testing=True)
-    raw_test_dataset_by_question = raw_test_dataset[config["question_type"]]
-
-    test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
-
-    print("Created {} test features of length {}.".format(len(test_features), config["max_length"]))
-    test_dataset = QADataset(test_features)
-
     # Random Sampler used during training.
+    # We create a single data_loader for training.
     train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
                                    collate_fn=collate_wrapper)
-    test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
+
+    # ----- PREPARE THE EVALUATION DATASET -----
+    sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))
+
+    # Once populated, the test_data_loader_dict will contain {"dataset_path": {"factoid": dataloader, "list": datalo...}
+    test_data_loader_dict = {}
+
+    for test_dataset_file_path in test_dataset_file_paths:  # iterate over each path separately.
+        test_data_loader_dict[test_dataset_file_path] = {}  # initialise empty dict for this dataset path
+
+        raw_test_dataset = dataset_function([test_dataset_file_path], testing=True)
+
+        for qt in config["question_type"]:
+            raw_test_dataset_by_question = raw_test_dataset[qt]  # how do we also get list and factoid together?
+            test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
+
+            print("Created {} test features of length {} from {} questions.".format(len(test_features), config["max_length"], qt))
+            test_dataset = QADataset(test_features)
+
+            # Create a dataloader for each of the test datasets.
+            test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
+            test_data_loader_dict[test_dataset_file_path][qt] = test_data_loader
 
     config["num_warmup_steps"] = len(train_data_loader) // config["max_epochs"]
-
     electra_for_qa, optimizer, scheduler, electra_tokenizer, \
     config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,
                                              finetune_checkpoint_dir, checkpoint_name, config["question_type"], config)
@@ -251,5 +270,5 @@ if __name__ == "__main__":
     print(config)
 
     # ------ START THE FINE-TUNING LOOP ------
-    fine_tune(train_data_loader, test_data_loader, electra_for_qa, scheduler, optimizer, config,
+    fine_tune(train_data_loader, test_data_loader_dict, electra_for_qa, scheduler, optimizer, config,
               finetune_checkpoint_dir)

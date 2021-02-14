@@ -116,12 +116,20 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             # (does not care about the most pretrained)
 
             # pick the most recent fine-tuned checkpoint
-            subfolders = [x for x in Path(finetuned_checkpoint_dir).iterdir() \
-                          if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]
-                          and question_type in str(x)[str(x).rfind('/') + 1:]]
+            all_subfolders = []
+            for x in Path(finetuned_checkpoint_dir).iterdir():
+                if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]:
+                    for qt in question_type:
+                        if qt in str(x)[str(x).rfind('/') + 1:]:
+                            all_subfolders.append(x)
 
-            if len(subfolders) > 0:
-                path_to_checkpoint = get_recent_checkpoint_name(finetuned_checkpoint_dir, subfolders)
+            # pick the most recent fine-tuned checkpoint
+            # subfolders = [x for x in Path(finetuned_checkpoint_dir).iterdir() \
+            #               if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]
+            #               and question_type in str(x)[str(x).rfind('/') + 1:]]
+
+            if len(all_subfolders) > 0:
+                path_to_checkpoint = get_recent_checkpoint_name(finetuned_checkpoint_dir, all_subfolders)
                 print("\nTraining from the most advanced checkpoint - {}\n".format(path_to_checkpoint))
                 valid_finetune_checkpoint = True
                 building_from_pretrained = False
@@ -140,17 +148,16 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
         if valid_finetune_checkpoint:
             # check if the question_type is yesno or factoid
-            if question_type == "factoid" or question_type == "list":
+            if "factoid" in question_type or "list" in question_type:
                 qa_model = ElectraForQuestionAnswering(config=discriminator_config)
-            elif question_type == "yesno":
+            elif "yesno" in question_type:
                 qa_model = CostSensitiveSequenceClassification(config=discriminator_config)
             else:
-                raise Exception("Question type must be factoid, list or yesno.")
+                raise Exception("Question type list must be contain factoid, list or yesno.")
 
             electra_for_qa, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model,
                                                                                optimizer, scheduler, device,
                                                                                pre_training=False)
-
             config = update_settings(config, new_config,
                                      exceptions=["update_steps", "device", "evaluate_during_training"])
             building_from_pretrained = False
@@ -170,15 +177,15 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
                                          "steps": p_model_config["steps_trained"]}
         discriminator = pretrained_model.discriminator
 
-        if question_type == "factoid" or question_type == "list":
+        if "factoid" in question_type or "list" in question_type:
             electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None,
                                                                          state_dict=discriminator.state_dict(),
                                                                          config=discriminator_config)
-        elif question_type == "yesno":
+        elif "yesno" in question_type:
             electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None,
-                                                            state_dict=discriminator.state_dict(),
-                                                            config=discriminator_config)
+                                                                                 state_dict=discriminator.state_dict(),
+                                                                                 config=discriminator_config)
         else:
-            raise Exception("Question type must be factoid, list or yesno.")
+            raise Exception("Question type list must be contain factoid, list or yesno.")
 
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
