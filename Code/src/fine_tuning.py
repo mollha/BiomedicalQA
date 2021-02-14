@@ -26,11 +26,11 @@ config = {
 }
 
 
-def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer, settings, checkpoint_dir):
+def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
 
     print('len train dataloader', len(train_dataloader))  # todo remove these once it makes sense
-    print('len test dataloader', len(eval_dataloader))  # todo remove these once it makes sense
+    print('len test dataloader', len(eval_dataloader_dict))  # todo remove these once it makes sense
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     sys.stderr.write("\n---------- BEGIN FINE-TUNING ----------")
@@ -104,22 +104,32 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
 
         # TODO our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
         # just look at the statistics at the end of an epoch
-        if settings["question_type"] == "factoid":
-            metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
-        elif settings["question_type"] == "list":
-            metric_results = {}  # todo do nothing for now - need to add list qs
 
-        elif settings["question_type"] == "yesno":
-            metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
-        else:
-            raise Exception("Question type in config must be factoid, list or yesno.")
+        # if "factoid" in settings["question_type"] or "list" in settings["question_type"]:
 
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
 
-        if len(metric_results) > 0:
-            # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
-            sys.stderr.write("\nCurrent evaluation metrics are {}".format(metric_results))
+        for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
+            loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
+            sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
+
+            for qt in loader_all_question_types:
+                eval_dataloader = loader_all_question_types[qt]
+
+                if "factoid" in qt:
+                    metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
+                elif "list" in qt:
+                    metric_results = {}  # todo do nothing for now - need to add list qs
+                elif "yesno" in qt:
+                    metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
+                else:
+                    raise Exception("Question type in config must be factoid, list or yesno.")
+
+                sys.stderr.write("\nGathering metrics for {} questions".format(qt))
+                if len(metric_results) > 0:
+                    # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
+                    sys.stderr.write("\nCurrent evaluation metrics are {}".format(metric_results))
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
