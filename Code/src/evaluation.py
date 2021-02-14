@@ -100,8 +100,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
     """
     Given an extractive question answering model and some test data, perform evaluation.
 
-    We need to handle impossible questions in evaluation.
-
     :param factoid_model: Pytorch model trained on factoid (and list) questions
     :param test_dataloader: Dataloader iterable containing test data on which to evaluate
     :param tokenizer: The tokenizer used for converting text to tokens.
@@ -148,7 +146,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             # quit()
 
             start_end_positions = [x for x in zip(start_indices, end_indices)]
-            print('start_end_positions', start_end_positions)
+            # print('start_end_positions', start_end_positions)
 
             # todo are we even able to predict impossible outcomes?
 
@@ -164,15 +162,10 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
                 for (s, e) in sub_start_end_positions:  # convert the start and end positions to answers.
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
-
-                    if e == 0 and s == 0:  # this is an impossible prediction
-                        predicted_answer = None
-                    else:
-                        clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
-                        clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
-                        # make sure we don't end up with special characters in our predicted
-                        predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
-
+                    clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
+                    clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
+                    # make sure we don't end up with special characters in our predicted
+                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
                     list_of_predictions.append(predicted_answer)
 
                 if question_id in results_by_question_id:
@@ -192,10 +185,14 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
 
-        # For each factoid question, each participating system will have to return a list* of up to 5 entity names
+        # For each factoid question in BioASQ, each participating system will have to return a list* of up to 5 entity names
         # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
         best_predictions = []
         num_best_predictions = 0
+
+        # if dataset == "squad":
+        #     k = 1
+
         # iterate over this prediction list until we reach the end, or we have enough predictions.
         for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
             for pred in ordered_pred_list:
@@ -212,15 +209,15 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         results_by_question_id[q_id]["predictions"] = best_predictions
 
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
-        # If both of the below conditions are true, we are dealing with an impossible
-        if len(results_by_question_id[q_id]["expected_answers"]) > 1 or results_by_question_id[q_id]["expected_answers"][0] is not None:  # i.e. we have an answer
+        # If either of the below conditions are true, i.e. we have at least one valid
+        if len(results_by_question_id[q_id]["expected_answers"]) > 1 or results_by_question_id[q_id]["expected_answers"][0] is not None:
             predictions_list.append(predicted_answer)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
     if dataset == "bioasq":
         evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
     elif dataset == "squad":
-        # todo can this evaluation handle lists of lists of ground truth values.
+        # this should be able to handle lists of lists of ground truth values.
         evaluation_metrics = squad_evaluation(predictions_list, ground_truth_list)
     else:
         raise Exception('Only squad and bioasq are acceptable dataset names to be passed to evaluation functions.')

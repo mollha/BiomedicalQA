@@ -53,10 +53,9 @@ class BinaryFeature:
 
 
 class FactoidFeature:
-    def __init__(self, question_id, is_impossible, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
+    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
                  answer_text):
         self._question_id = question_id
-        self._is_impossible = is_impossible  # these questions can be impossible
         self._input_ids = input_ids
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
@@ -73,7 +72,6 @@ class FactoidFeature:
             self._answer_text,
             self._answer_start,
             self._answer_end,
-            self._is_impossible,
         )
 
 
@@ -194,16 +192,16 @@ def convert_examples_to_features(examples, tokenizer, max_length):
 
         # if text_start_pos and text_end_pos are -1, then we have an impossible question.
         # if text_start_pos and text_end_pos are None, then we have a test question with no answer.
-        if (text_start_pos == -1 and text_end_pos == -1) or (text_start_pos is None and text_end_pos is None):
+        if text_start_pos is None and text_end_pos is None:
             tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
                                         max_length=max_length)  # only truncate the second sequence
 
             # If it is not included, for impossible instances the target prediction
             # for both start and end (tokenized) position is 0, i.e. the [CLS] token
             # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
-            feature = FactoidFeature(example._question_id, example._is_impossible, tokenized_input["input_ids"],
+            feature = FactoidFeature(example._question_id, tokenized_input["input_ids"],
                                      tokenized_input["attention_mask"], tokenized_input["token_type_ids"],
-                                     None if text_start_pos is None else 0, None if text_end_pos is None else 0, None)
+                                     None, None, None)
             feature_list.append(feature)
             continue
 
@@ -333,7 +331,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
 
             # Now we're ready to create a feature
-            feature = FactoidFeature(example._question_id, example._is_impossible, all_input_ids,
+            feature = FactoidFeature(example._question_id, all_input_ids,
                                      all_attention_mask, all_token_type_ids, start_token_position,
                                      end_token_position, example._answer)
             feature_list.append(feature)
@@ -377,10 +375,9 @@ class BatchFeatures:
         # i.e. in the bioasq (non-golden) test dataset, answer_text, answer_start and answer_end is None
         self.answer_text = list(transposed_data[4])
 
-        if len(transposed_data) == 8:
+        if len(transposed_data) == 7:
             self.answer_start = torch.tensor(transposed_data[5], device=device)
             self.answer_end = torch.tensor(transposed_data[6], device=device)
-            self.is_impossible = torch.tensor(transposed_data[7], device=device)  # bool
         else:
             self.labels = torch.tensor(transposed_data[5], device=device)
 

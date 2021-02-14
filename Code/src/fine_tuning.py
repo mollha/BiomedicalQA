@@ -123,8 +123,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                 else:
                     raise Exception("Question type in config must be factoid, list or yesno.")
 
-                sys.stderr.write("\nGathering metrics for {} questions".format(qt))
                 if len(metric_results) > 0:
+                    sys.stderr.write("\nGathering metrics for {} questions".format(qt))
                     # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
                     sys.stderr.write("\nCurrent evaluation metrics are {}".format(metric_results))
 
@@ -147,8 +147,8 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default=["factoid", "list"], choices=[['factoid'], ['yesno'], ['list'], ["factoid", "list"]], type=list,
-                        help="Types supported by fine-tuned model - e.g. choose one of [['factoid'], ['yesno'], ['list'], ['factoid', 'list']]")
+    parser.add_argument("--question-type", default="factoid,list", choices=['factoid', 'yesno', 'list', 'factoid,list'], type=str,
+                        help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list' or 'factoid,list'")
     parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
     parser.add_argument("--k", default="5", type=int,
@@ -156,9 +156,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     config['size'] = args.size
-    config["question_type"] = args.question_type
+    config["question_type"] = args.question_type.split(',')
     args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
-    args.question_type = ".".join(args.question_type)
 
     sys.stderr.write("\n--- ARGUMENTS ---")
     sys.stderr.write(
@@ -178,7 +177,7 @@ if __name__ == "__main__":
             raise Exception(
                 "If using a fine-tuned checkpoint, the model size of the checkpoint must match provided model size."
                 "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --size small")
-        if args.question_type not in args.f_checkpoint:
+        if not any([q in args.f_checkpoint for q in args.question_type]):
             raise Exception(
                 "If using a fine-tuned checkpoint, the question type of the checkpoint must match question type."
                 "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --question-type factoid")

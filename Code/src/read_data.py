@@ -43,8 +43,7 @@ class BinaryExample:
 
 
 class FactoidExample:
-    def __init__(self, question_id, question_type, question, short_context, full_context, answer, answer_start, answer_end,
-                 is_impossible):
+    def __init__(self, question_id, question_type, question, short_context, full_context, answer, answer_start, answer_end):
         self._question_id = question_id
         self._question_type = question_type
         self._question = question
@@ -53,7 +52,6 @@ class FactoidExample:
         self._answer = answer
         self._answer_start = answer_start
         self._answer_end = answer_end
-        self._is_impossible = is_impossible
 
     def print_info(self):
         print("\n----- Factoid (squad) Example -----\n")
@@ -64,7 +62,6 @@ class FactoidExample:
         print("Answer:", self._answer)
         print("Answer Start:", self._answer_start)
         print("Answer End:", self._answer_end)
-        print("Is Impossible:", self._is_impossible)
 
 
 def pre_tokenize(short_context, start_position, end_position):
@@ -134,15 +131,13 @@ def read_squad(paths_to_files: list, testing=False):
 
     dataset = []
     metrics = {
-        "impossible_examples": 0,
-        "impossible_questions": 0,
         "num_questions": 0,
         "num_examples": 0,
         "num_skipped_examples": 0,
     }
 
     # todo verify that the start and end positions actually point to the answer
-    # todo also make sure that short_context contains the answer if question !impossible
+    # todo also make sure that short_context contains the answer
     # todo check in the reading dataset part that there is no leading and trailing whitespace
 
     for group in tqdm(squad_dict['data'], desc="SQuAD Data \u2b62 Examples"):
@@ -157,18 +152,11 @@ def read_squad(paths_to_files: list, testing=False):
                 question = qa['question']
                 question_id = qa['id']
                 is_impossible = qa['is_impossible']
-                metrics["impossible_questions"] += 1 if is_impossible else 0
-                metrics["num_questions"] += 1
 
-                if is_impossible:
-                    # still need to pre-tokenized the text
-                    pre_processed_context = unidecode.unidecode(full_context.lower())
-
-                    # impossible questions have an empty list for "answers"
-                    # the answer is None, and its start and end positions are negative 1
-                    dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, pre_processed_context,
-                                                  None, -1, -1, is_impossible))
+                if is_impossible:  # we are no longer include impossible questions
                     continue
+
+                metrics["num_questions"] += 1
 
                 for answer in qa['answers']:
                     answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
@@ -195,11 +183,10 @@ def read_squad(paths_to_files: list, testing=False):
                         continue
 
                     metrics["num_examples"] += 1
-                    metrics["impossible_examples"] += 1 if is_impossible else 0
 
                     # todo should we have a short context, or not?
                     dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, pre_processed_context, answer['text'],
-                                                  answer_start, answer_end, is_impossible))
+                                                  answer_start, answer_end))
             break  # todo remove later
         break  # todo remove later
 
@@ -209,20 +196,6 @@ def read_squad(paths_to_files: list, testing=False):
 
     print('\n------- COLLATING {}-SET METRICS -------'.format("TEST" if testing else "TRAIN"))
     print("There are {} questions and {} examples".format(total_questions, total_examples))
-
-    percentage_impossible_examples = 0 if total_examples == 0 else round(
-        100 * metrics["impossible_examples"] / total_examples, 2)
-
-    percentage_impossible_questions = 0 if total_questions == 0 else round(
-        100 * metrics["impossible_questions"] / total_questions, 2)
-
-    print("\n- Impossible Instances: {} questions ({}%), {} examples ({}%)"
-          .format(metrics["impossible_questions"], percentage_impossible_questions, metrics["impossible_examples"],
-                  percentage_impossible_examples))
-
-    print("- Non-Impossible Instances: {} questions ({}%), {} examples ({}%)"
-          .format(total_questions - metrics["impossible_questions"], 100.0 - percentage_impossible_questions,
-                  total_examples - metrics["impossible_examples"], 100.0 - percentage_impossible_examples))
 
     print('-', metrics["num_skipped_examples"], 'examples were skipped.\n')
     return {"factoid": dataset}
@@ -312,7 +285,6 @@ def read_bioasq(paths_to_files: list, testing=False):
                 flattened_answer_list.append(answer)
 
         metrics = {  # this dictionary is combined with metrics from previous questions
-            "impossible_examples": 0,
             "num_questions": 1,
             "num_examples": 0,
             "num_skipped_examples": 0
@@ -328,19 +300,8 @@ def read_bioasq(paths_to_files: list, testing=False):
                 matches = match_answer_to_passage("".join(answer), context)
 
                 if len(matches) == 0:  # there are no matches in the passage and the question is impossible
-                    # still need to pre-tokenized the text
-                    pre_processed_context = unidecode.unidecode(context.lower())
-                    metrics["impossible_examples"] += 1
-                    metrics["num_examples"] += 1
-                    # the answer is None, and its start and end positions are negative 1
-                    examples_from_question.append(FactoidExample(question_id, q_type, question, pre_processed_context, pre_processed_context,
-                                                  None, -1, -1, True))
-                    # examples_from_question.append(FactoidExample(question_id, q_type, question, context,
-                    #                                              context if article is None else article[section], "",
-                    #                                              start_pos, end_pos, is_impossible))
                     continue
 
-                is_impossible = False
                 # we have at least one match, iterate through each match
                 # and create an example for each get the matching text
                 for start_pos, end_pos in matches:
@@ -364,7 +325,7 @@ def read_bioasq(paths_to_files: list, testing=False):
                     # Create an example for every match
                     examples_from_question.append(
                         FactoidExample(question_id, q_type, question, pre_processed_context, pre_processed_context,
-                                       matching_text, start_pos, end_pos, is_impossible)
+                                       matching_text, start_pos, end_pos)
                     )
         return examples_from_question, metrics
 
@@ -461,13 +422,6 @@ def read_bioasq(paths_to_files: list, testing=False):
                           percentage_no_examples))
 
         elif qt == "factoid" or qt == "list":
-            percentage_impossible_examples = 0 if num_examples == 0 else round(100 * qt_metrics["impossible_examples"] / num_examples, 2)
-
-            print("\n- Impossible Examples: {} examples ({}%)"
-                  .format(qt_metrics["impossible_examples"], percentage_impossible_examples))
-            print("- Non-Impossible Examples: {} examples ({}%)"
-                  .format(num_examples - qt_metrics["impossible_examples"], 100 - percentage_impossible_examples))
-
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
 
     return dataset
