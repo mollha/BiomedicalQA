@@ -86,8 +86,8 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
     :param sub_tokens: the sub_tokens created when pre_token is tokenized
     :return:
     """
-    print('pre_token', pre_token)
-    print('subtokens', sub_tokens)
+    # print('pre_token', pre_token)
+    # print('subtokens', sub_tokens)
 
     # Pass over the sub_tokens and condense multiple [UNK] tokens in a row into a single [UNK]
     sub_tokens_condensed = []
@@ -146,15 +146,15 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             # we need to repeat this process to break down the current token further
             new_pre_token = sub_token.lstrip('#')  # remove leading hash-tags to convert token to string
             num_sub_tokens = tokenizer.tokenize(new_pre_token)
-            print('Num sub tokens', num_sub_tokens)
+            # print('Num sub tokens', num_sub_tokens)
 
             if len(num_sub_tokens) == 1 and num_sub_tokens[0] == new_pre_token:
                 lone_subtoken = num_sub_tokens.pop()
 
-                print('Num sub tokens again', num_sub_tokens)
+                # print('Num sub tokens again', num_sub_tokens)
                 # treat subtokens as a list of characters
                 num_sub_tokens = ["##{}".format(t) if i != 0 else t for i, t in enumerate(lone_subtoken)]
-                print('Num sub tokens again again', num_sub_tokens)
+                # print('Num sub tokens again again', num_sub_tokens)
 
 
             # recursive call to further break down sub-token
