@@ -104,9 +104,6 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
         # TODO our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
         # just look at the statistics at the end of an epoch
-
-        # if "factoid" in settings["question_type"] or "list" in settings["question_type"]:
-
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
 
