@@ -197,9 +197,13 @@ def convert_examples_to_features(examples, tokenizer, max_length):
         if (text_start_pos == -1 and text_end_pos == -1) or (text_start_pos is None and text_end_pos is None):
             tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
                                         max_length=max_length)  # only truncate the second sequence
+
+            # If it is not included, for impossible instances the target prediction
+            # for both start and end (tokenized) position is 0, i.e. the [CLS] token
+            # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
             feature = FactoidFeature(example._question_id, example._is_impossible, tokenized_input["input_ids"],
                                      tokenized_input["attention_mask"], tokenized_input["token_type_ids"],
-                                     text_start_pos, text_end_pos, None)
+                                     None if text_start_pos is None else 0, None if text_end_pos is None else 0, None)
             feature_list.append(feature)
             continue
 

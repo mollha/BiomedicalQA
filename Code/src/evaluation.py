@@ -17,7 +17,22 @@ https://huggingface.co/transformers/task_summary.html#extractive-question-answer
 
 
 def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioasq"):
-    results_by_question_id = {}
+    """
+    Given a model and a test-set, evaluate the model's performance on the test set.
+    The evaluation metrics we use depend on the dataset we use. Although, currently for
+    yes/no questions, we only have one evaluation dataset (bioasq).
+
+    For this question type, we do not expect to see any impossible (unanswerable) questions.
+    However, we do expect to get questions without an answer, answer-start and answer-end.
+    These are given when we use a non-golden bioasq test set, so we can't actually evaluate them.
+
+    :param yes_no_model: pytorch model trained on yes no (binary classification) questions.
+    :param test_dataloader: a dataloader iterable containing the yes/no test data.
+    :param training: flag indicating whether we are running this from finetuning or evaluation.
+    :param dataset: the dataset we are using determines the metrics we are using
+    """
+
+    results_by_question_id = {}  # initialise an empty dictionary for storing results by question id
 
     # when .eval() is set, all dropout layers are removed.
     # yes_no_model.eval()  # switch to evaluation mode
@@ -42,15 +57,14 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             for question_idx, question_id in enumerate(batch.question_ids):
                 expected_answer = batch.answer_text[question_idx]
                 predicted_label = torch.argmax(class_probabilities[question_idx])
-                # print(predicted_label)
                 if question_idx in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(predicted_label)
                 else:
                     results_by_question_id[question_id] = {"predictions": [predicted_label],
                                                            "expected_answer": expected_answer}
 
-    # iterate through predictions for each question
-    # we need to combine these predictions to produce a final "yes" or "no" prediction.
+    # Iterate through predictions for each question. We need to combine these predictions to produce a final prediction.
+    # create a list of predictions and a list of ground_truth for evaluation
     predictions_list, ground_truth_list = [], []
     for q_id in results_by_question_id:
         # results_by_question_id[q_id]["predictions"] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
@@ -65,19 +79,29 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
         predictions_list.append(predicted_answer)
         ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
 
-    # create a list of predictions and a list of ground_truth for evaluation
-    # print('predictions list', predictions_list)
-    # print('ground truth list', ground_truth_list)
-    evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
+    if dataset == "bioasq":  # Deploy the bioasq metrics on our results.
+        evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
 
-    if training:
-        return evaluation_metrics
-    else:
+        if training:
+            return evaluation_metrics
         # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
         return results_by_question_id, evaluation_metrics
+    raise Exception("Dataset name provided to evaluate_yesno must be 'bioasq', "
+                    "as no other datasets are handled at this time.")
 
 
 def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
+    """
+
+    :param factoid_model:
+    :param test_dataloader:
+    :param tokenizer:
+    :param k:
+    :param training:
+    :param dataset:
+    :return:
+    """
+
     # If the training flag is set, we only care about the metrics, this fc is being called from fine-tuning
     results_by_question_id = {}
     special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
@@ -166,13 +190,13 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         # iterate over this prediction list until we reach the end, or we have enough predictions.
         for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
             for pred in ordered_pred_list:
-                if num_best_predictions >= 5:
+                if num_best_predictions >= k:
                     break
 
                 num_best_predictions += 1
                 best_predictions.append(pred)
 
-            if num_best_predictions >= 5:
+            if num_best_predictions >= k:
                 break
 
         # swap the huge list of all predictions for our short-list of best predictions
