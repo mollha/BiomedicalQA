@@ -7,7 +7,7 @@ from models import *
 from utils import *
 from data_processing import convert_examples_to_features, QADataset, collate_wrapper, datasets
 from torch.utils.data import DataLoader
-from metrics.bioasq_metrics import yes_no_evaluation, factoid_evaluation
+from metrics.bioasq_metrics import yes_no_evaluation, factoid_evaluation, list_evaluation
 from metrics.squad_metrics import squad_evaluation
 
 """
@@ -337,7 +337,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
     if dataset == "bioasq":
-        evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
+        evaluation_metrics = list_evaluation(predictions_list, ground_truth_list)
     else:
         raise Exception('Only bioasq is an acceptable dataset name to be passed to list evaluation functions.')
 
@@ -345,8 +345,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
         return evaluation_metrics
     else:
         return results_by_question_id, evaluation_metrics
-
-    return
 
 
 if __name__ == "__main__":

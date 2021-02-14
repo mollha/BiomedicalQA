@@ -184,17 +184,17 @@ def list_evaluation(predictions, ground_truth):
         # fp are entities in prediction but not in truth_values
         fp = len(prediction) - tp
 
-        precision = tp / (tp + fp)  # save the rounding for avg calculation
-        recall = tp / (tp + fn)
-        f1 = 2 * ((precision * recall) / (precision + recall))
+        precision = 0 if (tp + fp) == 0 else tp / (tp + fp)  # save the rounding for avg calculation
+        recall = 0 if (tp + fn) == 0 else tp / (tp + fn)
+        f1 = 0 if (precision + recall) == 0 else 2 * ((precision * recall) / (precision + recall))
 
         total_precision += precision
         total_recall += recall
         total_f1 += f1
 
-    mean_average_precision = round(total_precision / total_questions, 3)
-    mean_average_recall = round(total_recall / total_questions, 3)
-    mean_average_f1 = round(total_f1 / total_questions, 3)
+    mean_average_precision = 0 if total_questions == 0 else round(total_precision / total_questions, 3)
+    mean_average_recall = 0 if total_questions == 0 else round(total_recall / total_questions, 3)
+    mean_average_f1 = 0 if total_questions == 0 else round(total_f1 / total_questions, 3)
 
     metrics = {
         "mean_average_precision": mean_average_precision,
