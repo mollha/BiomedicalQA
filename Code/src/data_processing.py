@@ -149,9 +149,11 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             print('Num sub tokens', num_sub_tokens)
 
             if len(num_sub_tokens) == 1 and num_sub_tokens[0] == new_pre_token:
+                lone_subtoken = num_sub_tokens.pop()
+
                 print('Num sub tokens again', num_sub_tokens)
                 # treat subtokens as a list of characters
-                num_sub_tokens = [num_sub_tokens[0]].extend(["##{}".format(t) for t in num_sub_tokens[1:]])
+                num_sub_tokens = ["##{}".format(t) if i != 0 else t for i, t in enumerate(lone_subtoken)]
                 print('Num sub tokens again again', num_sub_tokens)
 
 

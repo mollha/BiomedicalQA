@@ -226,7 +226,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         return results_by_question_id, evaluation_metrics
 
 
-def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
+def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
     """
     Given a pytorch model trained on factoid / list questions, we need to evaluate this model on a given dataset.
     The evaluation metrics we choose are dependent on our choice of dataset.
@@ -302,15 +302,49 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
                     results_by_question_id[question_id] = {"predictions": [list_of_predictions],
                                                            "expected_answers": [expected_answer]}
 
+    # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
+    predictions_list, ground_truth_list = [], []
+    for q_id in results_by_question_id:  # Gather all predictions for a particular question
+        # results_by_question_id[q_id]["predictions"] is a list of lists
+        # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
+        pred_lists = results_by_question_id[q_id]["predictions"]
 
+        # For each factoid question in BioASQ, each participating system will have to return a list* of up to 5 entity names
+        # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
+        best_predictions = []
+        num_best_predictions = 0
 
+        # iterate over this prediction list until we reach the end, or we have enough predictions.
+        for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
+            for pred in ordered_pred_list:
+                if num_best_predictions >= k:
+                    break
+
+                num_best_predictions += 1
+                best_predictions.append(pred)
+
+            if num_best_predictions >= k:
+                break
+
+        # swap the huge list of all predictions for our short-list of best predictions
+        results_by_question_id[q_id]["predictions"] = best_predictions
+
+        # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
+        # If either of the below conditions are true, i.e. we have at least one valid
+        if len(results_by_question_id[q_id]["expected_answers"]) > 1 or \
+                results_by_question_id[q_id]["expected_answers"][0] is not None:
+            predictions_list.append(predicted_answer)
+            ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
     if dataset == "bioasq":
-        pass
-    elif dataset == "squad":
-        pass
+        evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
     else:
-        raise Exception('Only squad and bioasq are acceptable dataset names to be passed to evaluation functions.')
+        raise Exception('Only bioasq is an acceptable dataset name to be passed to list evaluation functions.')
+
+    if training:
+        return evaluation_metrics
+    else:
+        return results_by_question_id, evaluation_metrics
 
     return
 
