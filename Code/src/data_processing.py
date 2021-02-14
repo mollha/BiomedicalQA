@@ -146,10 +146,14 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             # we need to repeat this process to break down the current token further
             new_pre_token = sub_token.lstrip('#')  # remove leading hash-tags to convert token to string
             num_sub_tokens = tokenizer.tokenize(new_pre_token)
+            print('Num sub tokens', num_sub_tokens)
 
             if len(num_sub_tokens) == 1 and num_sub_tokens[0] == new_pre_token:
+                print('Num sub tokens again', num_sub_tokens)
                 # treat subtokens as a list of characters
                 num_sub_tokens = [num_sub_tokens[0]].extend(["##{}".format(t) for t in num_sub_tokens[1:]])
+                print('Num sub tokens again again', num_sub_tokens)
+
 
             # recursive call to further break down sub-token
             sub_mapping = sub_tokenize_answer_tokens(tokenizer, new_pre_token, num_sub_tokens, st_start_pos,

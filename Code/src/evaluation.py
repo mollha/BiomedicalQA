@@ -270,6 +270,38 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
             answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
             answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
 
+            start_end_positions = [x for x in zip(start_indices, end_indices)]
+            # print('start_end_positions', start_end_positions)
+
+            # iterate over our pairs of start and end indices
+            for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
+                # e.g. start_tensor = tensor([110,  33,  38, 111,  35]), end_tensor = tensor([20,  0, 90, 36, 62])
+                sub_start_end_positions = zip(start_tensor, end_tensor)  # zip the start and end positions
+                input_ids = batch.input_ids[index]
+                expected_answer = batch.answer_text[index]
+                question_id = batch.question_ids[index]
+
+                list_of_predictions = []  # gather all of the predictions for this question
+                for (s, e) in sub_start_end_positions:  # convert the start and end positions to answers.
+                    if e <= s:  # if end position is less than or equal to start position, skip this pair
+                        continue
+                    clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
+                    clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
+                    # make sure we don't end up with special characters in our predicted
+                    predicted_answer = tokenizer.convert_tokens_to_string(
+                        clipped_tokens)  # todo we need a way to do this that handles punctuation better
+                    list_of_predictions.append(predicted_answer)
+
+                if question_id in results_by_question_id:
+                    results_by_question_id[question_id]["predictions"].append(list_of_predictions)
+
+                    # make sure we don't put the same expected answer in the list over and over again.
+                    if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
+                        results_by_question_id[question_id]["expected_answers"].append(expected_answer)
+                else:
+                    results_by_question_id[question_id] = {"predictions": [list_of_predictions],
+                                                           "expected_answers": [expected_answer]}
+
 
 
 
