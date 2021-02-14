@@ -148,8 +148,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             start_end_positions = [x for x in zip(start_indices, end_indices)]
             # print('start_end_positions', start_end_positions)
 
-            # todo are we even able to predict impossible outcomes?
-
             # iterate over our pairs of start and end indices
             for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
                 # e.g. start_tensor = tensor([110,  33,  38, 111,  35]), end_tensor = tensor([20,  0, 90, 36, 62])
