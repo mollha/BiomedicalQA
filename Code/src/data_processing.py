@@ -86,6 +86,8 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
     :param sub_tokens: the sub_tokens created when pre_token is tokenized
     :return:
     """
+    print('pre_token', pre_token)
+    print('subtokens', sub_tokens)
 
     # Pass over the sub_tokens and condense multiple [UNK] tokens in a row into a single [UNK]
     sub_tokens_condensed = []
