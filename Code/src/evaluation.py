@@ -109,8 +109,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
     :param training: Flag indicating whether we are calling this from fine-tuning or evaluation
     :param dataset: Name of the dataset we are using determines the metrics we are using.
     """
-
-    # If the training flag is set, we only care about the metrics, this fc is being called from fine-tuning
     results_by_question_id = {}
     special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
 
@@ -127,8 +125,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
 
             # model outputs are always tuples in transformers
             outputs = factoid_model(**inputs)
-            print(outputs)
-
             try:  # indexing outputs on CPU
                 start_logits, end_logits = outputs.start_logits, outputs.end_logits
             except AttributeError:  # indexing outputs on CUDA
@@ -214,8 +210,12 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
 
         # swap the huge list of all predictions for our short-list of best predictions
         results_by_question_id[q_id]["predictions"] = best_predictions
-        predictions_list.append(predicted_answer)
-        ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
+
+        # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
+        # If both of the below conditions are true, we are dealing with an impossible
+        if len(results_by_question_id[q_id]["expected_answers"]) > 1 or results_by_question_id[q_id]["expected_answers"][0] is not None:  # i.e. we have an answer
+            predictions_list.append(predicted_answer)
+            ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
     if dataset == "bioasq":
         evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)

@@ -125,9 +125,9 @@ def factoid_evaluation(predictions, ground_truth):
         one_over_ri = 0 if match_position is None else 1 / match_position
         total_one_over_ri += one_over_ri
 
-    strict_accuracy = round(correct_in_position_1 / total_questions, 3)
-    leniant_accuracy = round(correct_in_any_position / total_questions, 3)
-    mrr = round((1 / total_questions) / total_one_over_ri, 3)
+    strict_accuracy = 0 if total_questions == 0 else round(correct_in_position_1 / total_questions, 3)
+    leniant_accuracy = 0 if total_questions == 0 else round(correct_in_any_position / total_questions, 3)
+    mrr = 0 if total_one_over_ri == 0 or total_questions == 0 else round((1 / total_questions) / total_one_over_ri, 3)
 
     metrics = {
         "strict_accuracy": strict_accuracy,
