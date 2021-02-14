@@ -22,6 +22,8 @@ source /etc/profile
 # activate venv
 source ../../venv/bin/activate
 
+pip freeze | cat
+
 # parse arguments
 while [[ $# -gt 0 ]]
 do
