@@ -148,7 +148,7 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             num_sub_tokens = tokenizer.tokenize(new_pre_token)
 
             if len(num_sub_tokens) == 1 and num_sub_tokens[0] == new_pre_token:
-                num_sub_tokens = num_sub_tokens[0].split() # split into different characters
+                # treat subtokens as a list of characters
                 num_sub_tokens = [num_sub_tokens[0]].extend(["##{}".format(t) for t in num_sub_tokens[1:]])
 
             # recursive call to further break down sub-token

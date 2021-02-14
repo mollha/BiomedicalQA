@@ -231,11 +231,11 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
     Given a pytorch model trained on factoid / list questions, we need to evaluate this model on a given dataset.
     The evaluation metrics we choose are dependent on our choice of dataset.
 
-    
-    :param list_model:
-    :param test_dataloader:
-    :param tokenizer:
-    :param k:
+
+    :param list_model: Pytorch model capable of answering factoid questions
+    :param test_dataloader: Dataloader containing evaluation data
+    :param tokenizer: Tokenizer used to convert strings into tokens
+    :param k: The number of predictions to harness from each example.
     :param dataset:
     :return:
     """
