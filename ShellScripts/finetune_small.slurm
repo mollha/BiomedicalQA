@@ -22,6 +22,7 @@ source /etc/profile
 # activate venv
 source ../../venv/bin/activate
 
+pip install transformers==4.2.2
 pip freeze | cat
 
 # parse arguments
