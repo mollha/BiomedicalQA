@@ -23,4 +23,7 @@ def check_match(prediction, expected):
         # translate characters to lower case
         return text.lower()
 
+    if type(expected) == list:  # we have a list of candidate answers
+        # check if it matches any of the correct answers.
+        return any([transform(prediction) == transform(exp) for exp in expected])
     return transform(prediction) == transform(expected)

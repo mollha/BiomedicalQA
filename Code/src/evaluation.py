@@ -16,7 +16,7 @@ https://huggingface.co/transformers/task_summary.html#extractive-question-answer
 """
 
 
-def evaluate_yesno(yes_no_model, test_dataloader, training=False):
+def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioasq"):
     results_by_question_id = {}
 
     # when .eval() is set, all dropout layers are removed.
@@ -77,16 +77,12 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False):
         return results_by_question_id, evaluation_metrics
 
 
-def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False):
-    # if training flag is set, we only care about the metrics
-    # this fc is being called from finetuning
-    # todo handle impossible questions in evaluation and in batch wrapper
-
-
+def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
+    # If the training flag is set, we only care about the metrics, this fc is being called from fine-tuning
     results_by_question_id = {}
-    special_tokens = {tokenizer.unk_token, tokenizer.sep_token, tokenizer.pad_token}
+    special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
 
-    factoid_model.eval()  # switch to evaluation mode
+    # factoid_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
             # question_ids = batch.question_ids
@@ -99,60 +95,92 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
 
             # model outputs are always tuples in transformers
             outputs = factoid_model(**inputs)
+            print(outputs)
 
-            # print(outputs.start_logits)
-            # answer_start = torch.argmax(outputs.start_logits,
-            #                             dim=1)  # Get the most likely beginning of answer with the argmax of the score
-            # todo outputs cant be indexed like this anymore (see yes no)
-            answer_starts, start_indices = torch.topk(outputs.start_logits, k=k, dim=1)
-            answer_ends, end_indices = torch.topk(outputs.end_logits, k=k, dim=1)
+            try:  # indexing outputs on CPU
+                start_logits, end_logits = outputs.start_logits, outputs.end_logits
+            except AttributeError:  # indexing outputs on CUDA
+                start_logits, end_logits = outputs[0], outputs[1]
 
-            # print('answer_start', answer_start)
-            # print('indices', start_indices)
+            # Each list in the tensor relates to a single question - and these are likelihood values (probabilities)
+            # e.g. start_logits = tensor([[0.0943, 0.1020, 0.1816, ..., 0.0474, 0.1435, 0.0335], ...],)
+
+            # Convert the batches of start and end logits into answer span position predictions
+            # This will give us k predictions per feature in the batch
+            answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
+            answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
+
+
+            # todo perform thresholding if necessary
+
+            # print('answer_starts', answer_starts)
+            # print('start_indices', start_indices)
+            # print('answer_ends', answer_ends)
+            # print('end_indices', end_indices)
+            # quit()
 
             start_end_positions = [x for x in zip(start_indices, end_indices)]
+            print('start_end_positions', start_end_positions)
 
+            # todo are we even able to predict impossible outcomes?
+
+            # iterate over our pairs of start and end indices
             for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
-                sub_start_end_positions = zip(start_tensor, end_tensor)
+                # e.g. start_tensor = tensor([110,  33,  38, 111,  35]), end_tensor = tensor([20,  0, 90, 36, 62])
+                sub_start_end_positions = zip(start_tensor, end_tensor)  # zip the start and end positions
                 input_ids = batch.input_ids[index]
                 expected_answer = batch.answer_text[index]
                 question_id = batch.question_ids[index]
 
-                list_of_predictions = []
+                list_of_predictions = []  # gather all of the predictions for this question
+                for (s, e) in sub_start_end_positions:  # convert the start and end positions to answers.
+                    if e <= s:  # if end position is less than or equal to start position, skip this pair
+                        continue
 
-                # convert the start and end positions to answers.
-                for (s, e) in sub_start_end_positions:
-                    # print('s', s, 'e', e)
-                    tokens = tokenizer.convert_ids_to_tokens(input_ids)
-                    clipped_tokens = [t for t in tokens[int(s):int(e)] if t not in special_tokens]
-                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+                    clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
+                    clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids)
+                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
                     list_of_predictions.append(predicted_answer)
 
                 if question_id in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(list_of_predictions)
+
+                    # make sure we don't put the same expected answer in the list over and over again.
+                    if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
+                        results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
                     results_by_question_id[question_id] = {"predictions": [list_of_predictions],
-                                                           "expected_answer": expected_answer}
+                                                           "expected_answers": [expected_answer]}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
-    for ex in results_by_question_id:
-        pred_lists = results_by_question_id[ex]["predictions"]
+    predictions_list, ground_truth_list = [], []
+    for q_id in results_by_question_id:  # Gather all predictions for a particular question
+        # results_by_question_id[q_id]["predictions"] is a list of lists
+        # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
+        pred_lists = results_by_question_id[q_id]["predictions"]
 
-        all_predictions = []
-        for pred_list in pred_lists:
-            for p_idx in range(k):
-                all_predictions.append([pred_list[p_idx]])
+        # For each factoid question, each participating system will have to return a list* of up to 5 entity names
+        # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
+        best_predictions = []
+        num_best_predictions = 0
+        # iterate over this prediction list until we reach the end, or we have enough predictions.
+        for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
+            for pred in ordered_pred_list:
+                if num_best_predictions >= 5:
+                    break
 
-        results_by_question_id[ex]["predictions"] = all_predictions
+                num_best_predictions += 1
+                best_predictions.append(pred)
 
-        # print(all_predictions)
-        break
+            if num_best_predictions >= 5:
+                break
 
-    # todo add in a max length for this prediction list
+        # swap the huge list of all predictions for our short-list of best predictions
+        results_by_question_id[q_id]["predictions"] = best_predictions
+        predictions_list.append(predicted_answer)
+        ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
-    # todo evaluate factoid
-
-    evaluation_metrics = {}
+    evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
 
     if training:
         return evaluation_metrics
@@ -160,7 +188,19 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         return results_by_question_id, evaluation_metrics
 
 
-def evaluate_list(list_model, test_dataloader, tokenizer, k):
+def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
+
+    # For each list question, each participating system will have to return a single list* of entity names, numbers,
+    # or similar short expressions, jointly taken to constitute a single answer (e.g., the most common symptoms of
+    # a disease). The returned list will have to contain no more than 100 entries of no more than 100 characters each.
+
+    if dataset == "bioasq":
+        pass
+    elif dataset == "squad":
+        pass
+    else:
+        raise Exception('Only squad and bioasq are acceptable dataset names to be passed to evaluation functions.')
+
     return
 
 

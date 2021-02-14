@@ -107,6 +107,9 @@ def fine_tune(train_dataloader, eval_dataloader, qa_model, scheduler, optimizer,
             metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
         elif settings["question_type"] == "list":
             metric_results = {}  # todo do nothing for now - need to add list qs
+
+
+
         elif settings["question_type"] == "yesno":
             metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
         else:
@@ -211,14 +214,13 @@ if __name__ == "__main__":
     test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in datasets[selected_dataset]["test"]]
 
     sys.stderr.write("\nTraining files are '{}'\nEvaluation files are '{}'"
-                     .format(train_dataset_file_paths, test_dataset_file_paths))
+                     .format(datasets[selected_dataset]["train"], datasets[selected_dataset]["test"]))
 
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
     raw_train_dataset = dataset_function(train_dataset_file_paths)
     raw_train_dataset_by_question = raw_train_dataset[config["question_type"]]
 
-    print("Converting raw training text to features.")
     train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer,
                                                        config["max_length"])
 

@@ -200,6 +200,7 @@ def read_squad(paths_to_files: list, testing=False):
                     # todo should we have a short context, or not?
                     dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, pre_processed_context, answer['text'],
                                                   answer_start, answer_end, is_impossible))
+            break  # todo remove later
         break  # todo remove later
 
     # ------ DISPLAY METRICS -------
@@ -399,7 +400,7 @@ def read_bioasq(paths_to_files: list, testing=False):
     }
 
     combined_metrics = {q: {} for q in dataset.keys()}
-
+    count = 0  # todo remove later
     for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
         # todo remove all except summary from here - we only exclude the ones we can't handle for now.
@@ -416,7 +417,12 @@ def read_bioasq(paths_to_files: list, testing=False):
 
         example_list, question_metrics = fc(data_point)  # apply the right function for the question type
         combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
-        dataset[question_type].extend(example_list)  # collate examples
+        dataset[question_type].extend(example_list)  # collate examples]
+
+        if question_type == "factoid":  # only counting factoid
+            count += 1  # todo remove later
+        if count > 5:
+            break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
@@ -427,7 +433,6 @@ def read_bioasq(paths_to_files: list, testing=False):
     for qt in combined_metrics.keys():  # iterate over each question type
         print('\n------- {} METRICS -------'.format(qt.upper()))
         qt_metrics = combined_metrics[qt]  # get the metrics for that question type
-        print(qt_metrics)
         if len(qt_metrics) == 0:
             print("No metrics available for question type '{}'".format(qt))
             continue
@@ -455,7 +460,7 @@ def read_bioasq(paths_to_files: list, testing=False):
                   .format(qt_metrics["num_no_questions"], percentage_no_questions, qt_metrics["num_no_examples"],
                           percentage_no_examples))
 
-        elif qt == "factoid":
+        elif qt == "factoid" or qt == "list":
             percentage_impossible_examples = 0 if num_examples == 0 else round(100 * qt_metrics["impossible_examples"] / num_examples, 2)
 
             print("\n- Impossible Examples: {} examples ({}%)"
@@ -464,6 +469,7 @@ def read_bioasq(paths_to_files: list, testing=False):
                   .format(num_examples - qt_metrics["impossible_examples"], 100 - percentage_impossible_examples))
 
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
+
     return dataset
 
 

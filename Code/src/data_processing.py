@@ -304,8 +304,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
 
         # Note: the question token type ids are 0s, the context token type ids are 1s
         num_answer_tokens = end_token_position - start_token_position
-        # Shift the doc stride in intervals of 10 so that we don't create way too many features
-        for left_stride in range(0, num_context_tokens - num_answer_tokens, 10):
+        # Shift the doc stride in intervals of 20 so that we don't create way too many features
+        for left_stride in range(0, num_context_tokens - num_answer_tokens, 20):
             right_stride = num_context_tokens - num_answer_tokens - left_stride
             left_clip = max(0, start_token_position - left_stride)
             right_clip = min(end_token_position + right_stride, len(input_ids))

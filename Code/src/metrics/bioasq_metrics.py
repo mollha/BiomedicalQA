@@ -107,12 +107,12 @@ def factoid_evaluation(predictions, ground_truth):
         # We expect each prediction to be a list of candidate answers,
         # however, the ground truth answer should be a single string.
 
-        # get the corresponding ground truth label
-        truth_value = ground_truth[idx]
+        # get the corresponding ground truth label(s)
+        truth_values = ground_truth[idx]  # get the list of correct answers
 
         match_position = None
         for list_pos, candidate_answer in enumerate(prediction):
-            match = check_match(candidate_answer, truth_value)
+            match = check_match(candidate_answer, truth_values)
 
             if match:
                 correct_in_any_position += 1
