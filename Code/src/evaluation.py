@@ -240,10 +240,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
     :return:
     """
 
-    # For each list question, each participating system will have to return a single list* of entity names, numbers,
-    # or similar short expressions, jointly taken to constitute a single answer (e.g., the most common symptoms of
-    # a disease). The returned list will have to contain no more than 100 entries of no more than 100 characters each.
-
     results_by_question_id = {}
     special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
 
@@ -285,6 +281,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
                 for (s, e) in sub_start_end_positions:  # convert the start and end positions to answers.
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
+
+                    if dataset == "bioasq" and e - s > 100:
+                        continue  # if length is more than 100 and we are evaluating on bioasq, skip this pair
+
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     # make sure we don't end up with special characters in our predicted
@@ -309,8 +309,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
 
-        # For each factoid question in BioASQ, each participating system will have to return a list* of up to 5 entity names
-        # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
+        # For each list question, each participating system will have to return a single list* of entity names, numbers,
+        # or similar short expressions, jointly taken to constitute a single answer (e.g., the most common symptoms of
+        # a disease). The returned list will have to contain no more than 100 entries of no more than
+        # 100 characters each.
         best_predictions = []
         num_best_predictions = 0
 

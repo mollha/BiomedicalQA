@@ -361,10 +361,10 @@ def read_bioasq(paths_to_files: list, testing=False):
     }
 
     combined_metrics = {q: {} for q in dataset.keys()}
-    count = 0  # todo remove later
+    # count = 0  # todo remove later
     for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
-        # todo remove all except summary from here - we only exclude the ones we can't handle for now.
+
         # we don't care about summary questions
         if question_type in ['summary']:
             continue
@@ -380,10 +380,10 @@ def read_bioasq(paths_to_files: list, testing=False):
         combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples]
 
-        if question_type == "factoid":  # only counting factoid
-            count += 1  # todo remove later
-        if count > 5:
-            break  # todo remove later
+        # if question_type == "factoid":  # only counting factoid
+        #     count += 1  # todo remove later
+        # if count > 5:
+        #     break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
