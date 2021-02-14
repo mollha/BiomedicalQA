@@ -55,6 +55,8 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             class_probabilities = torch.softmax(logits, dim=1)
 
             for question_idx, question_id in enumerate(batch.question_ids):
+                # Note: expected answers could be None here if we don't have access to the answer.
+                # We still need to include them in our dictionary, and filter them at the next step.
                 expected_answer = batch.answer_text[question_idx]
                 predicted_label = torch.argmax(class_probabilities[question_idx])
                 if question_idx in results_by_question_id:
@@ -76,16 +78,20 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
         # print('best prediction', best_pred)
         predicted_answer = "yes" if best_pred == 1 else "no"  # convert 1s to yes and 0s to no
         results_by_question_id[q_id]["predictions"] = predicted_answer
-        predictions_list.append(predicted_answer)
-        ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
+
+        # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
+        if results_by_question_id[q_id]["expected_answer"] is not None:  # i.e. we have an answer
+            predictions_list.append(predicted_answer)
+            ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
 
     if dataset == "bioasq":  # Deploy the bioasq metrics on our results.
-        evaluation_metrics = yes_no_evaluation(predictions_list, ground_truth_list)
+        # Evaluation metrics are empty if we didn't have any expected answers.
+        eval_metrics = {} if len(predictions_list) == 0 else yes_no_evaluation(predictions_list, ground_truth_list)
 
         if training:
-            return evaluation_metrics
+            return eval_metrics
         # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
-        return results_by_question_id, evaluation_metrics
+        return results_by_question_id, eval_metrics
     raise Exception("Dataset name provided to evaluate_yesno must be 'bioasq', "
                     "as no other datasets are handled at this time.")
 
