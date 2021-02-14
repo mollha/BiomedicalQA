@@ -227,10 +227,51 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
 
 
 def evaluate_list(list_model, test_dataloader, tokenizer, k, dataset="bioasq"):
+    """
+    Given a pytorch model trained on factoid / list questions, we need to evaluate this model on a given dataset.
+    The evaluation metrics we choose are dependent on our choice of dataset.
+
+    
+    :param list_model:
+    :param test_dataloader:
+    :param tokenizer:
+    :param k:
+    :param dataset:
+    :return:
+    """
 
     # For each list question, each participating system will have to return a single list* of entity names, numbers,
     # or similar short expressions, jointly taken to constitute a single answer (e.g., the most common symptoms of
     # a disease). The returned list will have to contain no more than 100 entries of no more than 100 characters each.
+
+    results_by_question_id = {}
+    special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
+
+    with torch.no_grad():
+        for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Evaluation Step")):
+            inputs = {
+                "input_ids": batch.input_ids,
+                "attention_mask": batch.attention_mask,
+                "token_type_ids": batch.token_type_ids,
+            }
+
+            # model outputs are always tuples in transformers
+            outputs = list_model(**inputs)
+            try:  # indexing outputs on CPU
+                start_logits, end_logits = outputs.start_logits, outputs.end_logits
+            except AttributeError:  # indexing outputs on CUDA
+                start_logits, end_logits = outputs[0], outputs[1]
+
+            # Each list in the tensor relates to a single question - and these are likelihood values (probabilities)
+            # e.g. start_logits = tensor([[0.0943, 0.1020, 0.1816, ..., 0.0474, 0.1435, 0.0335], ...],)
+
+            # Convert the batches of start and end logits into answer span position predictions
+            # This will give us k predictions per feature in the batch
+            answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
+            answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
+
+
+
 
     if dataset == "bioasq":
         pass
