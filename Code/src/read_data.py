@@ -30,6 +30,7 @@ def update_dataset_metrics(total_metrics, additional_metrics):
 class BinaryExample:
     def __init__(self, question_id, question, short_context, answer):
         self._question_id = question_id
+        self._question_type = "yesno"
         self._question = question
         self._short_context = short_context
         self._answer = answer
