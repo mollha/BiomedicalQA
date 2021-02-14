@@ -126,7 +126,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                 if len(metric_results) > 0:
                     sys.stderr.write("\nGathering metrics for {} questions".format(qt))
                     # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
-                    sys.stderr.write("\nCurrent evaluation metrics are {}".format(metric_results))
+                    sys.stderr.write("\n\nCurrent evaluation metrics are {}\n".format(metric_results))
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
