@@ -337,6 +337,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             all_attention_mask = [1] + question_attention_mask + [1] + clipped_attention_mask + [1]
             all_token_type_ids = [0] + question_token_type_ids + [0] + clipped_token_type_ids + [1]
 
+            number_of_prepended_characters = 1 + len(question_input_ids)
+
             # pad the end with zeros if we have shorter length
             all_input_ids.extend([tokenizer.pad_token_id] * (max_length - len(all_input_ids)))  # add the padding token
             all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
@@ -344,8 +346,9 @@ def convert_examples_to_features(examples, tokenizer, max_length):
 
             # Now we're ready to create a feature
             feature = FactoidFeature(example._question_id, all_input_ids,
-                                     all_attention_mask, all_token_type_ids, start_token_position,
-                                     end_token_position, example._answer)
+                                     all_attention_mask, all_token_type_ids,
+                                     start_token_position + number_of_prepended_characters,
+                                     end_token_position + number_of_prepended_characters, example._answer)
             feature_list.append(feature)
 
     print('\n------- COLLATING FEATURE METRICS -------')
@@ -393,8 +396,10 @@ class BatchFeatures:
         else:
             self.labels = torch.tensor(transposed_data[5], device=device)
 
+
 def collate_wrapper(batch):
     return BatchFeatures(batch)
+
 
 class QADataset(Dataset):
     def __init__(self, examples):
