@@ -14,7 +14,7 @@ config = {
     'losses': [],
     'avg_loss': [0, 0],
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 20,  # can override the val in config
+    "max_epochs": 5,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
