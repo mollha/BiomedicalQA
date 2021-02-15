@@ -357,7 +357,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
     parser.add_argument(
         "--f-checkpoint",
-        default="small_yesno_26_11229_1_374",  # we can no longer use recent here - got to get specific :(
+        default="small_factoid_26_11229_1_380",  # we can no longer use recent here - got to get specific :(
         type=str,
         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
     )
@@ -377,11 +377,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     split_name = args.f_checkpoint.split("_")
-    model_size, question_type = split_name[0], split_name[1]
+    model_size, model_question_type = split_name[0], split_name[1]
+    eval_question_type = "factoid"
+
+    if eval_question_type in ["factoid", "list"] and model_question_type not in ["factoid", "list"]:
+        raise Exception("Eval question type is '{}', therefore model question type must be factoid or list."
+                        .format(eval_question_type))
+    elif eval_question_type == "yesno" and model_question_type != "yesno":
+        raise Exception("Eval question type is yesno, therefore model question type must be yesno.")
 
     sys.stderr.write("--- ARGUMENTS ---")
     sys.stderr.write("\nEvaluating checkpoint: {}\nQuestion type: {}\nModel Size: {}\nK: {}"
-                     .format(args.p_checkpoint, question_type, model_size, args.k))
+                     .format(args.f_checkpoint, eval_question_type, model_size, args.k))
 
     # ------- Check the validity of the arguments passed via command line -------
     try:  # check that the value of k is actually a number
@@ -395,9 +402,9 @@ if __name__ == "__main__":
     config = get_model_config(model_size, pretrain=False)
     config["num_warmup_steps"] = 100  # dummy value to avoid an error when building fine-tuned checkpoint.
 
-    # model_specific_pretrain_config = get_model_config(config['size'], pretrain=False)
-    # model_specific_finetune_config = get_model_config(config['size'], pretrain=False)
-    # config = {**model_specific_config, **config}
+    # ---- Set torch backend and set seed ----
+    torch.backends.cudnn.benchmark = torch.cuda.is_available()
+    set_seed(0)  # set seed for reproducibility
 
     # -- Find path to checkpoint directory - create the directory if it doesn't exist
     base_path = Path(__file__).parent
@@ -417,48 +424,47 @@ if __name__ == "__main__":
     print("Device: {}\n".format(config["device"].upper()))
 
     # get basic model building blocks
-    generator, discriminator, electra_tokenizer, discriminator_config = build_electra_model(model_size, get_config=True)
-
-    # ---- Load the data and prepare it in squad format ----
-    try:
-        dataset_file_name = datasets[selected_dataset]["test"]
-    except KeyError:
-        raise KeyError("The dataset '{}' in {} does not contain a 'test' key.".format(selected_dataset, datasets))
-
-    try:
-        dataset_function = dataset_to_fc[selected_dataset]
-    except KeyError:
-        raise KeyError("The dataset '{}' is not contained in the dataset_to_fc map.".format(selected_dataset))
-
-    all_datasets_dir = (base_checkpoint_dir / '../datasets').resolve()
-    selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
-    dataset_file_path = (selected_dataset_dir / dataset_file_name).resolve()
-
-    sys.stderr.write("\nReading raw dataset '{}' into SQuAD examples".format(dataset_file_name))
-    read_raw_dataset, metrics = dataset_function(dataset_file_path, testing=True)  # returns a dictionary of question type to list
-
-    print(read_raw_dataset)
-
-    raw_dataset = read_raw_dataset[question_type]
-
-    print("Converting raw text to features.")
-    features = convert_test_samples_to_features(raw_dataset, electra_tokenizer, config["max_length"])
-
-    print("Created {} features of length {}.".format(len(features), config["max_length"]))
-    test_dataset = QADataset(features)  # todo change this
-
-    # Random Sampler not used during evaluation - we need to maintain order.
-    data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_testing_wrapper)
-    electra_for_qa, _, _, electra_tokenizer,\
+    electra_for_qa, optimizer, scheduler, electra_tokenizer, \
     config = build_finetuned_from_checkpoint(model_size, config["device"], pretrain_checkpoint_dir,
-                                             finetune_checkpoint_dir, checkpoint_name, question_type, config)
+                                             finetune_checkpoint_dir, checkpoint_name, model_question_type, config)
 
-    # ---- Set torch backend and set seed ----
-    torch.backends.cudnn.benchmark = torch.cuda.is_available()
-    set_seed(config["seed"])  # set seed for reproducibility
+    # -- Load the data and prepare it in squad format
+    dataset_function = dataset_to_fc[selected_dataset]
 
-    # ------ START THE EVALUATION PROCESS ------
-    if question_type == "factoid":
-        results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, k)
-    elif question_type == "yesno":
-        results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
+    # ---- Find the path(s) to the dataset file(s) ----
+    dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
+    test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in
+                               datasets[selected_dataset]["test"]]
+
+    sys.stderr.write("\nEvaluation files are '{}'".format(datasets[selected_dataset]["test"]))
+
+    # ----- PREPARE THE EVALUATION DATASET -----
+    sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))
+
+    # Once populated, the test_data_loader_dict will contain {"dataset_path": {"factoid": dataloader, "list": datalo...}
+    test_data_loader_dict = {}
+
+    for test_dataset_file_path in test_dataset_file_paths:  # iterate over each path separately.
+        test_data_loader_dict[test_dataset_file_path] = {}  # initialise empty dict for this dataset path
+        raw_test_dataset = dataset_function([test_dataset_file_path], testing=True)
+
+        raw_test_dataset_by_question = raw_test_dataset[eval_question_type]  # how do we also get list and factoid together?
+        test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer,
+                                                     config["max_length"])
+
+        print("Created {} test features of length {} from {} questions.".format(len(test_features),
+                                                                                config["max_length"], eval_question_type))
+        test_dataset = QADataset(test_features)
+
+        # Create a dataloader for each of the test datasets.
+        test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
+
+        # ------ START THE EVALUATION PROCESS ------
+        if eval_question_type == "factoid":
+            results_by_question_id = evaluate_factoid(electra_for_qa, test_data_loader, electra_tokenizer, k)
+        elif eval_question_type == "yesno":
+            results_by_question_id = evaluate_yesno(electra_for_qa, test_data_loader)
+
+
+
+
