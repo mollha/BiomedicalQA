@@ -53,14 +53,14 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
             class_probabilities = torch.softmax(logits, dim=1)
-            print('classes', class_probabilities)
+            # print('classes', class_probabilities)
 
             for question_idx, question_id in enumerate(batch.question_ids):
                 # Note: expected answers could be None here if we don't have access to the answer.
                 # We still need to include them in our dictionary, and filter them at the next step.
                 expected_answer = batch.answer_text[question_idx]
                 predicted_label = torch.argmax(class_probabilities[question_idx])
-                print('predicted label', predicted_label)
+                # print('predicted label', predicted_label)
                 if question_idx in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(predicted_label)
                 else:
@@ -73,10 +73,10 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
     for q_id in results_by_question_id:
         # results_by_question_id[q_id]["predictions"] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
         pred_tensor = torch.Tensor(results_by_question_id[q_id]["predictions"])
-        print('pred tensor', pred_tensor)
+        # print('pred tensor', pred_tensor)
 
         best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
-        print('best pred', best_pred)
+        # print('best pred', best_pred)
         # todo best prediction always seems to be 1 / yes
         # batch labels are varied
         # print('best prediction', best_pred)

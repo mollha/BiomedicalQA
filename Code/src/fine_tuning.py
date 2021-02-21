@@ -122,7 +122,12 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
             outputs = qa_model(**inputs)  # put inputs through the model and get outputs
             loss = outputs[0]  # Collect loss from outputs
+            print('loss', loss)
+
+
             loss.backward()  # back-propagate
+
+
 
             # update the average loss statistics
             settings["avg_loss"][0] += float(loss.item())
