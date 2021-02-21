@@ -438,6 +438,9 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 if class_weights is not None:
                     loss_fct = CrossEntropyLoss(weight=class_weights)
                     print("used the weighted loss fc")
+                print('logits', logits.view(-1, self.num_labels))
+                print('labels', labels.view(-1))
+
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
