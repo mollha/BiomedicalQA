@@ -71,6 +71,8 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
     for q_id in results_by_question_id:
         # results_by_question_id[q_id]["predictions"] is a list of scalar tensors e.g. [tensor(1), tensor(2)]
         pred_tensor = torch.Tensor(results_by_question_id[q_id]["predictions"])
+        print('pred tensor', pred_tensor)
+
         best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
         print('best pred', best_pred)
         # todo best prediction always seems to be 1 / yes
