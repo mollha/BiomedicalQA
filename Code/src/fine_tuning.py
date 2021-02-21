@@ -6,7 +6,7 @@ from utils import *
 from evaluation import evaluate_factoid, evaluate_yesno, evaluate_list
 from data_processing import *
 from build_checkpoints import build_finetuned_from_checkpoint
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
@@ -177,10 +177,10 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid'],
+    parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid'],
                         type=str,
                         help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
-    parser.add_argument("--dataset", default="squad", choices=['squad', 'bioasq'], type=str,
+    parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
     parser.add_argument("--k", default="5", type=int,
                         help="K-best predictions are selected for factoid and list questions (between 1 and 100)")
@@ -272,10 +272,17 @@ if __name__ == "__main__":
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
 
-    # Random Sampler used during training.
-    # We create a single data_loader for training.
-    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
-                                   collate_fn=collate_wrapper)
+    if "yesno" in config["question_type"]:  # handling yesno questions with weighted random sampler
+        # sampler = WeightedRandomSampler(, 5, num_samples=1, replacement=True)
+        sampler = RandomSampler(train_dataset)
+    else:
+        sampler = RandomSampler(train_dataset)
+
+        # Random Sampler used during training.
+        # We create a single data_loader for training.
+        train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset),
+                                       batch_size=config["batch_size"],
+                                       collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))

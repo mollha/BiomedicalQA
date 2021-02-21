@@ -70,7 +70,7 @@ class AutoModelForYesno(PreTrainedModel):
     def __init__(self, config, model_type):
         super().__init__(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.regressor = nn.Linear(config.hidden_size, 1) # self.classifier
+        self.regressor = nn.Linear(config.hidden_size, 1)  # self.classifier
         self.sigmoid = nn.Sigmoid()
         self.init_weights()
 
