@@ -90,6 +90,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
     all_dataset_metrics = {key: {qt: [] for qt in eval_dataloader_dict[key]} for key in eval_dataloader_dict.keys()}
 
     for epoch_number in train_iterator:
+        print(qa_model.weights)
         step_iterator = tqdm(train_dataloader, desc="Step")  # get a tqdm iterator of the dataloader
         settings["current_epoch"] = epoch_number  # update the epoch number with the current epoch
 
