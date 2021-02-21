@@ -45,6 +45,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
     set_seed(settings["seed"])  # Added here for reproducibility
     train_iterator = trange(settings["current_epoch"], int(settings["max_epochs"]), desc="Epoch")  # Resume from epoch
     steps_trained = settings["steps_trained"]  # resume training
+    all_dataset_metrics = {key: {qt: [] for qt in eval_dataloader_dict[key]} for key in eval_dataloader_dict.keys()}
 
     for epoch_number in train_iterator:
         step_iterator = tqdm(train_dataloader, desc="Step")  # get a tqdm iterator of the dataloader
@@ -127,6 +128,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                     sys.stderr.write("\nGathering metrics for {} questions".format(qt))
                     # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
                     sys.stderr.write("\n\nCurrent evaluation metrics are {}\n".format(metric_results))
+                    all_dataset_metrics[eval_dataset_name][qt].append(metric_results)
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats

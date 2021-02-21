@@ -59,11 +59,7 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
     steps_trained = settings["steps_trained"]
 
     for epoch_number in train_iterator:
-        # raise Exception("why won't you work")
-
         iterable_dataset = iter(dataset)
-        #raise Exception("why won't you work")
-
         sys.stderr.write("\n{} steps trained, resuming from this step.".format(steps_trained))
         iterable_dataset.resume_from_step(steps_trained)        # this line is causing an issue
 
