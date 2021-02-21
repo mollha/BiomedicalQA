@@ -26,21 +26,20 @@ config = {
 }
 
 
-def condense_statistics(metrics):
-    for dataset_name in metrics:  # iterate over top-level dset names
-        for question_type in metrics[dataset_name]:
-            metric_names = {key: [] for key in metrics[dataset_name][question_type][0]}
-
-            for metric_dict in metrics[dataset_name][question_type]:  # condense this list of dicts into one avg dict
-                for metric_name in metric_names:
-                    metric_names[metric_name].append(metric_dict[metric_name])
-
-            for metric_name in metric_names:
-                values = metric_names[metric_name]
-                metric_names[metric_name] = 0 if len(values) == 0 else sum(values) / len(values)
-            print("Avg metrics for question type '{}' and dataset '{}' are {}.".format(question_type, dataset_name,
-                                                                                       metric_names))
-
+# def condense_statistics(metrics):
+#     for dataset_name in metrics:  # iterate over top-level dset names
+#         for question_type in metrics[dataset_name]:
+#             metric_names = {key: [] for key in metrics[dataset_name][question_type][0]}
+#
+#             for metric_dict in metrics[dataset_name][question_type]:  # condense this list of dicts into one avg dict
+#                 for metric_name in metric_names:
+#                     metric_names[metric_name].append(metric_dict[metric_name])
+#
+#             for metric_name in metric_names:
+#                 values = metric_names[metric_name]
+#                 metric_names[metric_name] = 0 if len(values) == 0 else sum(values) / len(values)
+#             print("Avg metrics for question type '{}' and dataset '{}' are {}.".format(question_type, dataset_name,
+#                                                                                        metric_names))
 def evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics):
 
     for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
@@ -160,7 +159,6 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
     all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
     print("\nAll dataset metrics", all_dataset_metrics)
-    condense_statistics(all_dataset_metrics)
 
 
 
@@ -177,32 +175,21 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid'],
-                        type=str,
-                        help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
-    parser.add_argument("--dataset", default="squad", choices=['squad', 'bioasq'], type=str,
+    parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
-    parser.add_argument("--k", default="5", type=int,
-                        help="K-best predictions are selected for factoid and list questions (between 1 and 100)")
+
 
     args = parser.parse_args()
     config['size'] = args.size
-    config["question_type"] = args.question_type.split(',')
+    config["question_type"] = ["yesno"]
     args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
 
     sys.stderr.write("\n--- ARGUMENTS ---")
     sys.stderr.write(
         "\nPre-training checkpoint: {}\nFine-tuning checkpoint: {}\nModel Size: {}\nQuestion Type: {}\nDataset: {}\nK: {}"
-        .format(args.p_checkpoint, args.f_checkpoint, args.size, args.question_type, args.dataset, args.k))
+        .format(args.p_checkpoint, args.f_checkpoint, args.size, "yesno", args.dataset, args.k))
 
     # ------- Check the validity of the arguments passed via command line -------
-    try:  # check that the value of k is actually a number
-        k = int(args.k)
-        if k < 1 or k > 100:  # check that k is at least 1 and at most 100
-            raise ValueError
-    except ValueError:
-        raise Exception("k must be an integer between 1 and 100. Got {}".format(args.k))
-
     if args.f_checkpoint != "" and args.f_checkpoint != "recent":
         if args.size not in args.f_checkpoint:
             raise Exception(
@@ -259,7 +246,7 @@ if __name__ == "__main__":
 
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
-    raw_train_dataset = dataset_function(train_dataset_file_paths, question_types=config["question_type"])
+    raw_train_dataset = dataset_function(train_dataset_file_paths)
 
     # combine the features from these datasets.
     train_features = []
@@ -285,18 +272,17 @@ if __name__ == "__main__":
 
     for test_dataset_file_path in test_dataset_file_paths:  # iterate over each path separately.
         test_data_loader_dict[test_dataset_file_path] = {}  # initialise empty dict for this dataset path
-        raw_test_dataset = dataset_function([test_dataset_file_path], testing=True, question_types=config["question_type"])
+        raw_test_dataset = dataset_function([test_dataset_file_path], testing=True, question_type=["yesno"])
+        raw_test_dataset_by_question = raw_test_dataset["yesno"]
 
-        for qt in config["question_type"]:
-            raw_test_dataset_by_question = raw_test_dataset[qt]
-            test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
+        test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
 
-            print("Created {} test features of length {} from {} questions.".format(len(test_features), config["max_length"], qt))
-            test_dataset = QADataset(test_features)
+        print("Created {} test features of length {} from {} questions.".format(len(test_features), config["max_length"], "yesno"))
+        test_dataset = QADataset(test_features)
 
-            # Create a dataloader for each of the test datasets.
-            test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
-            test_data_loader_dict[test_dataset_file_path][qt] = test_data_loader
+        # Create a dataloader for each of the test datasets.
+        test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
+        test_data_loader_dict[test_dataset_file_path]["yesno"] = test_data_loader
 
     config["num_warmup_steps"] = len(train_data_loader) // config["max_epochs"]
     electra_for_qa, optimizer, scheduler, electra_tokenizer, \
