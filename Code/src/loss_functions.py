@@ -120,8 +120,9 @@ class ELECTRALoss:
         self.combined_losses.append(avg_combined_loss[0] / avg_combined_loss[1])
         self.discriminator_accuracy.append((true_positives + true_negatives) /
                                            (true_positives + false_positives + true_negatives + false_negatives))
-        self.discriminator_precision.append(true_positives / (true_positives + false_positives))
-        self.discriminator_recall.append(true_positives / (true_positives + false_negatives))
+
+        self.discriminator_precision.append(0 if (true_positives + false_positives) == 0 else true_positives / (true_positives + false_positives))
+        self.discriminator_recall.append(0 if (true_positives + false_negatives) == 0 else true_positives / (true_positives + false_negatives))
 
         # reset epoch-level stats
         self.mid_epoch_stats = {

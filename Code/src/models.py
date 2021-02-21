@@ -433,7 +433,8 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                     class_weights = self.class_weights
                 except AttributeError:
                     pass
-                if not class_weights is None:
+
+                if class_weights is not None:
                     loss_fct = CrossEntropyLoss(weight=class_weights)
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
