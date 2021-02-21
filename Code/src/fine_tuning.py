@@ -279,14 +279,14 @@ if __name__ == "__main__":
     train_dataset = QADataset(train_features)
 
     if "yesno" in config["question_type"]:  # handling yesno questions with weighted random sampler
-        sampler = WeightedRandomSampler([4., 1], config["batch_size"])
-        # sampler = RandomSampler(train_dataset)
+        # sampler = WeightedRandomSampler([4., 1], config["batch_size"])
+        sampler = RandomSampler(train_dataset)
     else:
         sampler = RandomSampler(train_dataset)
 
     # Random Sampler used during training.
     # We create a single data_loader for training.
-    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset),
+    train_data_loader = DataLoader(train_dataset, sampler=sampler,
                                    batch_size=config["batch_size"],
                                    collate_fn=collate_wrapper)
 
