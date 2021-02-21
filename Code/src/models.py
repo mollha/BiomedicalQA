@@ -2,7 +2,7 @@ import torch
 import os
 from pathlib import Path
 from torch import nn
-from torch.nn import MSELoss, CrossEntropyLoss
+from torch.nn import MSELoss, CrossEntropyLoss, BCELoss
 from transformers import (ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM,
                           ElectraForPreTraining, ElectraForSequenceClassification)
 from transformers.modeling_outputs import SequenceClassifierOutput
@@ -428,7 +428,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 loss_fct = MSELoss()
                 loss = loss_fct(logits.view(-1), labels.view(-1))
             else:
-                loss_fct = CrossEntropyLoss()
+                loss_fct = BCELoss()
                 class_weights = None
                 try:
                     class_weights = self.class_weights
@@ -437,7 +437,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
 
                 if class_weights is not None:
                     print(self.num_labels)
-                    loss_fct = CrossEntropyLoss(weight=class_weights)
+                    loss_fct = BCELoss(weight=class_weights)
                     print("used the weighted loss fc")
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
