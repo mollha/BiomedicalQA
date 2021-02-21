@@ -86,18 +86,19 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     generator, discriminator, electra_tokenizer, \
     discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
 
-    # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
-    layerwise_learning_rates = get_layer_lrs(discriminator.named_parameters(), model_settings["lr"], model_settings["layerwise_lr_decay"], discriminator_config.num_hidden_layers)
-    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
-
-    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
-    for n, p in discriminator.named_parameters():
-        wd = model_settings["decay"] if not any(nd in n for nd in no_decay) else 0
-        lr = layerwise_learning_rates[n]
-        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
+    # # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
+    # layerwise_learning_rates = get_layer_lrs(discriminator.named_parameters(), model_settings["lr"], model_settings["layerwise_lr_decay"], discriminator_config.num_hidden_layers)
+    # no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
+    #
+    # layerwise_params = []  # todo check if lr should be dependent on non-zero wd
+    # for n, p in discriminator.named_parameters():
+    #     wd = model_settings["decay"] if not any(nd in n for nd in no_decay) else 0
+    #     lr = layerwise_learning_rates[n]
+    #     layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
 
     # Create the optimizer and scheduler
-    optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
+    # optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
+    optimizer = AdamW(discriminator.named_parameters(), eps=model_settings["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=(config["num_warmup_steps"]) * model_settings[
                                                     "warmup_fraction"],
