@@ -133,6 +133,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
     settings["avg_loss"] = [0, 0]  # reset stats
+
+    print("all dataset metrics", all_dataset_metrics)
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
