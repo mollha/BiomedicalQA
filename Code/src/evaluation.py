@@ -35,7 +35,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
     results_by_question_id = {}  # initialise an empty dictionary for storing results by question id
 
     # when .eval() is set, all dropout layers are removed.
-    # yes_no_model.eval()  # switch to evaluation mode
+    yes_no_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
             inputs = {
@@ -110,7 +110,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
     results_by_question_id = {}
     special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
 
-    # factoid_model.eval()  # switch to evaluation mode
+    factoid_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
             # question_ids = batch.question_ids
@@ -231,7 +231,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
     Given a pytorch model trained on factoid / list questions, we need to evaluate this model on a given dataset.
     The evaluation metrics we choose are dependent on our choice of dataset.
 
-
     :param list_model: Pytorch model capable of answering factoid questions
     :param test_dataloader: Dataloader containing evaluation data
     :param tokenizer: Tokenizer used to convert strings into tokens
@@ -239,10 +238,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
     :param dataset:
     :return:
     """
-
     results_by_question_id = {}
     special_tokens_ids = {tokenizer.unk_token_id, tokenizer.sep_token_id, tokenizer.pad_token_id}
 
+    list_model.eval()
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Evaluation Step")):
             inputs = {
@@ -464,6 +463,8 @@ if __name__ == "__main__":
             results_by_question_id = evaluate_factoid(electra_for_qa, test_data_loader, electra_tokenizer, k)
         elif eval_question_type == "yesno":
             results_by_question_id = evaluate_yesno(electra_for_qa, test_data_loader)
+
+        print('Results', results_by_question_id)
 
 
 
