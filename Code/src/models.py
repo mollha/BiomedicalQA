@@ -439,7 +439,9 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 if weights is not None:
                     loss_fct = BCELoss(weight=weights)
                     print("used the weighted loss fc")
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+                loss = loss_fct(logits.view(-1), labels.view(-1))
+
+                # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
             output = (logits,) + discriminator_hidden_states[1:]
