@@ -50,7 +50,8 @@ class BinaryFeature:
             self._attention_mask,
             self._token_type_ids,
             self._answer_text,
-            self._label
+            self._label,
+            self._weight
         )
 
 
@@ -397,6 +398,8 @@ class BatchFeatures:
             self.answer_end = torch.tensor(transposed_data[6], device=device)
         else:
             self.labels = torch.tensor(transposed_data[5], device=device)
+            self.weights = torch.tensor(transposed_data[6], device=device)
+
 
 
 def collate_wrapper(batch):
