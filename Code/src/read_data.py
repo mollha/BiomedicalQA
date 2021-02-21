@@ -336,8 +336,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         snippets = data["snippets"]
         answer = data["exact_answer"].lower()
 
-        if answer == "yes": # todo testing if model is dumb
-            return []
 
         metrics = {
             "num_examples": len(snippets),
@@ -370,6 +368,9 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
 
         # we don't care about summary questions
         if question_type in ['summary'] or question_type in set(fc_map.keys()).difference(set(question_types)):
+            continue
+
+        if question_type == "yesno" and data_point["exact_answer"] == "yes":  # todo testing if model is dumb
             continue
 
         try:
