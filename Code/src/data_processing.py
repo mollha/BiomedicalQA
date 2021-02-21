@@ -51,7 +51,8 @@ class BinaryFeature:
             self._token_type_ids,
             self._answer_text,
             self._label,
-            self._weight
+            self._weight,
+            "dummy"
         )
 
 
