@@ -26,6 +26,48 @@ config = {
 }
 
 
+def condense_statistics(metrics):
+    for dataset_name in metrics:  # iterate over top-level dset names
+        for question_type in metrics[dataset_name]:
+            metric_names = {key: [] for key in metrics[dataset_name][question_type][0]}
+
+            for metric_dict in metrics[dataset_name][question_type]:  # condense this list of dicts into one avg dict
+                for metric_name in metric_names:
+                    metric_names[metric_name].append(metric_dict[metric_name])
+
+            for metric_name in metric_names:
+                values = metric_names[metric_name]
+                metric_names[metric_name] = 0 if len(values) == 0 else sum(values) / len(values)
+            print("Avg metrics for question type '{}' and dataset '{}' are {}.".format(question_type, dataset_name,
+                                                                                       metric_names))
+
+def evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics):
+
+    for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
+        loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
+        sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
+
+        for qt in loader_all_question_types:
+            eval_dataloader = loader_all_question_types[qt]
+
+            if "factoid" in qt:
+                metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
+            elif "list" in qt:
+                metric_results = {}  # todo do nothing for now - need to add list qs
+            elif "yesno" in qt:
+                metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
+            else:
+                raise Exception("Question type in config must be factoid, list or yesno.")
+
+            if len(metric_results) > 0:
+                sys.stderr.write("\nGathering metrics for {} questions".format(qt))
+                # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
+                sys.stderr.write("\n\nCurrent evaluation metrics are {}\n".format(metric_results))
+                all_dataset_metrics[eval_dataset_name][qt].append(metric_results)
+
+    return all_dataset_metrics
+
+
 def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
 
@@ -108,35 +150,19 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
 
-        for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
-            loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
-            sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
-
-            for qt in loader_all_question_types:
-                eval_dataloader = loader_all_question_types[qt]
-
-                if "factoid" in qt:
-                    metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
-                elif "list" in qt:
-                    metric_results = {}  # todo do nothing for now - need to add list qs
-                elif "yesno" in qt:
-                    metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
-                else:
-                    raise Exception("Question type in config must be factoid, list or yesno.")
-
-                if len(metric_results) > 0:
-                    sys.stderr.write("\nGathering metrics for {} questions".format(qt))
-                    # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
-                    sys.stderr.write("\n\nCurrent evaluation metrics are {}\n".format(metric_results))
-                    all_dataset_metrics[eval_dataset_name][qt].append(metric_results)
+        all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
     settings["avg_loss"] = [0, 0]  # reset stats
 
-    print("all dataset metrics", all_dataset_metrics)
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
+    all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
+    print("\nAll dataset metrics", all_dataset_metrics)
+    condense_statistics(all_dataset_metrics)
+
+
 
 
 if __name__ == "__main__":
@@ -259,11 +285,10 @@ if __name__ == "__main__":
 
     for test_dataset_file_path in test_dataset_file_paths:  # iterate over each path separately.
         test_data_loader_dict[test_dataset_file_path] = {}  # initialise empty dict for this dataset path
-
         raw_test_dataset = dataset_function([test_dataset_file_path], testing=True)
 
         for qt in config["question_type"]:
-            raw_test_dataset_by_question = raw_test_dataset[qt]  # how do we also get list and factoid together?
+            raw_test_dataset_by_question = raw_test_dataset[qt]
             test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer, config["max_length"])
 
             print("Created {} test features of length {} from {} questions.".format(len(test_features), config["max_length"], qt))

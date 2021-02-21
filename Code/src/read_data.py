@@ -202,7 +202,7 @@ def read_squad(paths_to_files: list, testing=False):
     return {"factoid": dataset}
 
 
-def read_bioasq(paths_to_files: list, testing=False):
+def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
     """
     Read the bioasq data into three categories of contexts, questions and answers.
     BioASQ contexts are different than SQuAD, as they are a combination of articles and snippets.
@@ -361,13 +361,13 @@ def read_bioasq(paths_to_files: list, testing=False):
         "list": process_factoid_or_list_question,
     }
 
+
     combined_metrics = {q: {} for q in dataset.keys()}
-    # count = 0  # todo remove later
     for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
 
         # we don't care about summary questions
-        if question_type in ['summary']:
+        if question_type in ['summary'] or question_type in set(fc_map.keys()).difference(set(question_types)):
             continue
 
         try:
@@ -381,10 +381,6 @@ def read_bioasq(paths_to_files: list, testing=False):
         combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples]
 
-        # if question_type == "factoid":  # only counting factoid
-        #     count += 1  # todo remove later
-        # if count > 5:
-        #     break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
