@@ -418,6 +418,8 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
             return_dict,
         )
 
+        print('weights', self.electra.weights)
+
         sequence_output = discriminator_hidden_states[0]
         logits = self.classifier(sequence_output)
 
