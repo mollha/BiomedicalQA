@@ -278,11 +278,11 @@ if __name__ == "__main__":
     else:
         sampler = RandomSampler(train_dataset)
 
-        # Random Sampler used during training.
-        # We create a single data_loader for training.
-        train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset),
-                                       batch_size=config["batch_size"],
-                                       collate_fn=collate_wrapper)
+    # Random Sampler used during training.
+    # We create a single data_loader for training.
+    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset),
+                                   batch_size=config["batch_size"],
+                                   collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))
