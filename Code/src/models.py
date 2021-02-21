@@ -382,8 +382,8 @@ class ELECTRAModel(nn.Module):
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.class_weights = torch.tensor([1., 1.], device="cuda" if torch.cuda.is_available() else "cpu")
-        print('Class Weights', self.class_weights)
+        # self.class_weights = ([1., 1.], device="cuda" if torch.cuda.is_available() else "cpu")
+        # print('Class Weights', self.class_weights)
 
     def forward(
             self,
@@ -397,6 +397,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
             output_attentions=None,
             output_hidden_states=None,
             return_dict=None,
+            weights=None,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -429,15 +430,14 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 loss = loss_fct(logits.view(-1), labels.view(-1))
             else:
                 loss_fct = BCELoss()
-                class_weights = None
-                try:
-                    class_weights = self.class_weights
-                except AttributeError:
-                    pass
+                # class_weights = None
+                # try:
+                #     class_weights = self.class_weights
+                # except AttributeError:
+                #     pass
 
-                if class_weights is not None:
-                    print(self.num_labels)
-                    loss_fct = BCELoss(weight=class_weights)
+                if weights is not None:
+                    loss_fct = BCELoss(weight=weights)
                     print("used the weighted loss fc")
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
