@@ -101,7 +101,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     scheduler = get_linear_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=(config["num_warmup_steps"]) * model_settings[
                                                     "warmup_fraction"],
-                                                num_training_steps=-1)  # todo check whether num_training_steps should be -1
+                                                num_training_steps=config["num_warmup_steps"])  # todo check whether num_training_steps should be -1
 
     #   -------- DETERMINE WHETHER TRAINING FROM A FINE-TUNED CHECKPOINT OR FROM PRETRAINED CHECKPOINT --------
     valid_finetune_checkpoint, path_to_checkpoint, building_from_pretrained = False, None, True
