@@ -370,8 +370,8 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         if question_type in ['summary'] or question_type in set(fc_map.keys()).difference(set(question_types)):
             continue
 
-        # if question_type == "yesno" and data_point["exact_answer"] == "yes":  # todo testing if model is dumb
-        #     continue
+        if question_type == "yesno" and data_point["exact_answer"] == "yes":  # todo testing if model is dumb
+            continue
 
         try:
             fc = fc_map[question_type]
