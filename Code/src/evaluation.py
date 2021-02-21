@@ -59,6 +59,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
                 # We still need to include them in our dictionary, and filter them at the next step.
                 expected_answer = batch.answer_text[question_idx]
                 predicted_label = torch.argmax(class_probabilities[question_idx])
+                print('predicted label', predicted_label)
                 if question_idx in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(predicted_label)
                 else:
