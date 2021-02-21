@@ -116,7 +116,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                     "token_type_ids": batch.token_type_ids,
                     "labels": batch.labels,
                 }
-                # print('batch labels', batch.labels)
+
+                print('batch labels', batch.labels)
             else:
                 raise Exception("Question type list must be contain factoid, list or yesno.")
 
