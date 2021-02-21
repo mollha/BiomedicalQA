@@ -383,6 +383,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.class_weights = torch.tensor([1., 0.2], device="cuda" if torch.cuda.is_available() else "cpu")
+        print('Class Weights', self.class_weights)
 
     def forward(
             self,
