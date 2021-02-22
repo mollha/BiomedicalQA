@@ -100,8 +100,9 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     # optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
     optimizer = AdamW(discriminator.parameters(), eps=model_settings["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=(config["num_warmup_steps"]) * model_settings[
-                                                    "warmup_fraction"],
+                                                num_warmup_steps=0,
+                                                # num_warmup_steps=(config["num_warmup_steps"]) * model_settings[
+                                                #     "warmup_fraction"],
                                                 num_training_steps=config["num_warmup_steps"])  # todo check whether num_training_steps should be -1
 
     #   -------- DETERMINE WHETHER TRAINING FROM A FINE-TUNED CHECKPOINT OR FROM PRETRAINED CHECKPOINT --------
