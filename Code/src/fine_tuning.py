@@ -34,8 +34,6 @@ config = {
 # Tried non-weighted / normal implementation of the model
 
 
-
-
 def condense_statistics(metrics):
     for dataset_name in metrics:  # iterate over top-level dset names
         for question_type in metrics[dataset_name]:
@@ -136,6 +134,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
             loss = outputs[0]  # Collect loss from outputs
             # print('loss', loss)
 
+            # todo debug backprop step and check weights are being updated
+            # re-run with a really high learning rate - randomness may change the results
             loss.backward()  # back-propagate
 
             # update the average loss statistics
@@ -165,7 +165,11 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                          .format(settings["steps_trained"], settings["global_step"]))
 
         all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
-        print('params', list(qa_model.named_parameters()))
+
+        parameter_debug_name = 'electra.encoder.layer.11.output.LayerNorm.weight' # todo remove when finished with this
+        for n, p in qa_model.named_parameters():
+            if n == parameter_debug_name:
+                print(parameter_debug_name, ":", list(qa_model.named_parameters()))
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
