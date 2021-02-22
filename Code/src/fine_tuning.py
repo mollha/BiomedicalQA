@@ -118,13 +118,13 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                     "weights": batch.weights
                 }
 
-                print('batch labels', batch.labels)
+                # print('batch labels', batch.labels)
             else:
                 raise Exception("Question type list must be contain factoid, list or yesno.")
 
             outputs = qa_model(**inputs)  # put inputs through the model and get outputs
             loss = outputs[0]  # Collect loss from outputs
-            print('loss', loss)
+            # print('loss', loss)
 
             loss.backward()  # back-propagate
 
