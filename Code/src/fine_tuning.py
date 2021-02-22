@@ -169,7 +169,10 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         parameter_debug_name = 'electra.encoder.layer.11.output.LayerNorm.weight' # todo remove when finished with this
         for n, p in qa_model.named_parameters():
             if n == parameter_debug_name:
-                print(parameter_debug_name, ":", list(qa_model.named_parameters()))
+                print("\n", parameter_debug_name, ":")
+                print('n', n)
+                print('p', p)
+
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
