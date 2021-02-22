@@ -2,7 +2,7 @@ import torch
 import os
 from pathlib import Path
 from torch import nn
-from torch.nn import MSELoss, CrossEntropyLoss, BCELoss
+from torch.nn import MSELoss, CrossEntropyLoss, BCELoss, BCEWithLogitsLoss
 from transformers import (ElectraConfig, ElectraTokenizerFast, ElectraForMaskedLM,
                           ElectraForPreTraining, ElectraForSequenceClassification)
 from transformers.modeling_outputs import SequenceClassifierOutput
@@ -382,8 +382,8 @@ class ELECTRAModel(nn.Module):
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.class_weights = torch.tensor([1., 1.], device="cuda" if torch.cuda.is_available() else "cpu")
-        print('Class Weights', self.class_weights)
+        # self.class_weights = torch.tensor([1., 1.], device="cuda" if torch.cuda.is_available() else "cpu")
+        # print('Class Weights', self.class_weights)
 
     def forward(
             self,
@@ -397,6 +397,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
             output_attentions=None,
             output_hidden_states=None,
             return_dict=None,
+            weights=None
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
@@ -415,7 +416,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
             inputs_embeds,
             output_attentions,
             output_hidden_states,
-            return_dict,
+            return_dict
         )
 
         sequence_output = discriminator_hidden_states[0]
@@ -428,20 +429,24 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 loss_fct = MSELoss()
                 loss = loss_fct(logits.view(-1), labels.view(-1))
             else:
-                loss_fct = CrossEntropyLoss()
-                class_weights = None
-                try:
-                    class_weights = self.class_weights
-                except AttributeError:
-                    pass
+                loss_fct = BCEWithLogitsLoss()
 
-                if class_weights is not None:
-                    loss_fct = CrossEntropyLoss(weight=class_weights)
+                # class_weights = None
+                # try:
+                #     class_weights = self.class_weights
+                # except AttributeError:
+                #     pass
+
+                if weights is not None:
+                    loss_fct = BCEWithLogitsLoss(weight=weights)
+
+                    # loss_fct = CrossEntropyLoss(weight=class_weights)
                     print("used the weighted loss fc")
                 print('logits', logits.view(-1, self.num_labels))
                 print('labels', labels.view(-1))
 
-                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+                loss = loss_fct(logits.view(-1, 2)[:, 1], labels.view(-1))
+                # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
             output = (logits,) + discriminator_hidden_states[1:]

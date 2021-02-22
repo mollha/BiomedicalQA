@@ -115,6 +115,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                     "attention_mask": batch.attention_mask,
                     "token_type_ids": batch.token_type_ids,
                     "labels": batch.labels,
+                    "weights": batch.weights
                 }
 
                 print('batch labels', batch.labels)
@@ -279,8 +280,8 @@ if __name__ == "__main__":
     train_dataset = QADataset(train_features)
 
     if "yesno" in config["question_type"]:  # handling yesno questions with weighted random sampler
-        sampler = WeightedRandomSampler([4., 1], config["batch_size"])
-        # sampler = RandomSampler(train_dataset)
+        # sampler = WeightedRandomSampler([4., 1], config["batch_size"])
+        sampler = RandomSampler(train_dataset)
     else:
         sampler = RandomSampler(train_dataset)
 

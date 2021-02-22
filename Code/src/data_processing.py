@@ -36,8 +36,10 @@ class BinaryFeature:
 
         if self._answer_text == "yes":
             self._label = 1
+            self._weight = 1.0
         elif self._answer_text == "no":
             self._label = 0
+            self._weight = 1.0
         else:
             raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
 
@@ -48,7 +50,9 @@ class BinaryFeature:
             self._attention_mask,
             self._token_type_ids,
             self._answer_text,
-            self._label
+            self._label,
+            self._weight,
+            "dummy"
         )
 
 
@@ -395,6 +399,7 @@ class BatchFeatures:
             self.answer_end = torch.tensor(transposed_data[6], device=device)
         else:
             self.labels = torch.tensor(transposed_data[5], device=device)
+            self.weights = torch.tensor(transposed_data[6], device=device)
 
 
 
