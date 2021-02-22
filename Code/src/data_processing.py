@@ -39,7 +39,7 @@ class BinaryFeature:
             self._weight = 0.2
         elif self._answer_text == "no":
             self._label = 0.0
-            self._weight = 0.8
+            self._weight = 10.0
         else:
             raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
 
