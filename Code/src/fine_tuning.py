@@ -166,12 +166,14 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
         all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
 
+        print(qa_model.named_parameters())
+
         parameter_debug_name = 'electra.encoder.layer.11.output.LayerNorm.weight' # todo remove when finished with this
-        for n, p in qa_model.named_parameters():
-            if n == parameter_debug_name:
-                print("\n", parameter_debug_name, ":")
-                print('n', n)
-                print('p', p[:10])
+        # for n, p in qa_model.named_parameters():
+        #     if n == parameter_debug_name:
+        #         print("\n", parameter_debug_name, ":")
+        #         print('n', n)
+        #         print('p', p[:10])
 
 
     # update loss function statistics
