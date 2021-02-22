@@ -115,7 +115,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                     "attention_mask": batch.attention_mask,
                     "token_type_ids": batch.token_type_ids,
                     "labels": batch.labels,
-                    "weights": batch.weights
+                    # "weights": batch.weights
                 }
 
                 # print('batch labels', batch.labels)

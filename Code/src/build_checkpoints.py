@@ -139,7 +139,9 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
                 qa_model = ElectraForQuestionAnswering.from_pretrained(config=discriminator_config)  # create extractive QA model
             elif "yesno" in question_type:  # check if the question_type is yes/no
-                qa_model = CostSensitiveSequenceClassification.from_pretrained(config=discriminator_config)  # create binary model
+                qa_model = ElectraForSequenceClassification.from_pretrained(config=discriminator_config)  # create binary model
+                # qa_model = CostSensitiveSequenceClassification.from_pretrained(config=discriminator_config)  # create binary model
+
             else:
                 raise Exception("Question type list must be contain factoid, list or yesno.")
             electra_for_qa, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model, optimizer, scheduler, device, pre_training=False)
@@ -161,7 +163,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
             electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         elif "yesno" in question_type:  # check if the question_type is yes/no
-            electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
+            # electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
+            electra_for_qa = ElectraForSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         else:
             raise Exception("Question type list must be contain factoid, list or yesno.")
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
