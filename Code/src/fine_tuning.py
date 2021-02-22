@@ -26,6 +26,16 @@ config = {
 }
 
 
+# Tried:
+# Used a weighted cross entropy loss function
+# Used a weighted bce loss function
+# Used the weighted random sampler
+# removed the layerwise parameters
+# Tried non-weighted / normal implementation of the model
+
+
+
+
 def condense_statistics(metrics):
     for dataset_name in metrics:  # iterate over top-level dset names
         for question_type in metrics[dataset_name]:
@@ -166,7 +176,6 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
     all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
     print("\nAll dataset metrics", all_dataset_metrics)
     condense_statistics(all_dataset_metrics)
-
 
 
 

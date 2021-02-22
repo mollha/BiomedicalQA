@@ -50,11 +50,11 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             except AttributeError:  # indexing outputs on CUDA
                 logits = outputs[0]
 
-            print('logits', logits)
+            # print('logits', logits)
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
             class_probabilities = torch.softmax(logits, dim=1)
-            print('classes', class_probabilities)
+            # print('classes', class_probabilities)
 
             for question_idx, question_id in enumerate(batch.question_ids):
                 # Note: expected answers could be None here if we don't have access to the answer.
@@ -68,6 +68,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
                     results_by_question_id[question_id] = {"predictions": [predicted_label],
                                                            "expected_answer": expected_answer}
     yes_no_model.train()  # back to train mode.
+
     # Iterate through predictions for each question. We need to combine these predictions to produce a final prediction.
     # create a list of predictions and a list of ground_truth for evaluation
     predictions_list, ground_truth_list = [], []
