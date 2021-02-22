@@ -67,7 +67,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
                 else:
                     results_by_question_id[question_id] = {"predictions": [predicted_label],
                                                            "expected_answer": expected_answer}
-
+    yes_no_model.train()  # back to train mode.
     # Iterate through predictions for each question. We need to combine these predictions to produce a final prediction.
     # create a list of predictions and a list of ground_truth for evaluation
     predictions_list, ground_truth_list = [], []
