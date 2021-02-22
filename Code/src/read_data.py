@@ -202,6 +202,70 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
     return {"factoid": dataset}
 
 
+def read_boolq(paths_to_files: list, testing=False, question_types=[]):
+    path = Path(paths_to_files.pop())
+
+    with open(path, 'rb') as f:
+        boolq_dict = json.load(f)
+
+    dataset = []
+    metrics = {
+        "num_questions": 0,
+        "num_examples": 0,
+    }
+
+    def process_yesno_question(data):
+        question_id = data["question"]
+        question = data["question"]
+        snippet = data["passage"]
+        answer = "yes" if data["answer"] else "no"
+
+        metrics["num_examples"] += 1
+        metrics["num_yes_questions"] += 1 if answer == "yes" else 0,
+        metrics["num_yes_examples"] += 1 if answer == "yes" else 0,
+        metrics["num_no_questions"] += 1 if answer == "no" else 0,
+        metrics["num_no_examples"] += 1 if answer == "no" else 0,
+
+        example = BinaryExample(question_id=question_id,
+                                question=question,
+                                short_context=snippet,
+                                answer=answer)
+        dataset.append(example)
+
+    for data_point in tqdm(boolq_dict, desc="BoolQ Data \u2b62 Examples"):
+
+        # if data_point["answer"] == False: # todo testing if model is dumb
+        #     continue
+
+        process_yesno_question(data_point)
+
+    # ------ DISPLAY METRICS -------
+    print('\n------- COLLATING {}-SET METRICS -------'.format("TEST" if testing else "TRAIN"))
+    print("Across all question types, there are {} questions and {} examples".format(total_questions, total_examples))
+
+    # compute this for all metric types
+    num_examples = metrics["num_examples"]
+    num_questions = metrics["num_questions"]
+
+    print("Created {} examples from {} questions".format(num_examples, num_questions))
+
+    percentage_yes_questions = 0 if num_questions == 0 else round(100 * metrics["num_yes_questions"] / num_questions, 2)
+    percentage_yes_examples = 0 if num_examples == 0 else round(100 * metrics["num_yes_examples"] / num_examples, 2)
+    percentage_no_questions = 0 if num_questions == 0 else round(100 * metrics["num_no_questions"] / num_questions, 2)
+    percentage_no_examples = 0 if num_examples == 0 else round(100 * metrics["num_no_examples"] / num_examples, 2)
+
+    print("\n- Positive Instances: {} questions ({}%), {} examples ({}%)"
+          .format(metrics["num_yes_questions"], percentage_yes_questions, metrics["num_yes_examples"],
+                  percentage_yes_examples))
+    print("- Negative Instances: {} questions ({}%), {} examples ({}%)"
+          .format(metrics["num_no_questions"], percentage_no_questions, metrics["num_no_examples"],
+                  percentage_no_examples))
+
+    return {"yesno": dataset}
+
+
+
+
 def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
     """
     Read the bioasq data into three categories of contexts, questions and answers.
@@ -428,5 +492,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
 
 dataset_to_fc = {
     "squad": read_squad,
-    "bioasq": read_bioasq
+    "bioasq": read_bioasq,
+    "boolq": read_boolq
 }

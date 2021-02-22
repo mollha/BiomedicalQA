@@ -18,6 +18,10 @@ datasets = {
                "test": ["raw_data/8B1_golden.json", "raw_data/8B2_golden.json", "raw_data/8B3_golden.json",
                         "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"],
                },
+    "boolq": {"train": ["train.jsonl", "dev.jsonl"],
+               "test": ["raw_data/8B1_golden.json", "raw_data/8B2_golden.json", "raw_data/8B3_golden.json",
+                        "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"],
+               },
     "squad": {
         "train": ["train-v2.0.json"],
         "test": ["dev-v2.0.json"],

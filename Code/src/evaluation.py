@@ -89,7 +89,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             predictions_list.append(predicted_answer)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answer"])
 
-    if dataset == "bioasq":  # Deploy the bioasq metrics on our results.
+    if dataset == "bioasq" or dataset == "boolq":  # Deploy the bioasq metrics on our results.
         # Evaluation metrics are empty if we didn't have any expected answers.
         eval_metrics = {} if len(predictions_list) == 0 else yes_no_evaluation(predictions_list, ground_truth_list)
 
@@ -97,7 +97,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             return eval_metrics
         # return a dictionary of {question_id: prediction (i.e. "yes" or "no")}
         return results_by_question_id, eval_metrics
-    raise Exception("Dataset name provided to evaluate_yesno must be 'bioasq', "
+    raise Exception("Dataset name provided to evaluate_yesno must be 'bioasq' or 'boolq', "
                     "as no other datasets are handled at this time.")
 
 
