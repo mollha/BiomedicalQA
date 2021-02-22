@@ -398,7 +398,7 @@ class BatchFeatures:
             self.answer_start = torch.tensor(transposed_data[5], device=device)
             self.answer_end = torch.tensor(transposed_data[6], device=device)
         else:
-            self.labels = torch.tensor(transposed_data[5], device=device, dtype=torch.long)
+            self.labels = torch.tensor(transposed_data[5], device=device, dtype=torch.float32)
             self.weights = torch.tensor(transposed_data[6], device=device)
 
 
