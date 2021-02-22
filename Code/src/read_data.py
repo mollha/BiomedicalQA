@@ -255,9 +255,6 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
     num_examples = metrics["num_examples"]
     num_questions = metrics["num_questions"]
     print("Across all question types, there are {} questions and {} examples".format(num_questions, num_examples))
-
-
-
     print("Created {} examples from {} questions".format(num_examples, num_questions))
 
     percentage_yes_questions = 0 if num_questions == 0 else round(100 * metrics["num_yes_questions"] / num_questions, 2)
