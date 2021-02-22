@@ -155,7 +155,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                          .format(settings["steps_trained"], settings["global_step"]))
 
         all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
-        print('params', qa_model.named_parameters())
+        print('params', list(qa_model.named_parameters()))
 
     # update loss function statistics
     settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
