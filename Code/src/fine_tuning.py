@@ -171,7 +171,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
             if n == parameter_debug_name:
                 print("\n", parameter_debug_name, ":")
                 print('n', n)
-                print('p', p)
+                print('p', p[:10])
 
 
     # update loss function statistics

@@ -29,7 +29,7 @@ def yes_no_evaluation(predictions, ground_truth):
         raise Exception(
             "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
 
-    print('predictions', predictions)
+    # print('predictions', predictions)
     true_yes = {"yes", "y", 1}
     true_no = {"no", "n", 0}
 
