@@ -98,7 +98,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
     # Create the optimizer and scheduler
     # optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
-    optimizer = AdamW(discriminator.parameters(), eps=model_settings["epsilon"], correct_bias=False)
+    optimizer = AdamW(discriminator.parameters(), eps=model_settings["epsilon"], lr=model_settings["lr"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=0,
                                                 # num_warmup_steps=(config["num_warmup_steps"]) * model_settings[
