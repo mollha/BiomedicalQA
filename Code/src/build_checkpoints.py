@@ -172,8 +172,6 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             build_pretrained_from_checkpoint(model_size, device, pretrained_checkpoint_dir, pretrained_checkpoint_name)
         config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
         discriminator = pretrained_model.discriminator
-        optimizer, scheduler = get_optimizer_and_scheduler(discriminator, discriminator_config, model_settings,
-                                                           config["num_warmup_steps"])
 
         # generator, discriminator, electra_tokenizer = build_electra_model(model_size) # todo remove - testing regular pretrained checkpoint to see if error in pretraining
 
@@ -181,6 +179,11 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         elif "yesno" in question_type:  # check if the question_type is yes/no
             electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
+
+            optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings,
+                                                               config["num_warmup_steps"])
+
+            # TODO OPTIMIZER AND SCHEDULER DEFINITIONS NEED TO CHANGE - THEY'RE BAD, AND WON'T WORK WHEN LOADING FROM CHECKPOINT
             # electra_for_qa = ElectraForSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         else:
             raise Exception("Question type list must be contain factoid, list or yesno.")
