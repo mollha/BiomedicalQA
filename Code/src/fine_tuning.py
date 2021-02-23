@@ -202,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid'],
                         type=str,
                         help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
-    parser.add_argument("--dataset", default="boolq", choices=['squad', 'bioasq', 'boolq'], type=str,
+    parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq', 'boolq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
     parser.add_argument("--k", default="5", type=int,
                         help="K-best predictions are selected for factoid and list questions (between 1 and 100)")
