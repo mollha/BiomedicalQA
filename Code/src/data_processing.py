@@ -37,6 +37,7 @@ class BinaryFeature:
         self._token_type_ids = token_type_ids
         self._answer_text = answer_text.lower()
 
+        # since using pos_weights, weights should not be floats anymore.
         if self._answer_text == "yes":
             self._label = 1.0
             self._weight = 0.2
@@ -402,7 +403,7 @@ class BatchFeatures:
             self.answer_end = torch.tensor(transposed_data[6], device=device)
         else:
             self.labels = torch.tensor(transposed_data[5], device=device, dtype=torch.float)
-            self.weights = torch.tensor(transposed_data[6], device=device)
+            self.weights = torch.tensor(transposed_data[6], device=device, dtype=torch.float)
 
 
 

@@ -75,6 +75,36 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
 
 
+
+def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_steps):
+    """
+    Get an optimizer and scheduler, adjusted for the particular parameters in our model.
+    model_settings are settings relating to the model, config are extra paramters
+    :return:
+    """
+    # todo, we may need to tweak this for classifier vs extractive models.
+    # # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
+    layerwise_learning_rates = get_layer_lrs(model.named_parameters(), model_settings["lr"],
+                                             model_settings["layerwise_lr_decay"],
+                                             model_config.num_hidden_layers)
+    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
+
+    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
+    for n, p in model.named_parameters():
+        wd = model_settings["decay"] if not any(nd in n for nd in no_decay) else 0
+        lr = layerwise_learning_rates[n]
+        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
+
+    # Create the optimizer and scheduler
+    optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
+    # optimizer = AdamW(discriminator.parameters(), eps=model_settings["epsilon"], correct_bias=False)
+    scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                num_warmup_steps=(num_warmup_steps) * model_settings[
+                                                    "warmup_fraction"],
+                                                num_training_steps=num_warmup_steps)  # todo check whether num_training_steps should be -1
+    return optimizer, scheduler
+
+
 def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_dir, finetuned_checkpoint_dir, checkpoint_name, question_type, config={}):
     # -- Create the checkpoint directories if they don't exist --
     pretrained_checkpoint_name, finetuned_checkpoint_name = checkpoint_name
@@ -86,22 +116,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     generator, discriminator, electra_tokenizer, \
     discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
 
-    # # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
-    layerwise_learning_rates = get_layer_lrs(discriminator.named_parameters(), model_settings["lr"], model_settings["layerwise_lr_decay"], discriminator_config.num_hidden_layers)
-    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
 
-    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
-    for n, p in discriminator.named_parameters():
-        wd = model_settings["decay"] if not any(nd in n for nd in no_decay) else 0
-        lr = layerwise_learning_rates[n]
-        layerwise_params.append({"params": [p], "weight_decay": wd, "lr": lr})
-
-    # Create the optimizer and scheduler
-    optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
-    # optimizer = AdamW(discriminator.parameters(), eps=model_settings["epsilon"], correct_bias=False)
-    scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=(config["num_warmup_steps"]) * model_settings["warmup_fraction"],
-                                                num_training_steps=config["num_warmup_steps"])  # todo check whether num_training_steps should be -1
+    optimizer, scheduler = get_optimizer_and_scheduler(discriminator, discriminator_config, model_settings, config["num_warmup_steps"])
 
     #   -------- DETERMINE WHETHER TRAINING FROM A FINE-TUNED CHECKPOINT OR FROM PRETRAINED CHECKPOINT --------
     valid_finetune_checkpoint, path_to_checkpoint, building_from_pretrained = False, None, True
@@ -156,6 +172,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             build_pretrained_from_checkpoint(model_size, device, pretrained_checkpoint_dir, pretrained_checkpoint_name)
         config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
         discriminator = pretrained_model.discriminator
+        optimizer, scheduler = get_optimizer_and_scheduler(discriminator, discriminator_config, model_settings,
+                                                           config["num_warmup_steps"])
 
         # generator, discriminator, electra_tokenizer = build_electra_model(model_size) # todo remove - testing regular pretrained checkpoint to see if error in pretraining
 
@@ -166,4 +184,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             # electra_for_qa = ElectraForSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         else:
             raise Exception("Question type list must be contain factoid, list or yesno.")
+
+
+
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
