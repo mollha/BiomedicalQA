@@ -10,7 +10,7 @@
 #SBATCH --gres=gpu
 #SBATCH --job-name=sm_finetune
 #SBATCH -p ug-gpu-small
-#SBATCH --qos=debug
+#SBATCH --qos=short
 #SBATCH -t 2:0:0
 #SBATCH --mem=28g
 #SBATCH --mail-type=FAIL
