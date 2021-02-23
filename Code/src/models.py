@@ -438,7 +438,7 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 #     pass
 
                 if weights is not None:
-                    loss_fct = BCEWithLogitsLoss(weight=weights)
+                    loss_fct = BCEWithLogitsLoss(pos_weight=weights)
 
                     # loss_fct = CrossEntropyLoss(weight=class_weights)
                     # print("used the weighted loss fc")
