@@ -382,8 +382,6 @@ class ELECTRAModel(nn.Module):
 class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.class_weights = torch.tensor([1., 1.], device="cuda" if torch.cuda.is_available() else "cpu")
-        # print('Class Weights', self.class_weights)
 
     def forward(
             self,
@@ -430,21 +428,8 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
                 loss = loss_fct(logits.view(-1), labels.view(-1))
             else:
                 loss_fct = BCEWithLogitsLoss()
-
-                # class_weights = None
-                # try:
-                #     class_weights = self.class_weights
-                # except AttributeError:
-                #     pass
-
                 if weights is not None:
                     loss_fct = BCEWithLogitsLoss(pos_weight=weights)
-
-                    # loss_fct = CrossEntropyLoss(weight=class_weights)
-                    # print("used the weighted loss fc")
-                # print('logits', logits.view(-1, self.num_labels))
-                # print('labels', labels.view(-1))
-
                 loss = loss_fct(logits.view(-1, 2)[:, 1], labels.view(-1))
                 # loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
