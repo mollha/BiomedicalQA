@@ -190,7 +190,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
     aggregated_metrics = condense_statistics(all_dataset_metrics)
     for _ in aggregated_metrics:
-        print("{}\n".format(_))
+        print("{}\n".format(aggregated_metrics[_]))
 
 
 if __name__ == "__main__":
