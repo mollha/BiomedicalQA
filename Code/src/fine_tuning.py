@@ -225,6 +225,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config['size'] = args.size
     config["question_type"] = args.question_type.split(',')
+    config["dataset"] = args.dataset
     args.f_checkpoint = args.f_checkpoint if args.f_checkpoint != "empty" else ""  # deals with slurm script
 
     sys.stderr.write("\n--- ARGUMENTS ---")
@@ -261,28 +262,20 @@ if __name__ == "__main__":
     # ---- Override general config with model specific config, for models of different sizes ----
     model_specific_config = get_model_config(config['size'], pretrain=False)
     config = {**model_specific_config, **config}
+    config["device"] = "cuda" if torch.cuda.is_available() else "cpu"  # set device
+    sys.stderr.write("\nDevice: {}\n".format(config["device"].upper()))
 
     # ---- Find path to checkpoint directory - create the directory if it doesn't exist ----
     base_path = Path(__file__).parent
     checkpoint_name = (args.p_checkpoint, args.f_checkpoint)
-
     selected_dataset = args.dataset.lower()
     base_checkpoint_dir = (base_path / '../checkpoints').resolve()
     pretrain_checkpoint_dir = (base_checkpoint_dir / 'pretrain').resolve()
     finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
-
-    # create the fine-tune directory if it doesn't exist already
     Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)  # create the fine-tune directory
 
-    # -- Set device
-    config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    sys.stderr.write("\nDevice: {}\n".format(config["device"].upper()))
-
-    # get the tokenizer to prepare the data
-    _, _, electra_tokenizer, _ = build_electra_model(config['size'], get_config=True)
-
-    # -- Load the data and prepare it in squad format
-    dataset_function = dataset_to_fc[selected_dataset]
+    _, _, electra_tokenizer, _ = build_electra_model(config['size'], get_config=True)  # get tokenizer to prepare data
+    dataset_function = dataset_to_fc[selected_dataset]  # Load the data and prepare it in squad format
 
     # ---- Find the path(s) to the dataset file(s) ----
     dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
@@ -309,15 +302,13 @@ if __name__ == "__main__":
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
     # Random Sampler used during training. We create a single data_loader for training.
-    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
-                                   collate_fn=collate_wrapper)
+    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))
 
     # Once populated, the test_data_loader_dict will contain {"dataset_path": {"factoid": dataloader, "list": datalo...}
     test_data_loader_dict = {}
-
     for test_dataset_file_path in test_dataset_file_paths:  # iterate over each path separately.
         test_data_loader_dict[test_dataset_file_path] = {}  # initialise empty dict for this dataset path
         raw_test_dataset = dataset_function([test_dataset_file_path], testing=True, question_types=config["question_type"])

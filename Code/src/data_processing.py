@@ -176,12 +176,14 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
 
 def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=(1.0, 1.0)):
     """
+    Given a list of training examples (e.g. BinaryExample or FactoidExample), convert these examples
+    into BinaryFeature or Factoid Feature.
 
     :param yesno_weights: weights for yes/no classes. Not used if we don't have yesno questions
     :param examples:
-    :param tokenizer:
-    :param max_length:
-    :return:
+    :param tokenizer: tokenizer to use when transforming plain text from examples to tokens for feature
+    :param max_length: maximum length of a model input sequence - determined by model config (e.g. 128 for small, 256 for base etc..)
+    :return: list of features
     """
     # What happens with evaluation if we don't know the answer?
     # we could do something interesting with these sorts of predictions, where we sub-tokenize around the predicted answer

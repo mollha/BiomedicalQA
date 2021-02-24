@@ -74,12 +74,11 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
 
     return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
 
-
-
+# This function is only applicable to fine-tuning as we want to use a different optimizer and scheduler.
 def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_steps):
     """
     Get an optimizer and scheduler, adjusted for the particular parameters in our model.
-    model_settings are settings relating to the model, config are extra paramters
+    model_settings are settings relating to the model, config are extra parameters
     :return:
     """
     # todo, we may need to tweak this for classifier vs extractive models.
@@ -87,9 +86,9 @@ def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_
     layerwise_learning_rates = get_layer_lrs(model.named_parameters(), model_settings["lr"],
                                              model_settings["layerwise_lr_decay"],
                                              model_config.num_hidden_layers)
-    no_decay = ["bias", "LayerNorm", "layer_norm"]  # Prepare optimizer and schedule (linear warm up and decay)
-
-    layerwise_params = []  # todo check if lr should be dependent on non-zero wd
+    no_decay = ["bias", "LayerNorm", "layer_norm"]  # do not have decay on these layers.
+    # Prepare optimizer and scheduler (linear warm up and decay)
+    layerwise_params = []
     for n, p in model.named_parameters():
         wd = model_settings["decay"] if not any(nd in n for nd in no_decay) else 0
         lr = layerwise_learning_rates[n]
@@ -97,11 +96,10 @@ def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_
 
     # Create the optimizer and scheduler
     optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
-    # optimizer = AdamW(discriminator.parameters(), eps=model_settings["epsilon"], correct_bias=False)
     scheduler = get_linear_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=(num_warmup_steps) * model_settings[
                                                     "warmup_fraction"],
-                                                num_training_steps=num_warmup_steps)  # todo check whether num_training_steps should be -1
+                                                num_training_steps=num_warmup_steps)
     return optimizer, scheduler
 
 
@@ -157,7 +155,14 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
             # get the template within which to load optimizer and scheduler
             optimizer, scheduler = get_optimizer_and_scheduler(qa_model, discriminator_config, model_settings, config["num_warmup_steps"])
-            electra_for_qa, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model, optimizer, scheduler, device, pre_training=False)
+            electra_for_qa, new_optimizer, new_scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model, optimizer, scheduler, device, pre_training=False)
+
+            # config["dataset"] contains the new dataset we're finetuning on
+            # if new_config["dataset"] (i.e. the old dataset) does not match, then we need a new scheduler and optimizer
+            # instead of the one we just loaded from the checkpoint.
+            if config["dataset"] == new_config["dataset"]:  # we're continuing training on the same dataset
+                optimizer, scheduler = new_optimizer, new_scheduler  # overwrite optimizer and scheduler with loaded
+
             config = update_settings(config, new_config, exceptions=["update_steps", "device", "evaluate_during_training"])
             building_from_pretrained = False
         else:
