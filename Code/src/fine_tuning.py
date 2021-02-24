@@ -35,16 +35,25 @@ config = {
 
 
 def condense_statistics(metrics):
-
     all_metrics = {}
+
     for dataset_name in metrics:  # iterate over top-level dset names
         all_metrics[dataset_name] = {}
 
         for question_type in metrics[dataset_name]:
+            list_of_result_dicts = metrics[dataset_name][qt]
             best_result = None
-            if question_type == "yesno":  # best metric is f1_ma
-                list_of_result_dicts = metrics[dataset_name][qt]
+
+            if question_type == "yesno":  # official eval metric is f1_ma
                 best_result = max(list_of_result_dicts, key=lambda x: x['f1_ma'])
+            elif question_type == "factoid":  # official eval metric is mrr
+                try:
+                    best_result = max(list_of_result_dicts, key=lambda x: x['mrr'])
+                except KeyError:
+                    # use exact_match if the dataset isn't bioasq (i.e. is squad)
+                    best_result = max(list_of_result_dicts, key=lambda x: x['exact_match'])
+            elif question_type == "list":
+                best_result = max(list_of_result_dicts, key=lambda x: x['mean_average_f1'])
 
             metric_names = {key: [] for key in metrics[dataset_name][question_type][0]}
             for metric_dict in metrics[dataset_name][question_type]:  # condense this list of dicts into one avg dict
