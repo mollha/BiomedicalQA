@@ -287,29 +287,20 @@ if __name__ == "__main__":
 
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
-    raw_train_dataset = dataset_function(train_dataset_file_paths, question_types=config["question_type"])
+    raw_train_dataset, yesno_weights = dataset_function(train_dataset_file_paths, question_types=config["question_type"])
+    print("Yes no weights are {}".format(yesno_weights))
 
     # combine the features from these datasets.
     train_features = []
     for qt in config["question_type"]:  # iterate through our chosen question types
         raw_train_dataset_by_question = raw_train_dataset[qt]
-        sub_train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer,
-                                                          config["max_length"])
+        sub_train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer, config["max_length"], yesno_weights)
         train_features.extend(sub_train_features)
 
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
-
-    if "yesno" in config["question_type"]:  # handling yesno questions with weighted random sampler
-        # sampler = WeightedRandomSampler([4., 1], config["batch_size"])
-        sampler = RandomSampler(train_dataset)
-    else:
-        sampler = RandomSampler(train_dataset)
-
-    # Random Sampler used during training.
-    # We create a single data_loader for training.
-    train_data_loader = DataLoader(train_dataset, sampler=sampler,
-                                   batch_size=config["batch_size"],
+    # Random Sampler used during training. We create a single data_loader for training.
+    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"],
                                    collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----

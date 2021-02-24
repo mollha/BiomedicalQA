@@ -199,7 +199,7 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
     print("There are {} questions and {} examples".format(total_questions, total_examples))
 
     print('-', metrics["num_skipped_examples"], 'examples were skipped.\n')
-    return {"factoid": dataset}
+    return {"factoid": dataset}, None # set yesno weights to None
 
 
 def read_boolq(paths_to_files: list, testing=False, question_types=[]):
@@ -269,7 +269,13 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
           .format(metrics["num_no_questions"], percentage_no_questions, metrics["num_no_examples"],
                   percentage_no_examples))
 
-    return {"yesno": dataset}
+    try:
+        yesno_weights = (max(metrics["num_yes_examples"], metrics["num_no_examples"]) / metrics["num_no_examples"],
+                         max(metrics["num_yes_examples"], metrics["num_no_examples"]) / metrics["num_yes_examples"])
+    except ZeroDivisionError:
+        yesno_weights = (1.0, 1.0)
+
+    return {"yesno": dataset}, yesno_weights
 
 
 
@@ -462,6 +468,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
     print('\n------- COLLATING {}-SET METRICS -------'.format("TEST" if testing else "TRAIN"))
     print("Across all question types, there are {} questions and {} examples".format(total_questions, total_examples))
 
+    yesno_weights = None
     for qt in combined_metrics.keys():  # iterate over each question type
         print('\n------- {} METRICS -------'.format(qt.upper()))
         qt_metrics = combined_metrics[qt]  # get the metrics for that question type
@@ -491,11 +498,17 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
             print("- Negative Instances: {} questions ({}%), {} examples ({}%)"
                   .format(qt_metrics["num_no_questions"], percentage_no_questions, qt_metrics["num_no_examples"],
                           percentage_no_examples))
+            try:
+                yesno_weights = (
+                max(qt_metrics["num_yes_examples"], qt_metrics["num_no_examples"]) / qt_metrics["num_no_examples"],
+                max(qt_metrics["num_yes_examples"], qt_metrics["num_no_examples"]) / qt_metrics["num_yes_examples"])
+            except ZeroDivisionError:
+                yesno_weights = (1.0, 1.0)
 
         elif qt == "factoid" or qt == "list":
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
 
-    return dataset
+    return dataset, yesno_weights
 
 
 dataset_to_fc = {

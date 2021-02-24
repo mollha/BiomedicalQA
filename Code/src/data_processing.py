@@ -30,7 +30,7 @@ datasets = {
 
 # ------------- DEFINE TRAINING FEATURE CLASSES ------------
 class BinaryFeature:
-    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_text):
+    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_text, weights=(1.0, 1.0)):
         self._question_id = question_id
         self._input_ids = input_ids
         self._attention_mask = attention_mask
@@ -40,10 +40,10 @@ class BinaryFeature:
         # since using pos_weights, weights should not be floats anymore.
         if self._answer_text == "yes":
             self._label = 1.0
-            self._weight = 1.0
+            self._weight = weights[1]
         elif self._answer_text == "no":
             self._label = 0.0
-            self._weight = 3.4145
+            self._weight = weights[0]
         else:
             raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
 
@@ -172,7 +172,15 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
             return sub_position_relative_mapping[0:idx] + sub_mapping + sub_position_relative_mapping[idx + 1:]
 
 
-def convert_examples_to_features(examples, tokenizer, max_length):
+def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=(1.0, 1.0)):
+    """
+
+    :param yesno_weights: weights for yes/no classes. Not used if we don't have yesno questions
+    :param examples:
+    :param tokenizer:
+    :param max_length:
+    :return:
+    """
     # What happens with evaluation if we don't know the answer?
     # we could do something interesting with these sorts of predictions, where we sub-tokenize around the predicted answer
     # and ask for the predictions again - let's look at this for making predictions
@@ -199,9 +207,8 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             attention_mask = tokenized_input["attention_mask"]
             token_type_ids = tokenized_input["token_type_ids"]
             feature = BinaryFeature(example._question_id, input_ids, attention_mask,
-                                    token_type_ids, example._answer)
+                                    token_type_ids, example._answer, yesno_weights)
             feature_list.append(feature)
-            # todo handle impossible yes no questions / ones without the answer.
             continue
 
         # If question type is factoid or list (i.e. not a yes/no question). Given start and end positions in the text,
