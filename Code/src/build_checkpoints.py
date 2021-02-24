@@ -121,9 +121,10 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         # ---- If we're training from a valid finetuned checkpoint ----
         if valid_finetune_checkpoint:
             if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
-                qa_model = ElectraForQuestionAnswering.from_pretrained(config=discriminator_config)  # create extractive QA model
+                qa_model = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create extractive QA model
+
             elif "yesno" in question_type:  # check if the question_type is yes/no
-                qa_model = CostSensitiveSequenceClassification.from_pretrained(config=discriminator_config)  # create binary model
+                qa_model = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create binary model
             else:
                 raise Exception("Question type list must be contain factoid, list or yesno.")
 
