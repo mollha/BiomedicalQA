@@ -40,10 +40,10 @@ class BinaryFeature:
         # since using pos_weights, weights should not be floats anymore.
         if self._answer_text == "yes":
             self._label = 1.0
-            self._weight = 0.2
+            self._weight = 0.23
         elif self._answer_text == "no":
             self._label = 0.0
-            self._weight = 0.8
+            self._weight = 0.77
         else:
             raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
 
@@ -352,6 +352,7 @@ def convert_examples_to_features(examples, tokenizer, max_length):
             all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
             all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
 
+            # todo we aren't accounting for the doc stride in our start and end positions, hence the terrible results
             # Now we're ready to create a feature
             feature = FactoidFeature(example._question_id, all_input_ids,
                                      all_attention_mask, all_token_type_ids,
