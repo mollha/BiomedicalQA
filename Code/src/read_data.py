@@ -199,7 +199,11 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
     print("There are {} questions and {} examples".format(total_questions, total_examples))
 
     print('-', metrics["num_skipped_examples"], 'examples were skipped.\n')
-    return {"factoid": dataset}, None # set yesno weights to None
+
+    if testing:
+        return {"factoid": dataset}
+    else:
+        return {"factoid": dataset}, None  # set yesno weights to None
 
 
 def read_boolq(paths_to_files: list, testing=False, question_types=[]):
@@ -275,8 +279,10 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
     except ZeroDivisionError:
         yesno_weights = (1.0, 1.0)
 
-    return {"yesno": dataset}, yesno_weights
-
+    if testing:
+        return {"yesno": dataset}
+    else:
+        return {"yesno": dataset}, yesno_weights
 
 
 
@@ -508,7 +514,10 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         elif qt == "factoid" or qt == "list":
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
 
-    return dataset, yesno_weights
+    if testing:
+        return dataset
+    else:
+        return dataset, yesno_weights
 
 
 dataset_to_fc = {
