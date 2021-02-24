@@ -68,7 +68,7 @@ def condense_statistics(metrics):
     return all_metrics
 
 
-def evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics):
+def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics):
 
     for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
         loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
@@ -78,10 +78,9 @@ def evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics
             eval_dataloader = loader_all_question_types[qt]
 
             if "factoid" == qt:
-                metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True)
+                metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True, dataset=dataset)
             elif "list" == qt:
-                metric_results = {}  # todo do nothing for now - need to add list qs
-
+                metric_results = evaluate_list(qa_model, eval_dataloader, electra_tokenizer, k, training=True, dataset=dataset)
             elif "yesno" == qt:
                 metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
 
@@ -178,7 +177,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
 
-        all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
+        all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
 
         # parameter_debug_name = 'electra.encoder.layer.11.attention.self.value.weight' # todo remove when finished with this
         # for n, p in qa_model.named_parameters():
@@ -194,7 +193,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
-    all_dataset_metrics = evaluate_during_training(qa_model, eval_dataloader_dict, all_dataset_metrics)
+    all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
     # print("\nAll dataset metrics", all_dataset_metrics)
 
     aggregated_metrics = condense_statistics(all_dataset_metrics)

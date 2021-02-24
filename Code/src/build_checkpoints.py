@@ -10,19 +10,9 @@ from utils import get_recent_checkpoint_name, update_settings
 
 
 def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, checkpoint_name, config={}):
-    """
-
-    Note: If we don't pass config and the checkpoint name is valid - config will be populated with
+    """ Note: If we don't pass config and the checkpoint name is valid - config will be populated with
     model-specific config only. This is useful when build_from_checkpoint is called from fine-tuning,
-    but we don't need the pre-training configuration - only model configuration.
-
-
-    :param model_size:
-    :param device:
-    :param checkpoint_name:
-    :param config:
-    :return:
-    """
+    but we don't need the pre-training configuration - only model configuration."""
     # create the checkpoint directory if it doesn't exist
     Path(checkpoint_directory).mkdir(exist_ok=True, parents=True)
 
@@ -31,8 +21,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     generator, discriminator, electra_tokenizer = build_electra_model(model_size)
     electra_model = ELECTRAModel(generator, discriminator, electra_tokenizer)
 
-    # Prepare optimizer and schedule (linear warm up and decay)
-    # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
+    # Prepare optimizer and schedule (linear warm up and decay) # eps=1e-6, mom=0.9, sqr_mom=0.999, wd=0.01
     optimizer = AdamW(electra_model.parameters(), eps=1e-6, weight_decay=0.01, lr=model_settings["lr"],
                       correct_bias=model_settings["adam_bias_correction"])
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=10000,
@@ -43,9 +32,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     valid_checkpoint, path_to_checkpoint = False, None
 
     if checkpoint_name.lower() == "recent":
-
-        subfolders = [x for x in Path(checkpoint_directory).iterdir() \
-                      if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]]
+        subfolders = [x for x in Path(checkpoint_directory).iterdir() if x.is_dir() and model_size in str(x)[str(x).rfind('/') + 1:]]
 
         if len(subfolders) > 0:
             path_to_checkpoint = get_recent_checkpoint_name(checkpoint_directory, subfolders)
@@ -54,35 +41,27 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
     elif checkpoint_name:
         path_to_checkpoint = os.path.join(checkpoint_directory, checkpoint_name)
         if os.path.exists(path_to_checkpoint):
-            print(
-                "\nCheckpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
-            # if the directory with the checkpoint name exists, we can retrieve the correct config from here
-            valid_checkpoint = True
+            print("\nCheckpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+            valid_checkpoint = True  # if dir with checkpoint name exists, we can retrieve correct config from here
         else:
-            print(
-                "WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
+            print("WARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
     if valid_checkpoint:
-        electra_model, optimizer, scheduler, populated_loss_function, \
-        new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
+        electra_model, optimizer, scheduler, populated_loss_function, new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
         config = update_settings(config, new_config, exceptions=["update_steps", "device"])
         loss_function.__dict__.update(populated_loss_function.__dict__)
         print('Successfully copied loss function statistics:', loss_function.mid_epoch_stats)
-
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")
-
     return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config
+
 
 # This function is only applicable to fine-tuning as we want to use a different optimizer and scheduler.
 def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_steps):
-    """
-    Get an optimizer and scheduler, adjusted for the particular parameters in our model.
-    model_settings are settings relating to the model, config are extra parameters
-    :return:
-    """
+    """ Get an optimizer and scheduler, adjusted for the particular parameters in our model.
+    model_settings are settings relating to the model, config are extra parameters """
     # todo, we may need to tweak this for classifier vs extractive models.
-    # # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
+    # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
     layerwise_learning_rates = get_layer_lrs(model.named_parameters(), model_settings["lr"],
                                              model_settings["layerwise_lr_decay"],
                                              model_config.num_hidden_layers)
@@ -96,10 +75,7 @@ def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_
 
     # Create the optimizer and scheduler
     optimizer = AdamW(layerwise_params, eps=model_settings["epsilon"], correct_bias=False)
-    scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                num_warmup_steps=(num_warmup_steps) * model_settings[
-                                                    "warmup_fraction"],
-                                                num_training_steps=num_warmup_steps)
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=(num_warmup_steps) * model_settings["warmup_fraction"], num_training_steps=num_warmup_steps)
     return optimizer, scheduler
 
 
@@ -136,13 +112,11 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         else:  # fine-tuned checkpoint name should contain full checkpoint info (pretrained and fine-tuned)
             path_to_checkpoint = os.path.join(finetuned_checkpoint_dir, finetuned_checkpoint_name)
             if os.path.exists(path_to_checkpoint):
-                print(
-                    "\nCheckpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
+                print("\nCheckpoint '{}' exists - Loading config values from memory.\n".format(path_to_checkpoint))
                 # if the directory with the checkpoint name exists, we can retrieve the correct config from here
                 valid_finetune_checkpoint, building_from_pretrained = True, False
             else:
-                print(
-                    "\nWARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
+                print("\nWARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
         # ---- If we're training from a valid finetuned checkpoint ----
         if valid_finetune_checkpoint:
@@ -180,13 +154,9 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         elif "yesno" in question_type:  # check if the question_type is yes/no
             electra_for_qa = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
-
-            # electra_for_qa = ElectraForSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)
         else:
             raise Exception("Question type list must be contain factoid, list or yesno.")
 
         optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings,
                                                            config["num_warmup_steps"])
-        # TODO OPTIMIZER AND SCHEDULER DEFINITIONS NEED MAY NEED EXTRA CONSIDERATION
-
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config

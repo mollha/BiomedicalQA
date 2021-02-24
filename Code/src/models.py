@@ -84,25 +84,21 @@ large_finetune_config = {
     "epsilon": 1e-8,  # Epsilon for Adam optimizer.
 }
 
+# ----------------------
+reconfigure_settings = {
+
+}  # todo we can define here how the settings transition for different datasets if we want to.
+
 
 def get_model_config(model_size: str, pretrain=True) -> dict:
-    """
-    Given a model size (e.g. small, base or large), return a dictionary containing the vanilla
-    ELECTRA settings for this model, as outlined in the ELECTRA paper.
-
-    Link to paper - https://arxiv.org/abs/2003.10555.
-
-    :param model_size: a string representing the size of the model
-    :return: a dictionary containing the model config
-    """
+    """ Given a model size (e.g. small, base or large), return a dictionary containing the vanilla
+        ELECTRA settings for this model, as outlined in the ELECTRA paper.
+        Link to paper - https://arxiv.org/abs/2003.10555."""
     assert (model_size in ["small", "base", "large"])
-
     index = ['small', 'base', 'large'].index(model_size)
-
     if pretrain:
         return [small_pretrain_config, base_pretrain_config, large_pretrain_config][index]
-    else:
-        return [small_finetune_config, base_finetune_config, large_finetune_config][index]
+    return [small_finetune_config, base_finetune_config, large_finetune_config][index]
 
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
@@ -142,10 +138,8 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
                         if subparam._grad is not None:
                             subparam._grad.data = subparam._grad.data.to(device)
 
-
     # Load in optimizer, tokenizer and scheduler states
     path_to_optimizer = os.path.join(path_to_checkpoint, "optimizer.pt")
-
     if os.path.isfile(path_to_optimizer):
         optimizer.load_state_dict(torch.load(path_to_optimizer, map_location=torch.device(device)))
         optimizer_to(optimizer, device)
@@ -161,21 +155,15 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
     loss_function = None
-
     if pre_training:
         path_to_loss_fc = os.path.join(path_to_checkpoint, "loss_function.pkl")
         if os.path.isfile(path_to_loss_fc):
             with open(path_to_loss_fc, 'rb') as input_file:
                 loss_function = pickle.load(input_file)
 
-    print(
-        "Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
-    print("Resuming training from epoch {} and step: {}\n"
-          .format(settings["current_epoch"], settings["steps_trained"]))
-
-    # update the device as this may have changed since last checkpoint.
-    settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-
+    print("Re-instating settings from model saved on {} at {}.".format(settings["saved_on"], settings["saved_at"]))
+    print("Resuming training from epoch {} and step: {}\n".format(settings["current_epoch"], settings["steps_trained"]))
+    settings["device"] = "cuda" if torch.cuda.is_available() else "cpu"  # update device as may change since checkpoint
     if pre_training:
         return model, optimizer, scheduler, loss_function, settings
     return model, optimizer, scheduler, settings
@@ -185,7 +173,6 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_t
     now = datetime.datetime.now()
     today = datetime.date.today()
 
-    # WE NEED TO CREATE A NEW CHECKPOINT NAME
     if pre_training:
         checkpoint_name = "{}_{}_{}".format(settings["size"], settings["current_epoch"], settings["steps_trained"])
     else:
@@ -218,24 +205,14 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_t
             # pre-training save checkpoint should provide a valid loss function
             raise Exception("Loss function should not be None during pre-training.")
 
-        torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))
-        # the tokenizer state is saved with the model
-
+        torch.save(model.state_dict(), os.path.join(save_dir, "model.pt"))  # tokenizer state is saved with the model
         sys.stderr.write("Saving model checkpoint, optimizer, scheduler and loss function states to {}".format(save_dir))
     except FileExistsError as e:
         sys.stderr.write("Checkpoint cannot be saved as it already exists - skipping this save.")
 
 
 def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):
-    """
-    Get the layer-wise learning rates. Layers closer to input have lower lr.
-    :param lr:
-    :param decay_rate:
-    :param num_hidden_layers:
-    :param config:
-    :return:
-    """
-
+    """Get the layer-wise learning rates. Layers closer to input have lower lr."""
     def get_depth(layer_name):
         numbers = [s for s in layer_name.split(".") if s.isdigit()]
         if len(numbers) > 0:
@@ -244,16 +221,13 @@ def get_layer_lrs(parameters, lr, decay_rate, num_hidden_layers):
             return 0
         else:
             return num_hidden_layers
-
     return {n: lr * (decay_rate ** get_depth(n)) for n, p in parameters}
-
 
 
 # ------- HELPER FUNCTION FOR BUILDING THE ELECTRA MODEL FOR PRETRAINING --------
 def build_electra_model(model_size: str, get_config=False):
     """
     Helper function for creating the base components of the electra model with default configuration.
-
     :param model_size: e.g. small, base or large
     :param get_config: whether or not the discriminator's config should be returned. Used for fine-tuning only.
     :return: generator, discriminator, tokenizer and (sometimes) discriminator's config.
@@ -276,8 +250,7 @@ def build_electra_model(model_size: str, get_config=False):
     path_to_biotokenizer = os.path.join(base_path, 'tokenization/bio_tokenizer/bio_electra_tokenizer_pubmed_vocab')
     if os.path.exists(path_to_biotokenizer):
         sys.stderr.write("\nUsing biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
-        # get tokenizer from save file
-        electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)
+        electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)  # get tokenizer from save file
     else:
         sys.stderr.write("\nPath {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
         electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
@@ -289,7 +262,6 @@ def build_electra_model(model_size: str, get_config=False):
 
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
-
     if get_config:
         return generator, discriminator, electra_tokenizer, discriminator_config
     return generator, discriminator, electra_tokenizer
@@ -298,10 +270,9 @@ def build_electra_model(model_size: str, get_config=False):
 # --------- CLASS DEFINING THE ELECTRA MODEL -----------
 # This implementation is adapted from the "PyTorch implementation of ELECTRA" implementation given at:
 # https://github.com/richarddwang/electra_pytorch/blob/master/pretrain.py#L261
-# All rights reserved by Richard Wang.
+# All copyrights reserved by Richard Wang.
 
 class ELECTRAModel(nn.Module):
-
     def __init__(self, generator, discriminator, electra_tokenizer):
         super().__init__()
         self.generator, self.discriminator = generator, discriminator
@@ -353,7 +324,6 @@ class ELECTRAModel(nn.Module):
         and token_type_ids and won't be unnecessarily large,
         thus, preventing cpu processes loading batches from consuming lots of cpu memory and slow down the machine.
         """
-
         # get a TensorText object (like a list) of booleans indicating whether each
         # input token is a pad token
         attention_mask = input_ids != self.electra_tokenizer.pad_token_id
