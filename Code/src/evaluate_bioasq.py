@@ -6,7 +6,7 @@ from read_data import dataset_to_fc
 from fine_tuning import datasets, build_finetuned_from_checkpoint
 from models import *
 from utils import *
-from data_processing import convert_test_samples_to_features, QADataset, collate_testing_wrapper
+from data_processing import *
 from torch.utils.data import DataLoader
 
 
@@ -39,7 +39,7 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
     for question in questions:
         question_id = question["id"]
 
-        if question_id in predictions: # if we have a prediction for this question
+        if question_id in predictions:  # if we have a prediction for this question
             pred = predictions[question_id]["predictions"]
             question["exact_answer"] = pred
 
@@ -47,12 +47,11 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
         json.dump(data_dict, outfile)
 
 
-
 # in bioasq, we need to provide results by file
 if __name__ == "__main__":
     yes_no_checkpoint = "small_yesno_26_11229_1_374"
     factoid_checkpoint = "small_factoid_26_11229_1_380"
-    list_checkpoint = None
+    list_checkpoint = factoid_checkpoint # use the same checkpoint for factoid and list
 
     print("Using the following checkpoints for evaluation:\n\tyesno - {}\n\tfactoid - {}\n\tlist - {}"
           .format(yes_no_checkpoint, factoid_checkpoint, list_checkpoint))

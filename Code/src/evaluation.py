@@ -1,12 +1,6 @@
-from datasets import load_metric
-import argparse
 from tqdm import tqdm
-from read_data import dataset_to_fc
-from build_checkpoints import build_finetuned_from_checkpoint
 from models import *
-from utils import *
-from data_processing import convert_examples_to_features, QADataset, collate_wrapper, datasets
-from torch.utils.data import DataLoader
+from data_processing import *
 from metrics.bioasq_metrics import yes_no_evaluation, factoid_evaluation, list_evaluation
 from metrics.squad_metrics import squad_evaluation
 
@@ -14,7 +8,6 @@ from metrics.squad_metrics import squad_evaluation
 Refer to the following code
 https://huggingface.co/transformers/task_summary.html#extractive-question-answering
 """
-
 
 def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioasq"):
     """
@@ -352,126 +345,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
         return evaluation_metrics
     else:
         return results_by_question_id, evaluation_metrics
-
-
-if __name__ == "__main__":
-    # Log the process ID
-    print(f"Process ID: {os.getpid()}\n")
-
-    # -- Parse command line arguments (checkpoint name and model size)
-    parser = argparse.ArgumentParser(description='Overwrite default fine-tuning settings.')
-    parser.add_argument(
-        "--f-checkpoint",
-        default="small_factoid_26_11229_1_380",  # we can no longer use recent here - got to get specific :(
-        type=str,
-        help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487",
-    )
-    parser.add_argument(
-        "--dataset",
-        default="bioasq",
-        choices=['squad', 'bioasq'],
-        type=str,
-        help="The name of the dataset to use in evaluated e.g. squad",
-    )
-    parser.add_argument(
-        "--k",
-        default="5",
-        type=int,
-        help="K-best predictions are selected for factoid and list questions (between 1 and 100)",
-    )
-
-    args = parser.parse_args()
-    split_name = args.f_checkpoint.split("_")
-    model_size, model_question_type = split_name[0], split_name[1]
-    eval_question_type = "factoid"
-
-    if eval_question_type in ["factoid", "list"] and model_question_type not in ["factoid", "list"]:
-        raise Exception("Eval question type is '{}', therefore model question type must be factoid or list."
-                        .format(eval_question_type))
-    elif eval_question_type == "yesno" and model_question_type != "yesno":
-        raise Exception("Eval question type is yesno, therefore model question type must be yesno.")
-
-    sys.stderr.write("--- ARGUMENTS ---")
-    sys.stderr.write("\nEvaluating checkpoint: {}\nQuestion type: {}\nModel Size: {}\nK: {}"
-                     .format(args.f_checkpoint, eval_question_type, model_size, args.k))
-
-    # ------- Check the validity of the arguments passed via command line -------
-    try:  # check that the value of k is actually a number
-        k = int(args.k)
-        if k < 1 or k > 100:  # check that k is at least 1 and at most 100
-            raise ValueError
-    except ValueError:
-        raise Exception("k must be an integer between 1 and 100. Got {}".format(args.k))
-
-    # -- Override general config with model specific config, for models of different sizes
-    config = get_model_config(model_size, pretrain=False)
-    config["num_warmup_steps"] = 100  # dummy value to avoid an error when building fine-tuned checkpoint.
-
-    # ---- Set torch backend and set seed ----
-    torch.backends.cudnn.benchmark = torch.cuda.is_available()
-    set_seed(0)  # set seed for reproducibility
-
-    # -- Find path to checkpoint directory - create the directory if it doesn't exist
-    base_path = Path(__file__).parent
-    checkpoint_name = ("", args.f_checkpoint)
-    selected_dataset = args.dataset.lower()
-
-    base_checkpoint_dir = (base_path / '../checkpoints').resolve()
-    pretrain_checkpoint_dir = (base_checkpoint_dir / 'pretrain').resolve()
-    finetune_checkpoint_dir = (base_checkpoint_dir / 'finetune').resolve()
-    dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
-
-    # Create the fine-tune directory if it doesn't exist already
-    Path(finetune_checkpoint_dir).mkdir(exist_ok=True, parents=True)
-
-    # -- Set device
-    config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    print("Device: {}\n".format(config["device"].upper()))
-
-    # get basic model building blocks
-    electra_for_qa, optimizer, scheduler, electra_tokenizer, \
-    config = build_finetuned_from_checkpoint(model_size, config["device"], pretrain_checkpoint_dir,
-                                             finetune_checkpoint_dir, checkpoint_name, model_question_type, config)
-
-    # -- Load the data and prepare it in squad format
-    dataset_function = dataset_to_fc[selected_dataset]
-
-    # ---- Find the path(s) to the dataset file(s) ----
-    dataset_dir = (base_checkpoint_dir / '../datasets').resolve()
-    test_dataset_file_paths = [(dataset_dir / (selected_dataset + "/" + d_path)).resolve() for d_path in
-                               datasets[selected_dataset]["test"]]
-
-    sys.stderr.write("\nEvaluation files are '{}'".format(datasets[selected_dataset]["test"]))
-
-    # ----- PREPARE THE EVALUATION DATASET -----
-    sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))
-
-    # Once populated, the test_data_loader_dict will contain {"dataset_path": {"factoid": dataloader, "list": datalo...}
-    test_data_loader_dict = {}
-
-    for test_dataset_file_path in test_dataset_file_paths:  # iterate over each path separately.
-        test_data_loader_dict[test_dataset_file_path] = {}  # initialise empty dict for this dataset path
-        raw_test_dataset = dataset_function([test_dataset_file_path], testing=True)
-
-        raw_test_dataset_by_question = raw_test_dataset[eval_question_type]  # how do we also get list and factoid together?
-        test_features = convert_examples_to_features(raw_test_dataset_by_question, electra_tokenizer,
-                                                     config["max_length"])
-
-        print("Created {} test features of length {} from {} questions.".format(len(test_features),
-                                                                                config["max_length"], eval_question_type))
-        test_dataset = QADataset(test_features)
-
-        # Create a dataloader for each of the test datasets.
-        test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
-
-        # ------ START THE EVALUATION PROCESS ------
-        if eval_question_type == "factoid":
-            results_by_question_id = evaluate_factoid(electra_for_qa, test_data_loader, electra_tokenizer, k)
-        elif eval_question_type == "yesno":
-            results_by_question_id = evaluate_yesno(electra_for_qa, test_data_loader)
-
-        print('Results', results_by_question_id)
-
 
 
 

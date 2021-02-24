@@ -6,7 +6,7 @@ from utils import *
 from evaluation import evaluate_factoid, evaluate_yesno, evaluate_list
 from data_processing import *
 from build_checkpoints import build_finetuned_from_checkpoint
-from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
+from torch.utils.data import DataLoader, RandomSampler
 
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
