@@ -355,20 +355,19 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             all_input_ids = [tokenizer.cls_token_id] + question_input_ids + [tokenizer.sep_token_id] + clipped_input_ids + [tokenizer.sep_token_id]
             all_attention_mask = [1] + question_attention_mask + [1] + clipped_attention_mask + [1]
             all_token_type_ids = [0] + question_token_type_ids + [0] + clipped_token_type_ids + [1]
-
-            number_of_prepended_characters = 1 + len(question_input_ids)
+            number_of_prepended_tokens = 1 + len(question_input_ids)
 
             # pad the end with zeros if we have shorter length
             all_input_ids.extend([tokenizer.pad_token_id] * (max_length - len(all_input_ids)))  # add the padding token
             all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
             all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
 
-            # todo we aren't accounting for the doc stride in our start and end positions, hence the terrible results
+            # we are now accounting for the doc stride in our start and end positions, hence the terrible results
             # Now we're ready to create a feature
             feature = FactoidFeature(example._question_id, all_input_ids,
                                      all_attention_mask, all_token_type_ids,
-                                     start_token_position + number_of_prepended_characters,
-                                     end_token_position + number_of_prepended_characters, example._answer)
+                                     start_token_position + number_of_prepended_tokens - left_stride,
+                                     end_token_position + number_of_prepended_tokens - left_stride, example._answer)
             feature_list.append(feature)
 
     print('\n------- COLLATING FEATURE METRICS -------')

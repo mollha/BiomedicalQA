@@ -420,7 +420,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         snippets = data["snippets"]
         answer = data["exact_answer"].lower()
 
-
         metrics = {
             "num_examples": len(snippets),
             "num_questions": 1,

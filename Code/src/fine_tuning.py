@@ -83,7 +83,6 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
                 metric_results = evaluate_list(qa_model, eval_dataloader, electra_tokenizer, k, training=True, dataset=dataset)
             elif "yesno" == qt:
                 metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
-
             else:
                 raise Exception("Question type in config must be factoid, list or yesno.")
 
