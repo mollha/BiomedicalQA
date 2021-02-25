@@ -150,6 +150,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         pretrained_model, _, _, electra_tokenizer, _, p_model_config =\
             build_pretrained_from_checkpoint(model_size, device, pretrained_checkpoint_dir, pretrained_checkpoint_name)
         config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
+        config = update_settings(config, model_settings)
+
         discriminator = pretrained_model.discriminator
 
         if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid

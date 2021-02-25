@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, RandomSampler
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
     'seed': 0,
-    'finetune_stats': {
+    'finetune_statistics': {
         'losses': [],
         'avg_loss': [0, 0],
     },
@@ -99,6 +99,7 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
 
 def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optimizer, settings, checkpoint_dir):
     qa_model.to(settings["device"])
+    finetune_statistics = settings["finetune_statistics"]
 
     # ------------------ PREPARE TO START THE TRAINING LOOP ------------------
     sys.stderr.write("\n---------- BEGIN FINE-TUNING ----------")
@@ -154,9 +155,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
             loss.backward()  # back-propagate
 
             # update the average loss statistics
-            settings['finetune_stats']["avg_loss"][0] += float(loss.item())
-            settings['finetune_stats']["avg_loss"][1] += 1
-
+            finetune_statistics["avg_loss"][0] += float(loss.item())
+            finetune_statistics["avg_loss"][1] += 1
             nn.utils.clip_grad_norm_(qa_model.parameters(), 1.)
 
             # --- perform updates ---
@@ -173,24 +173,21 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                                  .format(settings["steps_trained"], settings["global_step"]))
                 save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
-        # TODO our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
         # just look at the statistics at the end of an epoch
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
-
         all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
 
         # update loss function statistics
-        settings['finetune_stats']["losses"].append(settings['finetune_stats']["avg_loss"][0] / settings['finetune_stats']["avg_loss"][1])  # bank stats
-        settings['finetune_stats']["avg_loss"] = [0, 0]  # reset stats
-
-
+        finetune_statistics["losses"].append(finetune_statistics["avg_loss"][0] / finetune_statistics["avg_loss"][1])  # bank stats
+        finetune_statistics["avg_loss"] = [0, 0]  # reset stats
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
-
     all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
     aggregated_metrics = condense_statistics(all_dataset_metrics)
+
+    print("\nOverall Metrics")
     for _ in aggregated_metrics:
         print("{}\n".format(aggregated_metrics[_]))
 
