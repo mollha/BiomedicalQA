@@ -27,11 +27,19 @@ def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=N
     plt.show()
 
 
+def pretty_print_settings(settings):
+    print("--- SETTINGS ---")
+    for key, value in settings.items():
+        print("{}: {}".format(key, value))
+    print()
+
+
 def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
 
     path_to_settings = os.path.join(path_to_checkpoint, "train_settings.bin")
     if os.path.isfile(path_to_settings):
         settings = torch.load(path_to_settings)
+        pretty_print_settings(settings)
     else:
         raise Exception("No training statistics to display.")
 
@@ -53,8 +61,10 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
     print("Graph creation complete.\n")
 
 
+
+
 if __name__ == "__main__":
-    chckpt_name = "small_yesno_26_11229_1_374"    # e.g. small_10_50
+    chckpt_name = "small_yesno_13_68164_9_123"    # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")

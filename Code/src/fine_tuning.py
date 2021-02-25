@@ -11,8 +11,10 @@ from torch.utils.data import DataLoader, RandomSampler
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
     'seed': 0,
-    'losses': [],
-    'avg_loss': [0, 0],
+    'finetune_stats': {
+        'losses': [],
+        'avg_loss': [0, 0],
+    },
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 10,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
@@ -178,23 +180,14 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
         all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
 
-        # parameter_debug_name = 'electra.encoder.layer.11.attention.self.value.weight' # todo remove when finished with this
-        # for n, p in qa_model.named_parameters():
-        #     if n == parameter_debug_name:
-        #         print("\n", parameter_debug_name, ":")
-        #         print('n', n)
-        #         print('p', p[:10])
-
-    # update loss function statistics
-    settings["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
-    settings["avg_loss"] = [0, 0]  # reset stats
+        # update loss function statistics
+        settings['finetune_stats']["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
+        settings['finetune_stats']["avg_loss"] = [0, 0]  # reset stats
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
 
     all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
-    # print("\nAll dataset metrics", all_dataset_metrics)
-
     aggregated_metrics = condense_statistics(all_dataset_metrics)
     for _ in aggregated_metrics:
         print("{}\n".format(aggregated_metrics[_]))
@@ -257,8 +250,11 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = torch.cuda.is_available()
     set_seed(config["seed"])  # set seed for reproducibility
 
-    # ---- Override general config with model specific config, for models of different sizes ----
+    # ---- Override model specific config with general config ----
     model_specific_config = get_model_config(config['size'], pretrain=False)
+
+    print("{} model config: {}".format(config["size"], model_specific_config))
+
     config = {**model_specific_config, **config}
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"  # set device
     sys.stderr.write("\nDevice: {}\n".format(config["device"].upper()))

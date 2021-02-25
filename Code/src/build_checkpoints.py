@@ -60,7 +60,6 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
 def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_steps):
     """ Get an optimizer and scheduler, adjusted for the particular parameters in our model.
     model_settings are settings relating to the model, config are extra parameters """
-    # todo, we may need to tweak this for classifier vs extractive models.
     # ------ LOAD MODEL FROM PRE-TRAINED CHECKPOINT OR FROM FINE-TUNED CHECKPOINT ------
     layerwise_learning_rates = get_layer_lrs(model.named_parameters(), model_settings["lr"],
                                              model_settings["layerwise_lr_decay"],
@@ -87,6 +86,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
     # -- Override general config with model specific config --
     model_settings = get_model_config(model_size, pretrain=False)
+    model_settings = {**model_settings, **get_data_specific_config(config['size'], config["dataset"])}
+
     generator, discriminator, electra_tokenizer, \
     discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
 
@@ -158,6 +159,5 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         else:
             raise Exception("Question type list must be contain factoid, list or yesno.")
 
-        optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings,
-                                                           config["num_warmup_steps"])
+        optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings, config["num_warmup_steps"])
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config

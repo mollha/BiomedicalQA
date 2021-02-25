@@ -85,9 +85,23 @@ large_finetune_config = {
 }
 
 # ----------------------
-reconfigure_settings = {
-
+reconfigure_small_settings = {
+    "boolq": {"lr": 1e-4},
+    "bioasq": {},
+    "squad": {},
 }  # todo we can define here how the settings transition for different datasets if we want to.
+
+reconfigure_base_settings = {
+    "boolq": {},
+    "bioasq": {},
+    "squad": {},
+}
+
+reconfigure_large_settings = {
+    "boolq": {},
+    "bioasq": {},
+    "squad": {},
+}
 
 
 def get_model_config(model_size: str, pretrain=True) -> dict:
@@ -99,6 +113,14 @@ def get_model_config(model_size: str, pretrain=True) -> dict:
     if pretrain:
         return [small_pretrain_config, base_pretrain_config, large_pretrain_config][index]
     return [small_finetune_config, base_finetune_config, large_finetune_config][index]
+
+
+# These settings are specific to particular datasets, if we need to make tweaks in the finetuning phase.
+def get_data_specific_config(model_size: str, dataset: str):
+    # assume fine-tuning
+    assert (model_size in ["small", "base", "large"])
+    index = ['small', 'base', 'large'].index(model_size)
+    return [reconfigure_small_settings, reconfigure_base_settings, reconfigure_large_settings][index][dataset]
 
 
 # ------------------ LOAD AND SAVE MODEL CHECKPOINTS ------------------
