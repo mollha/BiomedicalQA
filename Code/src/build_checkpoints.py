@@ -137,8 +137,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             # instead of the one we just loaded from the checkpoint.
             if config["dataset"] == new_config["dataset"]:  # we're continuing training on the same dataset
                 optimizer, scheduler = new_optimizer, new_scheduler  # overwrite optimizer and scheduler with loaded
+                config = update_settings(config, new_config, exceptions=["update_steps", "device", "evaluate_during_training"])
 
-            config = update_settings(config, new_config, exceptions=["update_steps", "device", "evaluate_during_training"])
             building_from_pretrained = False
         else:
             print("\nFine-tuning from the most advanced pre-trained checkpoint - invalid checkpoint '{}' provided.\n"
@@ -159,4 +159,6 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             raise Exception("Question type list must be contain factoid, list or yesno.")
 
         optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings, config["num_warmup_steps"])
+
+    print("finalised config leaving build checkpoints", config)
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
