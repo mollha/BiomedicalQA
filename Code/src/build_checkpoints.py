@@ -130,19 +130,19 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
             # get the template within which to load optimizer and scheduler
             optimizer, scheduler = get_optimizer_and_scheduler(qa_model, discriminator_config, model_settings, config["num_warmup_steps"])
-            electra_for_qa, new_optimizer, new_scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model, optimizer, scheduler, device, pre_training=False)
+            electra_for_qa, optimizer, scheduler, new_config = load_checkpoint(path_to_checkpoint, qa_model, optimizer, scheduler, device, pre_training=False)
 
             # config["dataset"] contains the new dataset we're fine-tuning on
             # if new_config["dataset"] (i.e. the old dataset) does not match, then we need a new scheduler and optimizer
             # instead of the one we just loaded from the checkpoint.
             if config["dataset"] == new_config["dataset"]:  # we're continuing training on the same dataset
-                optimizer, scheduler = new_optimizer, new_scheduler  # overwrite optimizer and scheduler with loaded
+                # optimizer and scheduler are overwritten with loaded versions
                 config = update_settings(config, new_config, exceptions=["update_steps", "device", "evaluate_during_training"])
+            else:
+                optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings, config["num_warmup_steps"])
 
             for param_group in optimizer.param_groups:
                 print(param_group['lr'])
-
-            raise Exception('force quit')
 
             building_from_pretrained = False
         else:
