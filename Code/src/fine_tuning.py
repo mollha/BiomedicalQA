@@ -181,7 +181,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
 
         # update loss function statistics
-        settings['finetune_stats']["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
+        settings['finetune_stats']["losses"].append(settings['finetune_stats']["avg_loss"][0] / settings['finetune_stats']["avg_loss"][1])  # bank stats
         settings['finetune_stats']["avg_loss"] = [0, 0]  # reset stats
 
 
