@@ -11,7 +11,7 @@
 #SBATCH --job-name=sm_finetune
 #SBATCH -p ug-gpu-small
 #SBATCH --qos=short
-#SBATCH -t 2:0:0
+#SBATCH -t 4:0:0
 #SBATCH --mem=12g
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
