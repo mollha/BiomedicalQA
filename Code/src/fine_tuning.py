@@ -154,8 +154,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
             loss.backward()  # back-propagate
 
             # update the average loss statistics
-            settings["avg_loss"][0] += float(loss.item())
-            settings["avg_loss"][1] += 1
+            settings['finetune_stats']["avg_loss"][0] += float(loss.item())
+            settings['finetune_stats']["avg_loss"][1] += 1
 
             nn.utils.clip_grad_norm_(qa_model.parameters(), 1.)
 
@@ -183,6 +183,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         # update loss function statistics
         settings['finetune_stats']["losses"].append(settings["avg_loss"][0] / settings["avg_loss"][1])  # bank stats
         settings['finetune_stats']["avg_loss"] = [0, 0]  # reset stats
+
+
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
