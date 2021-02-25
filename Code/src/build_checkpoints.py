@@ -142,6 +142,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             for param_group in optimizer.param_groups:
                 print(param_group['lr'])
 
+            raise Exception('force quit')
+
             building_from_pretrained = False
         else:
             print("\nFine-tuning from the most advanced pre-trained checkpoint - invalid checkpoint '{}' provided.\n"
