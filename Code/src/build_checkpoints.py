@@ -85,8 +85,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     Path(finetuned_checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
     # -- Override general config with model specific config --
-    model_settings = {**get_model_config(model_size, pretrain=False),
-                      **get_data_specific_config(config['size'], config["dataset"])}
+    model_settings = {**get_model_config(model_size, pretrain=False), **get_data_specific_config(config['size'], config["dataset"])}
 
     generator, discriminator, electra_tokenizer, \
     discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
@@ -119,7 +118,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             else:
                 print("\nWARNING: Checkpoint {} does not exist at path {}.\n".format(checkpoint_name, path_to_checkpoint))
 
-        # ---- If we're training from a valid finetuned checkpoint ----
+        # ---- If we're training from a valid fine-tuned checkpoint ----
         if valid_finetune_checkpoint:
             if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
                 qa_model = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create extractive QA model
@@ -150,8 +149,6 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         pretrained_model, _, _, electra_tokenizer, _, p_model_config =\
             build_pretrained_from_checkpoint(model_size, device, pretrained_checkpoint_dir, pretrained_checkpoint_name)
         config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
-        config = update_settings(config, model_settings)
-
         discriminator = pretrained_model.discriminator
 
         if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
