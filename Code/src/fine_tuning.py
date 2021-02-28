@@ -14,6 +14,7 @@ config = {
     'finetune_statistics': {
         'losses': [],
         'avg_loss': [0, 0],
+        'metrics': [],
     },
     'num_workers': 3 if torch.cuda.is_available() else 0,
     "max_epochs": 10,  # can override the val in config
@@ -37,6 +38,7 @@ config = {
 
 
 def condense_statistics(metrics):
+
     all_metrics = {}
 
     for dataset_name in metrics:  # iterate over top-level dset names
@@ -177,6 +179,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
         all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
+        finetune_statistics["metrics"].append(condense_statistics(all_dataset_metrics))
 
         # update loss function statistics
         finetune_statistics["losses"].append(finetune_statistics["avg_loss"][0] / finetune_statistics["avg_loss"][1])  # bank stats

@@ -43,6 +43,9 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
     else:
         raise Exception("No training statistics to display.")
 
+    metrics = settings["finetune_statistic"]["metrics"]
+    print(metrics)
+
     num_epochs = range(1, settings["current_epoch"] + 1)  # might need to add 1
     losses = settings["losses"]
 
