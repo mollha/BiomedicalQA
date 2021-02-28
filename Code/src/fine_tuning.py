@@ -1,4 +1,6 @@
 import argparse
+import copy
+
 from read_data import dataset_to_fc
 from tqdm import tqdm
 from models import *
@@ -74,9 +76,13 @@ def condense_statistics(metrics):
 
 def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics):
 
+    metrics_for_plotting = {}
+
     for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
         loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
         sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
+
+        metrics_for_plotting[eval_dataset_name] = {}
 
         for qt in loader_all_question_types:
             eval_dataloader = loader_all_question_types[qt]
@@ -90,13 +96,14 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
             else:
                 raise Exception("Question type in config must be factoid, list or yesno.")
 
+            # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
             if len(metric_results) > 0:
                 sys.stderr.write("\nGathering metrics for {} questions".format(qt))
-                # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
                 sys.stderr.write("\n\nCurrent evaluation metrics are {}\n".format(metric_results))
                 all_dataset_metrics[eval_dataset_name][qt].append(metric_results)
+                metrics_for_plotting[eval_dataset_name][qt] = metric_results
 
-    return all_dataset_metrics
+    return all_dataset_metrics, metrics_for_plotting
 
 
 def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optimizer, settings, checkpoint_dir):
@@ -178,8 +185,8 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
         # just look at the statistics at the end of an epoch
         sys.stderr.write("\n{} steps trained in current epoch, {} steps trained overall."
                          .format(settings["steps_trained"], settings["global_step"]))
-        all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
-        finetune_statistics["metrics"].append(condense_statistics(all_dataset_metrics))
+        all_dataset_metrics, plotting_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
+        finetune_statistics["metrics"].append(copy.deepcopy(plotting_metrics))
 
         # update loss function statistics
         finetune_statistics["losses"].append(finetune_statistics["avg_loss"][0] / finetune_statistics["avg_loss"][1])  # bank stats
@@ -187,7 +194,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
-    all_dataset_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
+    all_dataset_metrics, _ = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
     aggregated_metrics = condense_statistics(all_dataset_metrics)
 
     print("\nOverall Metrics")
