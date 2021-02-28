@@ -28,9 +28,9 @@ def update_dataset_metrics(total_metrics, additional_metrics):
 
 def get_question_stats(list_of_questions):
     # Note: list of questions should be the same type
-    avg_length = round(sum([len(q._question) for q in list_of_questions])/len(list_of_questions), 2)
-    return avg_length
-
+    avg_question_length = round(sum([len(q._question) for q in list_of_questions])/len(list_of_questions), 2)
+    avg_context_length = round(sum([len(q._short_context) for q in list_of_questions])/len(list_of_questions), 2)
+    return avg_question_length, avg_context_length
 
 
 class BinaryExample:
@@ -487,7 +487,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
             print("No metrics available for question type '{}'".format(qt))
             continue
 
-        print("Average length: {}".format(get_question_stats(dataset[qt])))
+        print("Average questiion and context length: {}".format(get_question_stats(dataset[qt])))
 
         # compute this for all metric types
         num_examples = qt_metrics["num_examples"]
