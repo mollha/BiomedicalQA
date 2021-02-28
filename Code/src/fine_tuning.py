@@ -204,7 +204,7 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid'],
+    parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
                         type=str,
                         help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
     parser.add_argument("--dataset", default="boolq", choices=['squad', 'bioasq', 'boolq'], type=str,
@@ -256,7 +256,6 @@ if __name__ == "__main__":
     print("{} model config: {}".format(config["size"], model_specific_config))
     config = {**model_specific_config, **config, **data_specific_config}
     print("Combined config: {}".format(config))
-
 
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"  # set device
     sys.stderr.write("\nDevice: {}\n".format(config["device"].upper()))
