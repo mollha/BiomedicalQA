@@ -40,41 +40,39 @@ def visualise_yes_no(checkpoint_name, metrics):
     #         "f1_ma": f1_ma,
     #     }
 
-    for dataset in metrics:
-        num_epochs = range(1, len(metrics) + 1)  # might need to add 1
-        fig_size = (5, 5)
+    num_epochs = range(1, len(metrics) + 1)  # might need to add 1
+    fig_size = (5, 5)
 
-        accuracy = [metric_dict[dataset]["yesno"]["accuracy"] for metric_dict in metrics]
-        precision = [metric_dict[dataset]["yesno"]["precision_y"] for metric_dict in metrics]
-        recall = [metric_dict[dataset]["yesno"]["recall_y"] for metric_dict in metrics]
-        # f1_y = [metric_dict[dataset]["yesno"]["f1_y"] for metric_dict in metrics]
-        # f1_n = [metric_dict[dataset]["yesno"]["f1_n"] for metric_dict in metrics]
-        f1_ma = [metric_dict[dataset]["yesno"]["f1_ma"] for metric_dict in metrics]
+    accuracy = [metric_dict["yesno"][0]["accuracy"] for metric_dict in metrics]
+    precision = [metric_dict["yesno"][0]["precision"] for metric_dict in metrics]
+    recall = [metric_dict["yesno"][0]["recall"] for metric_dict in metrics]
+    # f1_y = [metric_dict["yesno"][0]["f1_y"] for metric_dict in metrics]
+    # f1_n = [metric_dict["yesno"][0]["f1_n"] for metric_dict in metrics]
+    f1_ma = [metric_dict["yesno"][0]["f1_ma"] for metric_dict in metrics]
 
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Accuracy",
+               data=accuracy,
+               data_label="Accuracy",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
 
-        plt.figure(3, figsize=fig_size)
-        draw_graph(graph_title="Accuracy",
-                   data=accuracy,
-                   data_label="Accuracy",
-                   epochs=num_epochs,
-                   checkpoint_name=checkpoint_name)
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Precision and Recall",
+               data=precision,
+               data_label="Precision",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               y_label="Metric Value",
+               more_data=recall,
+               more_data_label="Recall")
 
-        plt.figure(3, figsize=fig_size)
-        draw_graph(graph_title="Precision and Recall",
-                   data=precision,
-                   data_label="Precision",
-                   epochs=num_epochs,
-                   checkpoint_name=checkpoint_name,
-                   y_label="Metric Value",
-                   more_data=recall,
-                   more_data_label="Recall")
-
-        plt.figure(3, figsize=fig_size)
-        draw_graph(graph_title="F1 Score",
-                   data=f1_ma,
-                   data_label="Macro Avg F1 Score",
-                   epochs=num_epochs,
-                   checkpoint_name=checkpoint_name)
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="F1 Score",
+               data=f1_ma,
+               data_label="Macro Avg F1 Score",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
 
 
 def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
@@ -101,7 +99,7 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
     print(losses)
 
     print("Creating graph of model loss")
-    draw_graph(graph_title="Loss during fine-tuning",
+    draw_graph(graph_title="Loss",
                data=losses,
                data_label="Loss",
                epochs=num_epochs,
