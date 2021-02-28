@@ -4,27 +4,103 @@ from pathlib import Path
 import pickle
 
 import torch
+from matplotlib import rc
+
+
+axis_font_size=12
 
 base_path = Path(__file__).parent
 checkpoint_dir = (base_path / '../checkpoints/finetune').resolve()
 graphs_path = (base_path / 'visualisations/fine_tuning_graphs').resolve()
 Path(graphs_path).mkdir(exist_ok=True, parents=True)
 
+rc('font', **{'family': 'serif', 'serif': ['Times']})
+rc('text', usetex=True)
 
-def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=None, more_data=None, more_data_label=None):
-    plt.plot(epochs, data, label=data_label)
+def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=None, more_data=None,
+               more_data_label=None, save_figure=True, color="b"):
+    plt.plot(epochs, data, label=data_label, color=color)
     if more_data is not None:
         plt.plot(epochs, more_data, label=more_data_label)
 
-    plt.title(graph_title)
+    plt.title(r"\textbf{" + graph_title + "}")
     plt.xlabel("Epochs")
     y_label = y_label if y_label is not None else data_label
     graph_save_name = checkpoint_name + "_" + y_label.lower().replace(" ", "_") + "_epochs.png"
 
     plt.ylabel(y_label)
-    plt.legend()
-    plt.savefig((graphs_path / graph_save_name).resolve())
+
+    if more_data is not None:
+        plt.legend()
+
+    if save_figure:
+        plt.savefig((graphs_path / graph_save_name).resolve())  # this is saving them weird due to subplots
+        plt.show()
+    return plt
+
+def create_subplots(checkpoint_name, metrics, losses):
+    num_epochs = range(1, len(metrics) + 1)  # might need to add 1
+
+    accuracy = [metric_dict["yesno"][0]["accuracy"] for metric_dict in metrics]
+    precision = [metric_dict["yesno"][0]["precision"] for metric_dict in metrics]
+    recall = [metric_dict["yesno"][0]["recall"] for metric_dict in metrics]
+    # f1_y = [metric_dict["yesno"][0]["f1_y"] for metric_dict in metrics]
+    # f1_n = [metric_dict["yesno"][0]["f1_n"] for metric_dict in metrics]
+    f1_ma = [metric_dict["yesno"][0]["f1_ma"] for metric_dict in metrics]
+
+    plt.subplot(2, 2, 1)
+    draw_graph(graph_title="Accuracy",
+               data=accuracy,
+               data_label="Accuracy",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="r",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplot(2, 2, 2)
+    draw_graph(graph_title="Precision and Recall",
+               data=precision,
+               data_label="Precision",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               y_label="Metric Value",
+               more_data=recall,
+               more_data_label="Recall",
+               color="g",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplot(2, 2, 3)
+    draw_graph(graph_title="F1 Score",
+               data=f1_ma,
+               data_label="Macro Avg F1 Score",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="c",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+
+    plt.subplot(2, 2, 4)
+    draw_graph(graph_title="Loss",
+               data=losses,
+               data_label="Loss",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               y_label="Loss",
+               color="C0",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplots_adjust(hspace=0.6, wspace=0.45)
+    plt.savefig((checkpoint_name + "_finetuning_subplot.png"))  # this is saving them weird due to subplots
     plt.show()
+    print("\nGraph creation complete.\n")
 
 
 def visualise_yes_no(checkpoint_name, metrics):
@@ -56,6 +132,7 @@ def visualise_yes_no(checkpoint_name, metrics):
                data_label="Accuracy",
                epochs=num_epochs,
                checkpoint_name=checkpoint_name)
+
 
     plt.figure(3, figsize=fig_size)
     draw_graph(graph_title="Precision and Recall",
@@ -91,22 +168,14 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
     metrics = settings["finetune_statistics"]["metrics"]
     print(metrics)
 
-    num_epochs = range(0, settings["current_epoch"] + 1)  # might need to add 1
     losses = settings["finetune_statistics"]["losses"]
 
     if len(losses) == 0:
         raise Exception("Losses list does not contain any data.")
     print(losses)
 
-    print("Creating graph of model loss")
-    draw_graph(graph_title="Loss",
-               data=losses,
-               data_label="Loss",
-               epochs=num_epochs,
-               checkpoint_name=checkpoint_name,
-               y_label="Loss")
-
     visualise_yes_no(checkpoint_name, metrics)
+    create_subplots(checkpoint_name, metrics, losses)
 
     print("Graph creation complete.\n")
 
@@ -114,7 +183,7 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "small_yesno_14_79670_9_103"    # e.g. small_10_50
+    chckpt_name = "small_yesno_14_79670_29_103"    # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
