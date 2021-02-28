@@ -294,8 +294,6 @@ if __name__ == "__main__":
         sub_train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer, config["max_length"], yesno_weights)
         train_features.extend(sub_train_features)
 
-    raise Exception('Force quit')
-
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
     # Random Sampler used during training. We create a single data_loader for training.
@@ -320,6 +318,9 @@ if __name__ == "__main__":
             # Create a dataloader for each of the test datasets.
             test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
             test_data_loader_dict[test_dataset_file_path][qt] = test_data_loader
+
+    raise Exception('Force quit')
+
 
     config["num_warmup_steps"] = len(train_data_loader) * config["max_epochs"]
     electra_for_qa, optimizer, scheduler, electra_tokenizer, \
