@@ -82,7 +82,7 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
         loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
         sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
 
-        metrics_for_plotting[eval_dataset_name] = {}
+        metrics_for_plotting = {k: [] for k in loader_all_question_types}
 
         for qt in loader_all_question_types:
             eval_dataloader = loader_all_question_types[qt]
@@ -101,7 +101,7 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
                 sys.stderr.write("\nGathering metrics for {} questions".format(qt))
                 sys.stderr.write("\n\nCurrent evaluation metrics are {}\n".format(metric_results))
                 all_dataset_metrics[eval_dataset_name][qt].append(metric_results)
-                metrics_for_plotting[eval_dataset_name][qt] = metric_results
+                metrics_for_plotting[qt].append(metric_results)
 
     return all_dataset_metrics, metrics_for_plotting
 
