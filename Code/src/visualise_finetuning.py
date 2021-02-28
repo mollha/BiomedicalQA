@@ -98,7 +98,7 @@ def create_subplots(checkpoint_name, metrics, losses):
     for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
     plt.subplots_adjust(hspace=0.6, wspace=0.45)
-    plt.savefig((checkpoint_name + "_finetuning_subplot.png"))  # this is saving them weird due to subplots
+    plt.savefig(graphs_path + "/" + checkpoint_name + "_finetuning_subplot.png")  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")
 
