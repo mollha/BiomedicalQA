@@ -74,7 +74,7 @@ def condense_statistics(metrics):
     return all_metrics
 
 
-def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics):
+def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics, k=5):
 
     metrics_for_plotting = {}
 

@@ -7,7 +7,7 @@ import torch
 from matplotlib import rc
 
 
-axis_font_size=12
+axis_font_size=13
 
 base_path = Path(__file__).parent
 checkpoint_dir = (base_path / '../checkpoints/finetune').resolve()
@@ -23,12 +23,12 @@ def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=N
     if more_data is not None:
         plt.plot(epochs, more_data, label=more_data_label)
 
-    plt.title(r"\textbf{" + graph_title + "}")
-    plt.xlabel("Epochs")
+    plt.title(r"\textbf{" + graph_title + "}", fontsize=axis_font_size)
+    plt.xlabel("Epochs", fontsize=axis_font_size)
     y_label = y_label if y_label is not None else data_label
     graph_save_name = checkpoint_name + "_" + y_label.lower().replace(" ", "_") + "_epochs.png"
 
-    plt.ylabel(y_label)
+    plt.ylabel(y_label, fontsize=axis_font_size)
 
     if more_data is not None:
         plt.legend()
@@ -98,7 +98,7 @@ def create_subplots(checkpoint_name, metrics, losses):
     for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
     plt.subplots_adjust(hspace=0.6, wspace=0.45)
-    plt.savefig(graphs_path + "/" + checkpoint_name + "_finetuning_subplot.png")  # this is saving them weird due to subplots
+    plt.savefig(str(graphs_path) + "/" + checkpoint_name + "_finetuning_subplot.png")  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")
 
