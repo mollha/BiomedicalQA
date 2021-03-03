@@ -1,17 +1,14 @@
 import json
 from pathlib import Path
 import re
-
 import unidecode
 from transformers import DistilBertTokenizerFast
 from spacy.lang.en import English
 import spacy
 from nltk.tokenize import sent_tokenize
 from transformers.data.processors.squad import SquadExample
-
 import string
 from tqdm import tqdm
-
 from spacy.matcher import PhraseMatcher, Matcher
 from spacy.lang.en.stop_words import STOP_WORDS
 
@@ -25,6 +22,7 @@ def update_dataset_metrics(total_metrics, additional_metrics):
         else:
             total_metrics[key] = additional_metrics[key]
     return total_metrics
+
 
 def get_question_stats(list_of_questions):
     # Note: list of questions should be the same type
@@ -289,7 +287,6 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
         return {"yesno": dataset}
     else:
         return {"yesno": dataset}, yesno_weights
-
 
 
 def read_bioasq(paths_to_files: list, testing=False, question_types=[]):

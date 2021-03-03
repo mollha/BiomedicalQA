@@ -194,6 +194,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
         "non_match_gt": 0,
         "non_match_pt": 0,
         "empty_mapping": 0,
+        "exceed_max_length": 0,
     }
 
     feature_list = []
@@ -272,8 +273,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             # If we have found the token containing the start position, then we need to find the corresponding (sub)tok
             if pre_token_start_pos <= text_start_pos < pre_token_end_pos:  # found the token corresponding to start
                 # We receive a mapping of the sub_tokens that we passed to this function
-                mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens,
-                                                     pre_token_start_pos, text_start_pos)
+                mapping = sub_tokenize_answer_tokens(tokenizer, pre_token, token_sub_tokens, pre_token_start_pos, text_start_pos)
                 if mapping is None:
                     metrics["empty_mapping"] += 1
                     continue
@@ -287,7 +287,6 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                 if mapping is None:
                     metrics["empty_mapping"] += 1
                     continue
-
                 token_sub_tokens = [t[0] for t in mapping]
 
             if mapping is not None:
@@ -321,14 +320,15 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
         # At this point, we have the tokenized start and end position of the answer, input ids, attention mask,
         # token_type_ids question etc. We need to combine these components into actual features.
-        tokenized_question = tokenizer.tokenize(question)
+        tokenized_question = tokenizer.tokenize(question)  # tokenize the question
         question_input_ids = tokenizer.convert_tokens_to_ids(tokenized_question)
-        question_attention_mask = len(question_input_ids) * [1]
-        question_token_type_ids = len(question_input_ids) * [0]
+        question_attention_mask = len(question_input_ids) * [1]  # pay attention to all question input ids.
+        question_token_type_ids = len(question_input_ids) * [0]  # token type ids are 0 for question tokens.
 
-        num_question_tokens = len(tokenized_question)  # tokenize the question
+        num_question_tokens = len(tokenized_question)  # count number of question tokens
+        # [CLS] QUESTION [SEP] SHORT_CONTEXT [SEP]
         num_additional_tokens = 3  # refers to the [CLS] tokens and [SEP] tokens used when combining question & context
-        num_context_tokens = max_length - num_question_tokens - num_additional_tokens
+        num_context_tokens = max_length - num_question_tokens - num_additional_tokens  # e.g. SHORT_CONTEXT length
 
         # We need to take "doc strides" of the context paragraph of lengths up to num_context_tokens
         # These strides must centre around the tokenized start and end positions
@@ -337,15 +337,38 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
         # Note: the question token type ids are 0s, the context token type ids are 1s
         num_answer_tokens = end_token_position - start_token_position
+
+        # if the max short context length is less than the answer length, then we can't use this example :(
+        # as we do not have enough tokens to represent the answer in the context paragraph.
+        if num_answer_tokens > num_context_tokens:
+            metrics["exceed_max_length"] += 1
+            continue
+
         # Shift the doc stride in intervals of 20 so that we don't create way too many features
-        for left_stride in range(0, num_context_tokens - num_answer_tokens, 20):
-            right_stride = num_context_tokens - num_answer_tokens - left_stride
-            left_clip = max(0, start_token_position - left_stride)
-            right_clip = min(end_token_position + right_stride, len(input_ids))
+
+        # for left_stride in range(0, num_context_tokens - num_answer_tokens, 20):  # left_stride
+
+        # change the 20 to a more random amount to stop the model learning weird patterns around this
+        for left_clip in range(max(0, start_token_position - num_context_tokens + num_answer_tokens), start_token_position, 20):  # left_stride starts between start_token_position - num_context_tokens and start token position
+            right_clip = min(left_clip + num_context_tokens, len(input_ids))
+            # print('\nleft_clip', left_clip)
+            # print('right_clip', right_clip)
+            #
+            # print('num context', num_context_tokens)
+
+            # min(left_clip + num_context_tokens, len(input_ids))
+            # right_stride = num_context_tokens - num_answer_tokens - left_clip
+
+            # print(tokenizer.convert_ids_to_tokens(input_ids[start_token_position:end_token_position]))
+
+            # left_clip = max(0, start_token_position - left_stride)
+            # right_clip = min(end_token_position + right_stride, len(input_ids))  # todo do we need to add 1 to len(input_ids) to account for end position clipping
 
             clipped_input_ids = input_ids[left_clip: right_clip]
             clipped_attention_mask = attention_mask[left_clip: right_clip]
             clipped_token_type_ids = token_type_ids[left_clip: right_clip]
+
+            # print(tokenizer.convert_ids_to_tokens(clipped_input_ids))
 
             # concatenate the question, special tokens and context to make features
             # [CLS] and first [SEP] are considered part of the context for token_type_ids.
@@ -355,7 +378,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             all_input_ids = [tokenizer.cls_token_id] + question_input_ids + [tokenizer.sep_token_id] + clipped_input_ids + [tokenizer.sep_token_id]
             all_attention_mask = [1] + question_attention_mask + [1] + clipped_attention_mask + [1]
             all_token_type_ids = [0] + question_token_type_ids + [0] + clipped_token_type_ids + [1]
-            number_of_prepended_tokens = 1 + len(question_input_ids)
+            number_of_prepended_tokens = 1 + len(question_input_ids) + 1
 
             # pad the end with zeros if we have shorter length
             all_input_ids.extend([tokenizer.pad_token_id] * (max_length - len(all_input_ids)))  # add the padding token
@@ -366,8 +389,17 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             # Now we're ready to create a feature
             feature = FactoidFeature(example._question_id, all_input_ids,
                                      all_attention_mask, all_token_type_ids,
-                                     start_token_position + number_of_prepended_tokens - left_stride,
-                                     end_token_position + number_of_prepended_tokens - left_stride, example._answer)
+                                     start_token_position + number_of_prepended_tokens - left_clip,
+                                     end_token_position + number_of_prepended_tokens - left_clip, example._answer)
+            # print("start and end verifications")
+            # print('start', start_token_position + number_of_prepended_tokens - left_clip)
+            # print('end', end_token_position + number_of_prepended_tokens - left_clip)
+            # print('\nexpected answer', example._answer)
+
+            # iids = all_input_ids[start_token_position + number_of_prepended_tokens - left_clip:end_token_position + number_of_prepended_tokens - left_clip]
+            # tids = tokenizer.convert_ids_to_tokens(iids)
+
+            # print('actual answer', tokenizer.convert_tokens_to_string(tids))
             feature_list.append(feature)
 
     print('\n------- COLLATING FEATURE METRICS -------')
@@ -382,6 +414,8 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
         100 * metrics["non_match_pt"] / total_examples_skipped, 2)
     percentage_empty_mapping = 0 if total_examples_skipped == 0 else round(
         100 * metrics["empty_mapping"] / total_examples_skipped, 2)
+    percentage_exceed_max_length = 0 if total_examples_skipped == 0 else round(
+        100 * metrics["exceed_max_length"] / total_examples_skipped, 2)
 
     print('{} examples were skipped in total due to the following errors:'.format(total_examples_skipped))
     print("- {} errors ({}%): Ground truth answer does not match joined token answer"
@@ -390,6 +424,8 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
           .format(metrics["non_match_pt"], percentage_non_match_pt))
     print("- {} errors ({}%): Map returned by sub-tokenize was empty"
           .format(metrics["empty_mapping"], percentage_empty_mapping))
+    print("- {} errors ({}%): Not enough context tokens available to represent the answer"
+          .format(metrics["exceed_max_length"], percentage_exceed_max_length))
     return feature_list
 
 
