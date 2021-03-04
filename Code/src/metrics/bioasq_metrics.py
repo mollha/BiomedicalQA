@@ -104,6 +104,7 @@ def factoid_evaluation(predictions, ground_truths):
     correct_in_position_1 = 0
     correct_in_any_position = 0
     total_one_over_ri = 0
+
     for idx, prediction in enumerate(predictions):  # for every prediction
         # We expect each prediction to be a list of candidate answers,
         # however, the ground truth answer should be a single string.
@@ -128,7 +129,7 @@ def factoid_evaluation(predictions, ground_truths):
 
     strict_accuracy = 0 if total_questions == 0 else round(correct_in_position_1 / total_questions, 3)
     leniant_accuracy = 0 if total_questions == 0 else round(correct_in_any_position / total_questions, 3)
-    mrr = 0 if total_one_over_ri == 0 or total_questions == 0 else round((1 / total_questions) / total_one_over_ri, 3)
+    mrr = 0 if total_one_over_ri == 0 or total_questions == 0 else round((1 / total_questions) * total_one_over_ri, 3)
 
     metrics = {
         "strict_accuracy": strict_accuracy,
