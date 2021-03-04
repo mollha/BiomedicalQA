@@ -94,11 +94,11 @@ def yes_no_evaluation(predictions, ground_truth):
 
 
 # --------- METRICS FOR FACTOID QUESTIONS ---------
-def factoid_evaluation(predictions, ground_truth):
-    if len(predictions) != len(ground_truth):
+def factoid_evaluation(predictions, ground_truths):
+    if len(predictions) != len(ground_truths):
         # not enough labels to match
         raise Exception(
-            "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truth)))
+            "There are {} predictions and {} ground truth values.".format(len(predictions), len(ground_truths)))
 
     total_questions = len(predictions)
     correct_in_position_1 = 0
@@ -109,7 +109,7 @@ def factoid_evaluation(predictions, ground_truth):
         # however, the ground truth answer should be a single string.
 
         # get the corresponding ground truth label(s)
-        truth_values = ground_truth[idx]  # get the list of correct answers
+        truth_values = ground_truths[idx]  # get the list of correct answers
 
         match_position = None
         for list_pos, candidate_answer in enumerate(prediction):

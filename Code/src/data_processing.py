@@ -166,7 +166,6 @@ def sub_tokenize_answer_tokens(tokenizer, pre_token, sub_tokens, pre_token_absol
                 num_sub_tokens = ["##{}".format(t) if i != 0 else t for i, t in enumerate(lone_subtoken)]
                 # print('Num sub tokens again again', num_sub_tokens)
 
-
             # recursive call to further break down sub-token
             sub_mapping = sub_tokenize_answer_tokens(tokenizer, new_pre_token, num_sub_tokens, st_start_pos,
                                                      match_position)
@@ -218,8 +217,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
         # If question type is factoid or list (i.e. not a yes/no question). Given start and end positions in the text,
         # we now need to find the tokenized start and end positions of the answer(s)
-        text_start_pos = example._answer_start
-        text_end_pos = example._answer_end
+        text_start_pos, text_end_pos = example._answer_start, example._answer_end
         answer = example._answer
 
         # if text_start_pos and text_end_pos are -1, then we have an impossible question.
@@ -351,24 +349,9 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
         # change the 20 to a more random amount to stop the model learning weird patterns around this
         for left_clip in range(max(0, start_token_position - num_context_tokens + num_answer_tokens), start_token_position, 20):  # left_stride starts between start_token_position - num_context_tokens and start token position
             right_clip = min(left_clip + num_context_tokens, len(input_ids))
-            # print('\nleft_clip', left_clip)
-            # print('right_clip', right_clip)
-            #
-            # print('num context', num_context_tokens)
-
-            # min(left_clip + num_context_tokens, len(input_ids))
-            # right_stride = num_context_tokens - num_answer_tokens - left_clip
-
-            # print(tokenizer.convert_ids_to_tokens(input_ids[start_token_position:end_token_position]))
-
-            # left_clip = max(0, start_token_position - left_stride)
-            # right_clip = min(end_token_position + right_stride, len(input_ids))  # todo do we need to add 1 to len(input_ids) to account for end position clipping
-
             clipped_input_ids = input_ids[left_clip: right_clip]
             clipped_attention_mask = attention_mask[left_clip: right_clip]
             clipped_token_type_ids = token_type_ids[left_clip: right_clip]
-
-            # print(tokenizer.convert_ids_to_tokens(clipped_input_ids))
 
             # concatenate the question, special tokens and context to make features
             # [CLS] and first [SEP] are considered part of the context for token_type_ids.
@@ -390,7 +373,11 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             feature = FactoidFeature(example._question_id, all_input_ids,
                                      all_attention_mask, all_token_type_ids,
                                      start_token_position + number_of_prepended_tokens - left_clip,
-                                     end_token_position + number_of_prepended_tokens - left_clip, example._answer)
+                                     end_token_position + number_of_prepended_tokens - left_clip,
+                                     example._answer)
+
+            # question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end, answer_text
+
             # print("start and end verifications")
             # print('start', start_token_position + number_of_prepended_tokens - left_clip)
             # print('end', end_token_position + number_of_prepended_tokens - left_clip)

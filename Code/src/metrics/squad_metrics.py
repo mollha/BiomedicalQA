@@ -81,7 +81,7 @@ def squad_evaluation(predictions, ground_truth):
 
         # get the corresponding ground truth label
         truth_values = ground_truth[idx]
-        truth_value = truth_values[0] # take the first, and most likely prediction.
+        truth_value = truth_values[0]  # take the first, and most likely prediction for squad.
 
         max_exact_match = -float('inf')
         max_f1 = -float('inf')

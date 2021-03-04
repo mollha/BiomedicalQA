@@ -135,7 +135,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
             answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
 
-
             # todo perform thresholding if necessary
 
             # print('answer_starts', answer_starts)
@@ -208,8 +207,12 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
         if len(results_by_question_id[q_id]["expected_answers"]) > 1 or results_by_question_id[q_id]["expected_answers"][0] is not None:
-            predictions_list.append(predicted_answer)
+            # predictions_list.append(predicted_answer)
+            predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
+
+            print('\nBest Predictions', best_predictions)
+            print('Expected Answers', results_by_question_id[q_id]["expected_answers"])
 
     if dataset == "bioasq":
         evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
