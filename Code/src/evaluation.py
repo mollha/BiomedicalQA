@@ -8,7 +8,6 @@ from metrics.squad_metrics import squad_evaluation
 Refer to the following code
 https://huggingface.co/transformers/task_summary.html#extractive-question-answering
 """
-
 def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioasq"):
     """
     Given a model and a test-set, evaluate the model's performance on the test set.
@@ -71,10 +70,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
         # print('pred tensor', pred_tensor)
 
         best_pred = torch.mode(pred_tensor, 0).values  # get the most common value in the prediction tensor
-        # print('best pred', best_pred)
-        # todo best prediction always seems to be 1 / yes
         # batch labels are varied
-        # print('best prediction', best_pred)
         predicted_answer = "yes" if best_pred == 1 else "no"  # convert 1s to yes and 0s to no
         results_by_question_id[q_id]["predictions"] = predicted_answer
 
@@ -85,7 +81,10 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
 
     if dataset == "bioasq" or dataset == "boolq":  # Deploy the bioasq metrics on our results.
         # Evaluation metrics are empty if we didn't have any expected answers.
-        eval_metrics = {} if len(predictions_list) == 0 else yes_no_evaluation(predictions_list, ground_truth_list)
+        if any(ground_truth_list):  # if any of the ground truth values are not None
+            eval_metrics = {} if len(predictions_list) == 0 else yes_no_evaluation(predictions_list, ground_truth_list)
+        else:
+            eval_metrics = {}
 
         if training:
             return eval_metrics
@@ -136,22 +135,14 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
 
             # todo perform thresholding if necessary
-
-            # print('answer_starts', answer_starts)
-            # print('start_indices', start_indices)
-            # print('answer_ends', answer_ends)
-            # print('end_indices', end_indices)
-            # quit()
-
             start_end_positions = [x for x in zip(start_indices, end_indices)]
-            # print('start_end_positions', start_end_positions)
 
             # iterate over our pairs of start and end indices
             for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
                 # e.g. start_tensor = tensor([110,  33,  38, 111,  35]), end_tensor = tensor([20,  0, 90, 36, 62])
                 sub_start_end_positions = zip(start_tensor, end_tensor)  # zip the start and end positions
                 input_ids = batch.input_ids[index]
-                expected_answer = batch.answer_text[index]
+                expected_answer = batch.answer_text[index]  # Note: this will could be None
                 question_id = batch.question_ids[index]
 
                 list_of_predictions = []  # gather all of the predictions for this question
@@ -162,7 +153,10 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     # make sure we don't end up with special characters in our predicted
                     predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
-                    list_of_predictions.append(predicted_answer)
+
+                    # don't put repeats in our list.
+                    if predicted_answer not in list_of_predictions:
+                        list_of_predictions.append(predicted_answer)
 
                 if question_id in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(list_of_predictions)
@@ -186,18 +180,13 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         best_predictions = []
         num_best_predictions = 0
 
-        # if dataset == "squad":
-        #     k = 1
-
         # iterate over this prediction list until we reach the end, or we have enough predictions.
         for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
             for pred in ordered_pred_list:
                 if num_best_predictions >= k:
                     break
-
                 num_best_predictions += 1
                 best_predictions.append(pred)
-
             if num_best_predictions >= k:
                 break
 
@@ -210,22 +199,26 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             # predictions_list.append(predicted_answer)
             predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
-
             print('\nBest Predictions', best_predictions)
             print('Expected Answers', results_by_question_id[q_id]["expected_answers"])
 
-    if dataset == "bioasq":
-        evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
-    elif dataset == "squad":
-        # this should be able to handle lists of lists of ground truth values.
-        evaluation_metrics = squad_evaluation(predictions_list, ground_truth_list)
+    if any(ground_truth_list):  # if any of the ground truth values are not None
+        if dataset == "bioasq":
+            evaluation_metrics = factoid_evaluation(predictions_list, ground_truth_list)
+        elif dataset == "squad":
+            # this should be able to handle lists of lists of ground truth values.
+            evaluation_metrics = squad_evaluation(predictions_list, ground_truth_list)
+        else:
+            raise Exception('Only squad and bioasq are acceptable dataset names to be passed to evaluation functions.')
     else:
-        raise Exception('Only squad and bioasq are acceptable dataset names to be passed to evaluation functions.')
+        evaluation_metrics = {}
 
     if training:
         return evaluation_metrics
     else:
         return results_by_question_id, evaluation_metrics
+
+
 
 
 def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
@@ -291,7 +284,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
                     # make sure we don't end up with special characters in our predicted
                     predicted_answer = tokenizer.convert_tokens_to_string(
                         clipped_tokens)  # todo we need a way to do this that handles punctuation better
-                    list_of_predictions.append(predicted_answer)
+
+                    # don't put repeats in our list.
+                    if predicted_answer not in list_of_predictions:
+                        list_of_predictions.append(predicted_answer)
 
                 if question_id in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(list_of_predictions)
@@ -339,10 +335,13 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
             predictions_list.append(predicted_answer)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
-    if dataset == "bioasq":
-        evaluation_metrics = list_evaluation(predictions_list, ground_truth_list)
+    if any(ground_truth_list):  # if any of the ground truth values are not None
+        if dataset == "bioasq":
+            evaluation_metrics = list_evaluation(predictions_list, ground_truth_list)
+        else:
+            raise Exception('Only bioasq is an acceptable dataset name to be passed to list evaluation functions.')
     else:
-        raise Exception('Only bioasq is an acceptable dataset name to be passed to list evaluation functions.')
+        evaluation_metrics = {}
 
     if training:
         return evaluation_metrics

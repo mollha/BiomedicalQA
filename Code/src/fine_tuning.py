@@ -326,7 +326,6 @@ if __name__ == "__main__":
             test_data_loader = DataLoader(test_dataset, batch_size=config["batch_size"], collate_fn=collate_wrapper)
             test_data_loader_dict[test_dataset_file_path][qt] = test_data_loader
 
-
     config["num_warmup_steps"] = len(train_data_loader) * config["max_epochs"]
     electra_for_qa, optimizer, scheduler, electra_tokenizer, \
     config = build_finetuned_from_checkpoint(config["size"], config["device"], pretrain_checkpoint_dir,

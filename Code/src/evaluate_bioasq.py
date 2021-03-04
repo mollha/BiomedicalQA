@@ -13,19 +13,6 @@ from torch.utils.data import DataLoader
 def write_predictions(path_to_read_file, path_to_write_file, predictions):
     print(predictions)
     """
-    Write predictions to a file within a folder named after the dataset.
-
-    The format of a bioasq dataset is as follow:
-    -- questions
-    ------ body
-    ------ id
-    ------ ideal_answer
-    ------ exact_answer
-    ------ documents
-    ------ snippets
-    ------ concepts
-    ------ triples
-    
     We need to write our results file as follows:
     {
       "system": "TestSystem2",
@@ -44,22 +31,25 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
           "exact_answer": "es",
           "ideal_answer": "bla bla bla"
         },
-  ]
-}
-
-    :param predictions: predictions is a dictionary of question id to either list (factoid and list) or string (yesno)
-    :return: None
+        ]
+    }
     """
     # we want to create file at path_to_new_file within which we can write our predictions
     with open(path_to_read_file, 'rb') as infile:
         data_dict = json.load(infile)
 
     # now we need to add our predictions into the data_dict
-    questions = data_dict["questions"]
+    data_dict["system"] = "MollyDU"  # system name
+    data_dict["username"] = "molly_ha"  # username
+    data_dict["password"] = ""  # pw
 
     # iterate through every question
+    questions = data_dict["questions"]
     for question in questions:
         question_id = question["id"]
+
+        # delete all of the extra stuff in the question
+        question = {}
 
         if question_id in predictions:  # if we have a prediction for this question
             pred = predictions[question_id]["predictions"]
@@ -79,6 +69,9 @@ if __name__ == "__main__":
 
     selected_dataset = "bioasq"
     evaluate_on_dataset = "raw_data/BioASQ-task1bPhaseB-testset1"
+
+    number_of_factoid_predictions = 5
+    number_of_list_predictions = 100
 
     # -------------------------------
 
@@ -129,7 +122,6 @@ if __name__ == "__main__":
 
         model_size = checkpoint_name.split("_")[0]
         question_type = question_order[checkpoint_idx]
-
         sys.stderr.write("\nEvaluating checkpoint {} - model size is {} and question type is {}\n"
                          .format(checkpoint_name, model_size, question_type))
 
@@ -155,27 +147,19 @@ if __name__ == "__main__":
 
         # ------ START THE EVALUATION PROCESS ------
         if question_type == "factoid":
-            results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer, k=5, training=True, dataset=selected_dataset)
+            results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer,
+                                                                      k=number_of_factoid_predictions, training=True,
+                                                                      dataset=selected_dataset)
         elif question_type == "yesno":
             results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
         elif question_type == "list":
-            results_by_question_id, metric_results = evaluate_list(electra_for_qa, data_loader, electra_tokenizer, k=5, training=True, dataset=selected_dataset)
+            results_by_question_id, metric_results = evaluate_list(electra_for_qa, data_loader, electra_tokenizer,
+                                                                   k=number_of_list_predictions, training=True,
+                                                                   dataset=selected_dataset)
         else:
             raise Exception("No other question types permitted except factoid, yesno and list.")
 
         results_by_question_id_dictionary = {**results_by_question_id_dictionary, **results_by_question_id}
-
-        # metric_dictionary[question_type] = metric_results
-
-    print(results_by_question_id_dictionary)
-
-    print('----- METRICS -----')  # pretty-print the metrics
-    print('\n--- Dataset: {}'.format(selected_dataset))
-    # metrics_for_dset = metric_dictionary[selected_dataset]
-
-    # for qt in metrics_for_dset.keys():
-    #     metrics_for_qt_dset = metrics_for_dset[qt]
-    #     print('Question Type: {}, Metrics: {}'.format(qt, metrics_for_qt_dset))
 
     # iterate through our predictions for each dataset and write them to text files
     selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
@@ -184,6 +168,6 @@ if __name__ == "__main__":
     path_to_prediction_file = (predictions_dataset_dir / evaluate_on_dataset.split('/')[-1]).resolve()
     path_to_original_file = (selected_dataset_dir / evaluate_on_dataset).resolve()
 
-    # for the bioasq challenge, we need to add our answers BACK into the dataset.
+    # for the BioASQ challenge, we need to add our answers BACK into the dataset.
     # provide the name of the file we want to write predictions to
     write_predictions(path_to_original_file, path_to_prediction_file, results_by_question_id_dictionary)

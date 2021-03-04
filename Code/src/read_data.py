@@ -32,18 +32,18 @@ def get_question_stats(list_of_questions):
 
 
 class BinaryExample:
-    def __init__(self, question_id, question, short_context, answer):
+    def __init__(self, question_id, question, context, answer):
         self._question_id = question_id
         self._question_type = "yesno"
         self._question = question
-        self._short_context = short_context
+        self._context = context
         self._answer = answer
 
     def print_info(self):
         print("\n----- Yes/No (binary) Example -----\n")
         print("Question ID:", self._question_id)
         print("Question:", self._question)
-        print("Short Context:", self._short_context)
+        print("Context:", self._context)
         print("Answer:", self._answer)
 
 
@@ -252,7 +252,7 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
 
         example = BinaryExample(question_id=question_id,
                                 question=question,
-                                short_context=snippet,
+                                context=snippet,
                                 answer=answer)
         dataset.append(example)
 
@@ -442,7 +442,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         question_id = data["id"]
         question = data["body"]
         snippets = data["snippets"]
-        answer = data["exact_answer"].lower()
+        answer = None if "exact_answer" not in data else data["exact_answer"].lower()
 
         metrics = {
             "num_examples": len(snippets),
@@ -458,7 +458,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
             snippet_text = snippet['text']
             example = BinaryExample(question_id=question_id,
                                     question=question,
-                                    short_context=snippet_text,
+                                    context=snippet_text,
                                     answer=answer)
             examples_from_question.append(example)
         return examples_from_question, metrics
