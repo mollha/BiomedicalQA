@@ -38,7 +38,6 @@ config = {
 
 
 def condense_statistics(metrics):
-
     all_metrics = {}
 
     for dataset_name in metrics:  # iterate over top-level dataset names

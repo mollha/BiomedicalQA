@@ -199,7 +199,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
     feature_list = []
     for example_number in trange(len(examples), desc="Examples \u2b62 Features"):
         example = examples[example_number]
-        question, short_context = example._question, example._short_context  # get context and question from example
+        question, short_context = example._question, example._context  # get context and question from example
 
         if example._question_type == "yesno":  # if we're looking at a yes/no question
             # concatenate context with question - [CLS] SHORT_CONTEXT [SEP] QUESTION [SEP]
@@ -217,11 +217,11 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
         # If question type is factoid or list (i.e. not a yes/no question). Given start and end positions in the text,
         # we now need to find the tokenized start and end positions of the answer(s)
+        # NOTE: this only applies when we aren't in testing mode.
         text_start_pos, text_end_pos = example._answer_start, example._answer_end
         answer = example._answer
 
-        # if text_start_pos and text_end_pos are -1, then we have an impossible question.
-        # if text_start_pos and text_end_pos are None, then we have a test question with no answer.
+        # if text_start_pos and text_end_pos are None, then we have a test question. It may or may not have an answer.
         if text_start_pos is None and text_end_pos is None:
             tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
                                         max_length=max_length)  # only truncate the second sequence
@@ -231,7 +231,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
             feature = FactoidFeature(example._question_id, tokenized_input["input_ids"],
                                      tokenized_input["attention_mask"], tokenized_input["token_type_ids"],
-                                     None, None, None)
+                                     None, None, answer)  # todo check that answer is None if we don't have one
             feature_list.append(feature)
             continue
 

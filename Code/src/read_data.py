@@ -48,12 +48,11 @@ class BinaryExample:
 
 
 class FactoidExample:
-    def __init__(self, question_id, question_type, question, short_context, full_context, answer, answer_start, answer_end):
+    def __init__(self, question_id, question_type, question, context, answer, answer_start, answer_end):
         self._question_id = question_id
         self._question_type = question_type
         self._question = question
-        self._short_context = short_context  # the sentence(s) containing the answer
-        self._full_context = full_context  # the remaining context containing all sentences provided
+        self._context = context
         self._answer = answer
         self._answer_start = answer_start
         self._answer_end = answer_end
@@ -62,8 +61,7 @@ class FactoidExample:
         print("\n----- Factoid (squad) Example -----\n")
         print("Question ID:", self._question_id)
         print("Question:", self._question)
-        print("Short Context:", self._short_context)
-        print("Full Context:", self._full_context)
+        print("Context:", self._context)
         print("Answer:", self._answer)
         print("Answer Start:", self._answer_start)
         print("Answer End:", self._answer_end)
@@ -141,9 +139,9 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
         "num_skipped_examples": 0,
     }
 
-    # todo verify that the start and end positions actually point to the answer
-    # todo also make sure that short_context contains the answer
-    # todo check in the reading dataset part that there is no leading and trailing whitespace
+    # verify that the start and end positions actually point to the answer
+    # also make sure that short_context contains the answer
+    # check in the reading dataset part that there is no leading and trailing whitespace
 
     for group in tqdm(squad_dict['data'], desc="SQuAD Data \u2b62 Examples"):
         for passage in group['paragraphs']:
@@ -158,40 +156,52 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
                 question_id = qa['id']
                 is_impossible = qa['is_impossible']
 
-                if is_impossible:  # we are no longer include impossible questions
+                if is_impossible:  # we are no longer including impossible questions
                     continue
 
                 metrics["num_questions"] += 1
 
                 for answer in qa['answers']:
-                    answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
-                    add_end_idx(answer, full_context)  # set the end index - this will also be adjusted by leading ws
+                    # We need to make sure we include all test examples in our dataset.
+                    if testing:  # if we're in test-mode, we don't care about start and end positions
+                        metrics["num_examples"] += 1
 
-                    # When the answer contains special characters, if we pre-tokenize then we will lose some characters
-                    answer['text'] = unidecode.unidecode(answer['text'].lower())  # normalize the answer
+                        # pre-tokenize the context to make it easier for our model to read.
+                        full_context = full_context.lower()
+                        accent_stripped_context = unidecode.unidecode(full_context)
+                        answer['text'] = unidecode.unidecode(answer['text'].lower())  # normalize the answer
 
-                    # pre-tokenize and correct answer start and end if necessary
-                    pre_processed_context, answer_start, answer_end = pre_tokenize('{}'.format(full_context), answer['answer_start'],
-                                                                                   answer['answer_end'])
+                        dataset.append(
+                            FactoidExample(question_id, "factoid", question, accent_stripped_context, answer['text'],
+                                           None, None))
+                    else: # training
+                        answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
+                        add_end_idx(answer, full_context)  # set the end index - this will also be adjusted by leading ws
 
-                    # Correct differences relating to special characters in the answer
-                    # Length of the answer in original context
-                    length_original = len('{}'.format(full_context[answer['answer_start']:answer['answer_end']]))
+                        # When the answer contains special characters, if we pre-tokenize then we will lose some characters
+                        answer['text'] = unidecode.unidecode(answer['text'].lower())  # normalize the answer
 
-                    if length_original - (answer_end - answer_start) > 0:
-                        answer_end += length_original - (answer_end - answer_start)
+                        # pre-tokenize and correct answer start and end if necessary
+                        pre_processed_context, answer_start, answer_end = pre_tokenize('{}'.format(full_context), answer['answer_start'],
+                                                                                       answer['answer_end'])
 
-                    if answer['text'] != pre_processed_context[answer_start:answer_end]:
-                        # print('Answer "{}" from example does not match the spliced context "{}"'
-                        #       .format(answer['text'], pre_processed_context[answer_start:answer_end]))
-                        metrics["num_skipped_examples"] += 1
-                        continue
+                        # Correct differences relating to special characters in the answer
+                        # Length of the answer in original context
+                        length_original = len(full_context[answer['answer_start']:answer['answer_end']])
 
-                    metrics["num_examples"] += 1
+                        if length_original - (answer_end - answer_start) > 0:
+                            answer_end += length_original - (answer_end - answer_start)
 
-                    # todo should we have a short context, or not?
-                    dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, pre_processed_context, answer['text'],
-                                                  answer_start, answer_end))
+                        if answer['text'] != pre_processed_context[answer_start:answer_end]:
+                            # print('Answer "{}" from example does not match the spliced context "{}"'
+                            #       .format(answer['text'], pre_processed_context[answer_start:answer_end]))
+                            metrics["num_skipped_examples"] += 1
+                            continue
+
+                        metrics["num_examples"] += 1
+
+                        dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, answer['text'],
+                                                      answer_start, answer_end))
         #     break  # todo remove later
         # break  # todo remove later
 
@@ -385,36 +395,47 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
 
             for answer in flattened_answer_list:  # for each of our candidate answers
                 answer = unidecode.unidecode(answer.lower())  # normalize the answer
-                matches = match_answer_to_passage("".join(answer), context)
 
-                if len(matches) == 0:  # there are no matches in the passage and the question is impossible
-                    continue
-
-                # we have at least one match, iterate through each match
-                # and create an example for each get the matching text
-                for start_pos, end_pos in matches:
-                    # pre-tokenize and correct answer start and end if necessary
-                    pre_processed_context, answer_start, answer_end = pre_tokenize(context, start_pos, end_pos)
-
-                    metrics["num_examples"] += 1
-
-                    # We need to verify that the start and end positions actually point to the answer before we
-                    # expect our feature creation code to find the correctly tokenized positions.
-                    matching_text = pre_processed_context[answer_start:answer_end]
-                    if answer != matching_text:
-                        # print('Answer "{}" from example does not match the spliced context "{}"'
-                        #       .format(answer, matching_text))
-                        metrics["num_skipped_examples"] += 1
-                        continue
-
-                    # In the case where we match answers to the context, we know that context contains the answer
-                    # if the question is not impossible. We don't need to check this like in SQuAD.
+                # if we're testing, we don't care about start and end positions
+                if testing:
+                    context = context.lower()
+                    accent_stripped_context = unidecode.unidecode(context)
 
                     # Create an example for every match
                     examples_from_question.append(
-                        FactoidExample(question_id, q_type, question, pre_processed_context, pre_processed_context,
-                                       matching_text, start_pos, end_pos)
+                        FactoidExample(question_id, q_type, question, accent_stripped_context,
+                                       answer, None, None)
                     )
+                else:  # we're training, so we need to find where the answer matches in the passage.
+                    matches = match_answer_to_passage("".join(answer), context)
+                    if len(matches) == 0:  # there are no matches in the passage and the question is impossible
+                        continue
+
+                    # we have at least one match, iterate through each match
+                    # and create an example for each get the matching text
+                    for start_pos, end_pos in matches:
+                        # pre-tokenize and correct answer start and end if necessary
+                        pre_processed_context, answer_start, answer_end = pre_tokenize(context, start_pos, end_pos)
+
+                        metrics["num_examples"] += 1
+
+                        # We need to verify that the start and end positions actually point to the answer before we
+                        # expect our feature creation code to find the correctly tokenized positions.
+                        matching_text = pre_processed_context[answer_start:answer_end]
+                        if answer != matching_text:
+                            # print('Answer "{}" from example does not match the spliced context "{}"'
+                            #       .format(answer, matching_text))
+                            metrics["num_skipped_examples"] += 1
+                            continue
+
+                        # In the case where we match answers to the context, we know that context contains the answer
+                        # if the question is not impossible. We don't need to check this like in SQuAD.
+
+                        # Create an example for every match
+                        examples_from_question.append(
+                            FactoidExample(question_id, q_type, question, pre_processed_context,
+                                           matching_text, start_pos, end_pos)
+                        )
         return examples_from_question, metrics
 
     def process_yesno_question(data):

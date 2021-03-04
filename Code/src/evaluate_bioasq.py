@@ -25,6 +25,27 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
     ------ snippets
     ------ concepts
     ------ triples
+    
+    We need to write our results file as follows:
+    {
+      "system": "TestSystem2",
+      "username": "bill",
+      "password": "billbill",
+      "questions": [
+        {
+          "id": "51596a8ad24251bc0500009e",
+          "exact_answer": [
+            "centrosome"
+          ],
+          "ideal_answer": "Cep135 is the active component of the centrosome."
+        },...
+        {
+          "id": "5162e011298dcd4e51000049",
+          "exact_answer": "es",
+          "ideal_answer": "bla bla bla"
+        },
+  ]
+}
 
     :param predictions: predictions is a dictionary of question id to either list (factoid and list) or string (yesno)
     :return: None
@@ -57,7 +78,7 @@ if __name__ == "__main__":
     list_checkpoint = factoid_checkpoint # use the same checkpoint for factoid and list
 
     selected_dataset = "bioasq"
-    evaluate_on_dataset = "raw_data/8B1_golden.json"
+    evaluate_on_dataset = "raw_data/BioASQ-task1bPhaseB-testset1"
 
     # -------------------------------
 
