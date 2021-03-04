@@ -381,12 +381,12 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             # print("start and end verifications")
             # print('start', start_token_position + number_of_prepended_tokens - left_clip)
             # print('end', end_token_position + number_of_prepended_tokens - left_clip)
-            print('\nexpected answer', example._answer)
+            # print('\nexpected answer', example._answer)
 
             iids = all_input_ids[start_token_position + number_of_prepended_tokens - left_clip:end_token_position + number_of_prepended_tokens - left_clip]
             tids = tokenizer.convert_ids_to_tokens(iids)
 
-            print('actual answer', tokenizer.convert_tokens_to_string(tids))
+            # print('actual answer', tokenizer.convert_tokens_to_string(tids))
             feature_list.append(feature)
 
     print('\n------- COLLATING FEATURE METRICS -------')
