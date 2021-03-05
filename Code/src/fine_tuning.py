@@ -43,6 +43,8 @@ def condense_statistics(metrics):
     for dataset_name in metrics:  # iterate over top-level dataset names
         all_metrics[dataset_name] = {}
 
+        print(metrics[dataset_name])
+
         for question_type in metrics[dataset_name]:
             list_of_result_dicts = metrics[dataset_name][qt]
             best_result = None

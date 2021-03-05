@@ -202,8 +202,8 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
 
                         dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, answer['text'],
                                                       answer_start, answer_end))
-            break  # todo remove later
-        break  # todo remove later
+        #     break  # todo remove later
+        # break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = metrics["num_questions"]
