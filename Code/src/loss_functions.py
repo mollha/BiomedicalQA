@@ -58,7 +58,6 @@ class ELECTRALoss:
         self.discriminator_accuracy = []
         self.discriminator_precision = []
         self.discriminator_recall = []
-
         self.sigmoid_fc = nn.Sigmoid()
 
     def __call__(self, pred, targ_ids):
@@ -75,8 +74,6 @@ class ELECTRALoss:
 
         true_positives, false_positives, \
         true_negatives, false_negatives = confusion_matrix(disc_predictions, is_replaced.float())
-
-        print(confusion_matrix(disc_predictions, is_replaced.float()))
 
         gen_loss = self.generator_loss_function(mlm_gen_logits.float(), targ_ids[is_mlm_applied])
         disc_loss = self.discriminator_loss_function(disc_logits.float(), is_replaced.float())

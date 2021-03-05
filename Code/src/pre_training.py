@@ -164,6 +164,9 @@ if __name__ == "__main__":
     electra_model, optimizer, scheduler, electra_tokenizer, loss_function,\
     config = build_pretrained_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
+    print(config)
+    raise Exception('jihubifuh')
+
     for param_group in optimizer.param_groups:
         print(param_group['lr'])
 

@@ -50,7 +50,7 @@ def build_pretrained_from_checkpoint(model_size, device, checkpoint_directory, c
         electra_model, optimizer, scheduler, populated_loss_function, new_config = load_checkpoint(path_to_checkpoint, electra_model, optimizer, scheduler, device)
         config = update_settings(config, new_config, exceptions=["update_steps", "device"])
         loss_function.__dict__.update(populated_loss_function.__dict__)
-        print('Successfully copied loss function statistics:', loss_function.mid_epoch_stats)
+        print('Successfully copied loss function statistics:', loss_function.__dict__)
     else:
         print("\nTraining from scratch - no checkpoint provided.\n")
     return electra_model, optimizer, scheduler, electra_tokenizer, loss_function, config

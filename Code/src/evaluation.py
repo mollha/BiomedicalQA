@@ -331,8 +331,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         # iterate over this prediction list until we reach the end, or we have enough predictions.
         for idx, ordered_pred_list in enumerate(zipped_predictions):  # zip each of the prediction lists found in here
             ordered_prob_list = zipped_probabilities[idx]
-            for pred in ordered_pred_list:
-                s_prob, e_prob = ordered_prob_list[idx]
+            for pred_idx, pred in ordered_pred_list:
+                s_prob, e_prob = ordered_prob_list[pred_idx]
 
                 # if our prediction does not meet the probability threshold
                 if s_prob < probability_threshold or e_prob < probability_threshold:
