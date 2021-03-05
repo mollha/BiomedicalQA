@@ -190,7 +190,7 @@ def create_separate_plots(statistics, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "base_4_14143"  # e.g. small_10_50
+    chckpt_name = "small_16_21417"  # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")

@@ -4,6 +4,22 @@ from data_processing import *
 from metrics.bioasq_metrics import yes_no_evaluation, factoid_evaluation, list_evaluation
 from metrics.squad_metrics import squad_evaluation
 
+word_nums = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
+        "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+        "sixteen", "seventeen", "eighteen", "nineteen",
+      ]
+
+def contains_k(text: str):
+    # Given a piece of text, check if text contains k. e.g. give two examples of...
+    # split on whitespace
+    for word in text.split():
+        if word in word_nums:
+            return word_nums.index(word)
+        if word.isdigit():
+            return int(word)
+    return None
+
 """
 Refer to the following code
 https://huggingface.co/transformers/task_summary.html#extractive-question-answering
@@ -310,6 +326,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
     predictions_list, ground_truth_list = [], []
+    k = 100 if contains_k("") is None else contains_k("")  # todo this properly
+
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -323,7 +341,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         best_predictions = []
         num_best_predictions = 0
 
-        probability_threshold = 0.4
+        probability_threshold = 0.2
 
         zipped_predictions = list(zip(*pred_lists))
         zipped_probabilities = list(zip(*prob_lists))
@@ -331,24 +349,24 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         # iterate over this prediction list until we reach the end, or we have enough predictions.
         for idx, ordered_pred_list in enumerate(zipped_predictions):  # zip each of the prediction lists found in here
             ordered_prob_list = zipped_probabilities[idx]
-            for pred_idx, pred in ordered_pred_list:
+            for pred_idx, pred in enumerate(ordered_pred_list):
                 s_prob, e_prob = ordered_prob_list[pred_idx]
 
                 # if our prediction does not meet the probability threshold
+                # todo we need to be more certain that our answer contains correct answers than with factoid questions
                 if s_prob < probability_threshold or e_prob < probability_threshold:
                     continue
 
-                if num_best_predictions >= 100:
+                if num_best_predictions >= k:
                     break
 
                 # Avoid putting repeats in our list.
                 # list predictions are counted negatively if they aren't part of the golden list
-                # todo we need to be more certain that our answer contains correct answers than with factoid questions
                 if predicted_answer not in best_predictions:
                     num_best_predictions += 1
                     best_predictions.append(pred)
 
-            if num_best_predictions >= 100:
+            if num_best_predictions >= k:
                 break
 
         # swap the huge list of all predictions for our short-list of best predictions
