@@ -27,7 +27,7 @@ def update_dataset_metrics(total_metrics, additional_metrics):
 def get_question_stats(list_of_questions):
     # Note: list of questions should be the same type
     avg_question_length = round(sum([len(q._question) for q in list_of_questions])/len(list_of_questions), 2)
-    avg_context_length = round(sum([len(q._short_context) for q in list_of_questions])/len(list_of_questions), 2)
+    avg_context_length = round(sum([len(q._context) for q in list_of_questions])/len(list_of_questions), 2)
     return avg_question_length, avg_context_length
 
 
