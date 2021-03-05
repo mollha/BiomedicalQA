@@ -173,7 +173,7 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
 
                         dataset.append(
                             FactoidExample(question_id, "factoid", question, accent_stripped_context, answer['text'],
-                                           None, None))
+                                           -1, -1))
                     else: # training
                         answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
                         add_end_idx(answer, full_context)  # set the end index - this will also be adjusted by leading ws
@@ -202,8 +202,8 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
 
                         dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, answer['text'],
                                                       answer_start, answer_end))
-        #     break  # todo remove later
-        # break  # todo remove later
+            break  # todo remove later
+        break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = metrics["num_questions"]
@@ -404,7 +404,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
                     # Create an example for every match
                     examples_from_question.append(
                         FactoidExample(question_id, q_type, question, accent_stripped_context,
-                                       answer, None, None)
+                                       answer, -1, -1)
                     )
                 else:  # we're training, so we need to find where the answer matches in the passage.
                     matches = match_answer_to_passage("".join(answer), context)

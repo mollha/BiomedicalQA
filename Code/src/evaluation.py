@@ -134,6 +134,9 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
             answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
 
+            print('answer starts', answer_starts)
+            print('answer ends', answer_ends)
+
             # todo perform thresholding if necessary
             start_end_positions = [x for x in zip(start_indices, end_indices)]
 
@@ -154,9 +157,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
                     # make sure we don't end up with special characters in our predicted
                     predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
 
-                    # don't put repeats in our list.
-                    if predicted_answer not in list_of_predictions:
-                        list_of_predictions.append(predicted_answer)
+                    list_of_predictions.append(predicted_answer)
 
                 if question_id in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(list_of_predictions)
@@ -185,8 +186,11 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
             for pred in ordered_pred_list:
                 if num_best_predictions >= k:
                     break
-                num_best_predictions += 1
-                best_predictions.append(pred)
+
+                # don't put repeats in our list.
+                if pred not in best_predictions:
+                    num_best_predictions += 1
+                    best_predictions.append(pred)
             if num_best_predictions >= k:
                 break
 
@@ -221,7 +225,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
 
 
 
-def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
+def evaluate_list(list_model, test_dataloader, tokenizer, training=False, dataset="bioasq"):
     """
     Given a pytorch model trained on factoid / list questions, we need to evaluate this model on a given dataset.
     The evaluation metrics we choose are dependent on our choice of dataset.
@@ -257,11 +261,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
 
             # Convert the batches of start and end logits into answer span position predictions
             # This will give us k predictions per feature in the batch
-            answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
-            answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
-
+            answer_starts, start_indices = torch.topk(start_logits, k=100, dim=1)
+            answer_ends, end_indices = torch.topk(end_logits, k=100, dim=1)
             start_end_positions = [x for x in zip(start_indices, end_indices)]
-            # print('start_end_positions', start_end_positions)
+            start_end_probabilities = [x for x in zip(answer_starts, answer_ends)]
 
             # iterate over our pairs of start and end indices
             for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
@@ -271,8 +274,12 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
                 expected_answer = batch.answer_text[index]
                 question_id = batch.question_ids[index]
 
+                start_probabilities, end_probabilities = start_end_probabilities[index]
+                sub_start_end_probabilities = list(zip(start_probabilities, end_probabilities))
+
                 list_of_predictions = []  # gather all of the predictions for this question
-                for (s, e) in sub_start_end_positions:  # convert the start and end positions to answers.
+                list_of_probability_pairs = []
+                for pos_index, (s, e) in enumerate(sub_start_end_positions):  # convert the start and end positions to answers.
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
 
@@ -281,22 +288,25 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
 
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
+
                     # make sure we don't end up with special characters in our predicted
-                    predicted_answer = tokenizer.convert_tokens_to_string(
-                        clipped_tokens)  # todo we need a way to do this that handles punctuation better
+                    # todo we need a way to do this that handles punctuation better
+                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
 
-                    # don't put repeats in our list.
-                    if predicted_answer not in list_of_predictions:
-                        list_of_predictions.append(predicted_answer)
+                    s_prob, e_prob = sub_start_end_probabilities[pos_index]
+                    list_of_probability_pairs.append((s_prob, e_prob))
+                    list_of_predictions.append(predicted_answer)
 
+                # --- Perform probability thresholding on the list of predictions ---
                 if question_id in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].append(list_of_predictions)
-
+                    results_by_question_id[question_id]["prediction_probabilities"].append(list_of_probability_pairs)
                     # make sure we don't put the same expected answer in the list over and over again.
                     if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
                         results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
                     results_by_question_id[question_id] = {"predictions": [list_of_predictions],
+                                                           "prediction_probabilities": [list_of_probability_pairs],
                                                            "expected_answers": [expected_answer]}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
@@ -305,6 +315,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
+        prob_lists = results_by_question_id[q_id]["prediction_probabilities"]
 
         # For each list question, each participating system will have to return a single list* of entity names, numbers,
         # or similar short expressions, jointly taken to constitute a single answer (e.g., the most common symptoms of
@@ -313,16 +324,32 @@ def evaluate_list(list_model, test_dataloader, tokenizer, k, training=False, dat
         best_predictions = []
         num_best_predictions = 0
 
+        probability_threshold = 0.4
+
+        zipped_predictions = list(zip(*pred_lists))
+        zipped_probabilities = list(zip(*prob_lists))
+
         # iterate over this prediction list until we reach the end, or we have enough predictions.
-        for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
+        for idx, ordered_pred_list in enumerate(zipped_predictions):  # zip each of the prediction lists found in here
+            ordered_prob_list = zipped_probabilities[idx]
             for pred in ordered_pred_list:
-                if num_best_predictions >= k:
+                s_prob, e_prob = ordered_prob_list[idx]
+
+                # if our prediction does not meet the probability threshold
+                if s_prob < probability_threshold or e_prob < probability_threshold:
+                    continue
+
+                if num_best_predictions >= 100:
                     break
 
-                num_best_predictions += 1
-                best_predictions.append(pred)
+                # Avoid putting repeats in our list.
+                # list predictions are counted negatively if they aren't part of the golden list
+                # todo we need to be more certain that our answer contains correct answers than with factoid questions
+                if predicted_answer not in best_predictions:
+                    num_best_predictions += 1
+                    best_predictions.append(pred)
 
-            if num_best_predictions >= k:
+            if num_best_predictions >= 100:
                 break
 
         # swap the huge list of all predictions for our short-list of best predictions
