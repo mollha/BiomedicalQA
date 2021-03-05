@@ -261,10 +261,6 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
 
         for json_str in tqdm(json_list, desc="BoolQ Data \u2b62 Examples"):
             data_point = json.loads(json_str)
-
-            # if data_point["answer"] == False: # todo testing if model is dumb
-            #     continue
-
             process_yesno_question(data_point)
 
     # ------ DISPLAY METRICS -------
@@ -307,7 +303,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
     :return: a list containing a dictionary for each context, question and answer triple.
     """
 
-    # todo why don't we just train list and factoid questions together - it makes more sense???
+    # we can train list and factoid questions together
     # we will have a better model this way since they both predict in the same way.
 
     dataset = {
@@ -324,11 +320,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
             bioasq_dict["questions"].extend(bioasq_sub_dict["questions"])
 
     def match_answer_to_passage(answer: str, passage: str) -> list:
-        #
-        # print("\nanswer", answer)
-        # print("passage", passage)
-        # remove punctuation
-
         answer = answer.lower()
         passage = passage.lower()
 
@@ -430,7 +421,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
 
                         # In the case where we match answers to the context, we know that context contains the answer
                         # if the question is not impossible. We don't need to check this like in SQuAD.
-
                         # Create an example for every match
                         examples_from_question.append(
                             FactoidExample(question_id, q_type, question, pre_processed_context,
