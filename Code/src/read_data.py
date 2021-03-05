@@ -174,7 +174,7 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
                         dataset.append(
                             FactoidExample(question_id, "factoid", question, accent_stripped_context, answer['text'],
                                            -1, -1))
-                    else: # training
+                    else:  # training
                         answer['answer_start'] = answer['answer_start'] - num_leading_whitespaces  # adjust by leading ws
                         add_end_idx(answer, full_context)  # set the end index - this will also be adjusted by leading ws
 
@@ -202,8 +202,8 @@ def read_squad(paths_to_files: list, testing=False, question_types=[]):
 
                         dataset.append(FactoidExample(question_id, "factoid", question, pre_processed_context, answer['text'],
                                                       answer_start, answer_end))
-            break  # todo remove later
-        break  # todo remove later
+        #     break  # todo remove later
+        # break  # todo remove later
 
     # ------ DISPLAY METRICS -------
     total_questions = metrics["num_questions"]
