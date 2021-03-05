@@ -312,7 +312,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         "yesno": []
     }
 
-    # todo - read and combine multiple dictionaries here to allow reading multiple dataset files.
     bioasq_dict = {"questions": []}
     for path_to_file in paths_to_files:  # iterate over the different bioasq
         with open(path_to_file, 'rb') as f:
@@ -326,10 +325,8 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         def remove_punctuation(text: str) -> tuple:
             position_list = []
             escape_words = ["&apos;"]
-
             spacy_doc = nlp(text)
             spacy_tokens = [token.text for token in spacy_doc if token.tag_ == 'POS']
-
             escape_words.extend(spacy_tokens)  # also don't care about POS
             escape_range = [range(m.start(), m.end()) for word in escape_words for m in re.finditer(word, text)]
 
@@ -340,7 +337,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
                     if char_position in ra:
                         in_escape_range = True
                         break
-
                 if char not in string.punctuation and not in_escape_range:
                     position_list.append(char_position)
 
@@ -353,7 +349,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
             match_cleaned_starts = [m.start() for m in re.finditer(p_answer, p_passage)]
             match_raw_starts = [passage_positions[m] for m in match_cleaned_starts]
             match_raw_ends = [passage_positions[m + len(p_answer) - 1] for m in match_cleaned_starts]
-            # todo check if we should return end instead of end + 1
             return [[start, end + 1] for start, end in zip(match_raw_starts, match_raw_ends)]
 
         return []  # answer does not appear in passage
@@ -376,8 +371,11 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         metrics = {  # this dictionary is combined with metrics from previous questions
             "num_questions": 1,
             "num_examples": 0,
-            "num_skipped_examples": 0
+            "num_skipped_examples": 0,
+            "total_answers": 0
         }
+
+        metrics["total_answers"] += len(flattened_answer_list)
 
         for snippet in snippets:
             context = snippet['text']
@@ -492,7 +490,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
             print("No metrics available for question type '{}'".format(qt))
             continue
 
-        print("Average questiion and context length: {}".format(get_question_stats(dataset[qt])))
+        print("Average question and context length: {}".format(get_question_stats(dataset[qt])))
 
         # compute this for all metric types
         num_examples = qt_metrics["num_examples"]
@@ -524,6 +522,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
                 yesno_weights = (1.0, 1.0)
 
         elif qt == "factoid" or qt == "list":
+            print('-', round(qt_metrics["total_answers"] / qt_metrics["num_questions"], 2), 'avg num answers.')
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
 
     if testing:

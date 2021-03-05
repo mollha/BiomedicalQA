@@ -94,7 +94,7 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
                     "as no other datasets are handled at this time.")
 
 
-def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=False, dataset="bioasq"):
+def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, dataset="bioasq"):
     """
     Given an extractive question answering model and some test data, perform evaluation.
 
@@ -131,13 +131,12 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
 
             # Convert the batches of start and end logits into answer span position predictions
             # This will give us k predictions per feature in the batch
-            answer_starts, start_indices = torch.topk(start_logits, k=k, dim=1)
-            answer_ends, end_indices = torch.topk(end_logits, k=k, dim=1)
+            answer_starts, start_indices = torch.topk(start_logits, k=5, dim=1)
+            answer_ends, end_indices = torch.topk(end_logits, k=5, dim=1)
 
             print('answer starts', answer_starts)
             print('answer ends', answer_ends)
 
-            # todo perform thresholding if necessary
             start_end_positions = [x for x in zip(start_indices, end_indices)]
 
             # iterate over our pairs of start and end indices
@@ -180,10 +179,12 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
         best_predictions = []
         num_best_predictions = 0
+        k = 5 if dataset == "bioasq" else 1
 
         # iterate over this prediction list until we reach the end, or we have enough predictions.
         for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
             for pred in ordered_pred_list:
+
                 if num_best_predictions >= k:
                     break
 
@@ -221,8 +222,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, k, training=Fals
         return evaluation_metrics
     else:
         return results_by_question_id, evaluation_metrics
-
-
 
 
 def evaluate_list(list_model, test_dataloader, tokenizer, training=False, dataset="bioasq"):

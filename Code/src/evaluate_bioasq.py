@@ -148,13 +148,13 @@ if __name__ == "__main__":
         # ------ START THE EVALUATION PROCESS ------
         if question_type == "factoid":
             results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer,
-                                                                      k=number_of_factoid_predictions, training=True,
+                                                                      training=True,
                                                                       dataset=selected_dataset)
         elif question_type == "yesno":
             results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
         elif question_type == "list":
             results_by_question_id, metric_results = evaluate_list(electra_for_qa, data_loader, electra_tokenizer,
-                                                                   k=number_of_list_predictions, training=True,
+                                                                   training=True,
                                                                    dataset=selected_dataset)
         else:
             raise Exception("No other question types permitted except factoid, yesno and list.")

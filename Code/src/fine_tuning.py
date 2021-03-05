@@ -71,7 +71,7 @@ def condense_statistics(metrics):
     return all_metrics
 
 
-def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics, k=5):
+def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics):
 
     metrics_for_plotting = {}
 
@@ -85,9 +85,9 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
             eval_dataloader = loader_all_question_types[qt]
 
             if "factoid" == qt:
-                metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, k, training=True, dataset=dataset)
+                metric_results = evaluate_factoid(qa_model, eval_dataloader, electra_tokenizer, training=True, dataset=dataset)
             elif "list" == qt:
-                metric_results = evaluate_list(qa_model, eval_dataloader, electra_tokenizer, k, training=True, dataset=dataset)
+                metric_results = evaluate_list(qa_model, eval_dataloader, electra_tokenizer, training=True, dataset=dataset)
             elif "yesno" == qt:
                 metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
             else:
