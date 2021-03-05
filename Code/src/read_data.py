@@ -479,7 +479,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         dataset[question_type].extend(example_list)  # collate examples
 
         c += 1
-        if c > 50:
+        if c > 50: # todo remove
             break
 
     # ------ DISPLAY METRICS -------
