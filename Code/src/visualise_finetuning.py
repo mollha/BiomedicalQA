@@ -164,6 +164,66 @@ def create_factoid_subplots(checkpoint_name, metrics, losses):
     print("\nGraph creation complete.\n")
 
 
+def create_list_subplots(checkpoint_name, metrics, losses):
+    num_epochs = range(1, len(metrics) + 1)  # might need to add 1
+
+    mean_average_precision = [metric_dict["list"][0]["mean_average_precision"] for metric_dict in metrics]
+    mean_average_recall = [metric_dict["list"][0]["mean_average_recall"] for metric_dict in metrics]
+    mean_average_f1 = [metric_dict["list"][0]["mean_average_f1"] for metric_dict in metrics]
+
+    plt.subplot(2, 2, 1)
+    draw_graph(graph_title="Mean Avg Precision",
+               data=mean_average_precision,
+               data_label="Precision",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="r",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplot(2, 2, 2)
+    draw_graph(graph_title="Mean Avg Recall",
+               data=mean_average_recall,
+               data_label="Recall",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="g",
+               save_figure=False)
+
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplot(2, 2, 3)
+    draw_graph(graph_title="Mean Avg F1",
+               data=mean_average_f1,
+               data_label="F1 Score",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="c",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+
+    plt.subplot(2, 2, 4)
+    draw_graph(graph_title="Loss",
+               data=losses,
+               data_label="Loss",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               y_label="Loss",
+               color="C0",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplots_adjust(hspace=0.6, wspace=0.45)
+    plt.savefig(str(graphs_path) + "/" + checkpoint_name + "_list_finetuning_subplot.png")  # this is saving them weird due to subplots
+    plt.show()
+    print("\nGraph creation complete.\n")
+
+
 def visualise_yes_no(checkpoint_name, metrics):
     # Which metrics should we plot for yes no questions?
     # Plot all of these metrics on the same graph.
@@ -212,6 +272,7 @@ def visualise_yes_no(checkpoint_name, metrics):
                epochs=num_epochs,
                checkpoint_name=checkpoint_name)
 
+
 def visualise_factoid(checkpoint_name, metrics):
     num_epochs = range(1, len(metrics) + 1)  # might need to add 1
     fig_size = (5, 5)
@@ -239,6 +300,43 @@ def visualise_factoid(checkpoint_name, metrics):
     draw_graph(graph_title="MRR Score",
                data=mrr,
                data_label="Mean Reciprocal Rank (MRR)",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
+
+
+def visualise_list(checkpoint_name, metrics):
+    # metrics = {
+    #         "mean_average_precision": mean_average_precision,
+    #         "mean_average_recall": mean_average_recall,
+    #         "mean_average_f1": mean_average_f1,
+    #     }
+
+    num_epochs = range(1, len(metrics) + 1)  # might need to add 1
+    fig_size = (5, 5)
+
+    mean_average_precision = [metric_dict["list"][0]["mean_average_precision"] for metric_dict in metrics]
+    mean_average_recall = [metric_dict["list"][0]["mean_average_recall"] for metric_dict in metrics]
+    mean_average_f1 = [metric_dict["list"][0]["mean_average_f1"] for metric_dict in metrics]
+
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Mean Avg Precision",
+               data=mean_average_precision,
+               data_label="Precision",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
+
+
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Mean Avg Recall",
+               data=mean_average_recall,
+               data_label="Recall",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
+
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Mean Avg F1",
+               data=mean_average_f1,
+               data_label="F1 Score",
                epochs=num_epochs,
                checkpoint_name=checkpoint_name)
 
@@ -272,10 +370,11 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name, question_typ
     elif question_type == "factoid":
         visualise_factoid(checkpoint_name, metrics)
         create_factoid_subplots(checkpoint_name, metrics, losses)
+    elif question_type == "list":
+        visualise_list(checkpoint_name, metrics)
+        create_list_subplots(checkpoint_name, metrics, losses)
 
     print("Graph creation complete.\n")
-
-
 
 
 if __name__ == "__main__":
@@ -285,4 +384,4 @@ if __name__ == "__main__":
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
 
     checkpoint_path = (checkpoint_dir / chckpt_name).resolve()
-    load_stats_from_checkpoint(checkpoint_path, chckpt_name, "factoid")
+    load_stats_from_checkpoint(checkpoint_path, chckpt_name, "list")
