@@ -26,7 +26,7 @@ small_pretrain_config = {
 
 base_pretrain_config = {
     "mask_prob": 0.15,
-    "lr": 2e-4,
+    "lr": (2e-4 / 8),  # we divide by 8 as we decreased batch size by 8
     "batch_size": 32,  # "batch_size": 256,
     "max_steps": (10 ** 6) * 8,  # we multiply by 8 as we decreased batch size by 8
     "max_length": 256,
