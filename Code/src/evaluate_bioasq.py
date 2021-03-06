@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader
 
 
 def write_predictions(path_to_read_file, path_to_write_file, predictions):
-    print(predictions)
     """
     We need to write our results file as follows:
     {
@@ -47,12 +46,19 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
     questions = data_dict["questions"]
     for question in questions:
         question_id = question["id"]
+        # we keep body for now so we can skim check our answers.
+        keep_keys = ["id", "body", "type", "snippets"]  # todo remove body and type in final submission if necessary
 
         # delete all of the extra stuff in the question
-        question = {}
+        q_keys = [k for k in question.keys()]
+        for key in q_keys:
+            if key not in keep_keys:
+                del question[key]
 
         if question_id in predictions:  # if we have a prediction for this question
             pred = predictions[question_id]["predictions"]
+            if type(pred) == list:
+                pred = [[p] for p in pred]
             question["exact_answer"] = pred
 
     with open(path_to_write_file, 'w') as outfile:
@@ -63,12 +69,12 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
 if __name__ == "__main__":
 
     # ---- Manually set configuration here ----
-    yes_no_checkpoint = "small_yesno_13_68164_9_123"
-    factoid_checkpoint = None # "small_factoid_26_11229_1_380"
+    yes_no_checkpoint = "small_yesno_14_79670_29_103"
+    factoid_checkpoint = "small_factoid,list_18_64089_29_249"
     list_checkpoint = factoid_checkpoint # use the same checkpoint for factoid and list
 
     selected_dataset = "bioasq"
-    evaluate_on_dataset = "raw_data/BioASQ-task1bPhaseB-testset1"
+    evaluate_on_dataset = "raw_data/BioASQ-task1bPhaseB-testset1.json"
 
     number_of_factoid_predictions = 5
     number_of_list_predictions = 100
@@ -148,24 +154,24 @@ if __name__ == "__main__":
         # ------ START THE EVALUATION PROCESS ------
         if question_type == "factoid":
             results_by_question_id, metric_results = evaluate_factoid(electra_for_qa, data_loader, electra_tokenizer,
-                                                                      training=True,
+                                                                      training=False,
                                                                       dataset=selected_dataset)
         elif question_type == "yesno":
             results_by_question_id, metric_results = evaluate_yesno(electra_for_qa, data_loader)
         elif question_type == "list":
             results_by_question_id, metric_results = evaluate_list(electra_for_qa, data_loader, electra_tokenizer,
-                                                                   training=True,
+                                                                   training=False,
                                                                    dataset=selected_dataset)
         else:
             raise Exception("No other question types permitted except factoid, yesno and list.")
-
+        print(results_by_question_id)
         results_by_question_id_dictionary = {**results_by_question_id_dictionary, **results_by_question_id}
 
     # iterate through our predictions for each dataset and write them to text files
     selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
 
     # get the name of the file name
-    path_to_prediction_file = (predictions_dataset_dir / evaluate_on_dataset.split('/')[-1]).resolve()
+    path_to_prediction_file = (predictions_dataset_dir / ("results_" + str(evaluate_on_dataset.split('/')[-1]))).resolve()
     path_to_original_file = (selected_dataset_dir / evaluate_on_dataset).resolve()
 
     # for the BioASQ challenge, we need to add our answers BACK into the dataset.

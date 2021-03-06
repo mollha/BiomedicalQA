@@ -18,7 +18,7 @@ config = {
         'metrics': [],
     },
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 30,  # can override the val in config
+    "max_epochs": 1,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
@@ -36,17 +36,17 @@ config = {
 # removed the layerwise parameters
 # Tried non-weighted / normal implementation of the model
 
-
 def condense_statistics(metrics):
+    print(metrics)
     all_metrics = {}
 
     for dataset_name in metrics:  # iterate over top-level dataset names
         all_metrics[dataset_name] = {}
 
-        print(metrics[dataset_name])
-
         for question_type in metrics[dataset_name]:
-            list_of_result_dicts = metrics[dataset_name][qt]
+            print('question types checked:', question_type)
+            print(metrics[dataset_name][question_type])
+            list_of_result_dicts = metrics[dataset_name][question_type]
             best_result = None
 
             if question_type == "yesno":  # official eval metric is f1_ma
@@ -79,11 +79,14 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
 
     for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
         loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
+        print('laoder all q types', loader_all_question_types)
         sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
 
         metrics_for_plotting = {k: [] for k in loader_all_question_types}
 
         for qt in loader_all_question_types:
+            print(qt)
+
             eval_dataloader = loader_all_question_types[qt]
 
             if "factoid" == qt:
@@ -94,6 +97,8 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
                 metric_results = evaluate_yesno(qa_model, eval_dataloader, training=True)
             else:
                 raise Exception("Question type in config must be factoid, list or yesno.")
+
+            print('metric results', metric_results)
 
             # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
             if len(metric_results) > 0:
@@ -193,6 +198,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
+    print(all_dataset_metrics)
     all_dataset_metrics, _ = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
     aggregated_metrics = condense_statistics(all_dataset_metrics)
 
@@ -213,10 +219,10 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
+    parser.add_argument("--question-type", default="factoid,list", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
                         type=str,
                         help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
-    parser.add_argument("--dataset", default="squad", choices=['squad', 'bioasq', 'boolq'], type=str,
+    parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq', 'boolq'], type=str,
                         help="The name of the dataset to use in training e.g. squad")
     parser.add_argument("--k", default="5", type=int,
                         help="K-best predictions are selected for factoid and list questions (between 1 and 100)")

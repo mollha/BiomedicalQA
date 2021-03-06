@@ -37,7 +37,7 @@ class BinaryFeature:
         self._input_ids = input_ids
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
-        self._answer_text = answer_text.lower()
+        self._answer_text = None if answer_text is None else answer_text.lower()
 
         # since using pos_weights, weights should not be floats anymore.
         if self._answer_text == "yes":
@@ -46,8 +46,11 @@ class BinaryFeature:
         elif self._answer_text == "no":
             self._label = 0.0
             self._weight = weights[0]
+        elif self._answer_text is None:
+            self._label = 0.0  # dummy value
+            self._weight = 1.0 # dummy value
         else:
-            raise Exception('Answer text "{}" is not yes or no.'.format(self._answer_text))
+            raise Exception('Answer text "{}" is not yes or no or None (for bioasq eval).'.format(self._answer_text))
 
     def get_features(self):
         return (
@@ -71,7 +74,7 @@ class FactoidFeature:
         self._token_type_ids = token_type_ids
         self._answer_start = answer_start
         self._answer_end = answer_end
-        self._answer_text = answer_text
+        self._answer_text = None if answer_text is None else answer_text
 
     def get_features(self):
         return (
@@ -223,16 +226,55 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
         # if text_start_pos and text_end_pos are -1 and -1, then we have a test question. It may or may not have an answer.
         if text_start_pos == -1 and text_end_pos == -1:
-            tokenized_input = tokenizer(question, short_context, padding="max_length", truncation="only_second",
-                                        max_length=max_length)  # only truncate the second sequence
+            print(example._question_type)
+            # -- Perform a doc stride here, this will give us more predictions to work with --
+            tokenized_question = tokenizer.tokenize(question)
+            tokenized_context = tokenizer.tokenize(short_context)
 
-            # If it is not included, for impossible instances the target prediction
-            # for both start and end (tokenized) position is 0, i.e. the [CLS] token
-            # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
-            feature = FactoidFeature(example._question_id, tokenized_input["input_ids"],
-                                     tokenized_input["attention_mask"], tokenized_input["token_type_ids"],
-                                     -1, -1, answer)  # todo check that answer is None if we don't have one
-            feature_list.append(feature)
+            # [CLS] QUESTION [SEP] SHORT_CONTEXT [SEP]
+            num_question_tokens = len(tokenized_question)
+            num_additional_tokens = 3  # refers to the [CLS] tokens and [SEP] tokens used when combining question & context
+            num_context_tokens = max_length - num_question_tokens - num_additional_tokens  # e.g. SHORT_CONTEXT length
+
+            question_input_ids = tokenizer.convert_tokens_to_ids(tokenized_question)
+            question_attention_mask = len(question_input_ids) * [1]  # pay attention to all question input ids.
+            question_token_type_ids = len(question_input_ids) * [0]  # token type ids are 0 for question tokens.
+
+            context_input_ids = tokenizer.convert_tokens_to_ids(tokenized_context)
+            context_attention_mask = len(context_input_ids) * [1]  # pay attention to all context input ids.
+            context_token_type_ids = len(context_input_ids) * [1]  # token type ids are 1 for context tokens.
+            print('still here')
+            print('num context tokens', num_context_tokens)
+            print('num context tokens', num_context_tokens)
+
+            for left_clip in range(0, len(context_input_ids), 20):
+                print('not here')
+                clipped_input_ids = context_input_ids[left_clip:min(left_clip + num_context_tokens, len(context_input_ids))]
+                clipped_attention_mask = context_attention_mask[left_clip:min(left_clip + num_context_tokens, len(context_input_ids))]
+                clipped_token_type_ids = context_token_type_ids[left_clip:min(left_clip + num_context_tokens, len(context_input_ids))]
+
+                all_input_ids = [tokenizer.cls_token_id] + question_input_ids + [tokenizer.sep_token_id] + clipped_input_ids + [tokenizer.sep_token_id]
+                all_attention_mask = [1] + question_attention_mask + [1] + clipped_attention_mask + [1]
+                all_token_type_ids = [0] + question_token_type_ids + [0] + clipped_token_type_ids + [1]
+
+                # pad the end with zeros if we have shorter length
+                all_input_ids.extend([tokenizer.pad_token_id] * (max_length - len(all_input_ids)))  # add the padding token
+                all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
+                all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
+
+                print(tokenizer.convert_ids_to_tokens(all_input_ids))
+
+                # If it is not included, for impossible instances the target prediction
+                # for both start and end (tokenized) position is 0, i.e. the [CLS] token
+                # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
+                feature = FactoidFeature(example._question_id, all_input_ids,
+                                         all_attention_mask, all_token_type_ids,
+                                         -1, -1, answer)
+
+                print(feature)
+                feature_list.append(feature)
+                print(feature_list)
+
             continue
 
         # Lets create a mapping of characters in the original context to the position in the tokenized context.
@@ -376,17 +418,6 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                                      end_token_position + number_of_prepended_tokens - left_clip,
                                      example._answer)
 
-            # question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end, answer_text
-
-            # print("start and end verifications")
-            # print('start', start_token_position + number_of_prepended_tokens - left_clip)
-            # print('end', end_token_position + number_of_prepended_tokens - left_clip)
-            # print('\nexpected answer', example._answer)
-
-            iids = all_input_ids[start_token_position + number_of_prepended_tokens - left_clip:end_token_position + number_of_prepended_tokens - left_clip]
-            tids = tokenizer.convert_ids_to_tokens(iids)
-
-            # print('actual answer', tokenizer.convert_tokens_to_string(tids))
             feature_list.append(feature)
 
     print('\n------- COLLATING FEATURE METRICS -------')

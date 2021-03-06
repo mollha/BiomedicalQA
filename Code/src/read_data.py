@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import re
+import ast
 import unidecode
 from transformers import DistilBertTokenizerFast
 from spacy.lang.en import English
@@ -26,6 +27,7 @@ def update_dataset_metrics(total_metrics, additional_metrics):
 
 def get_question_stats(list_of_questions):
     # Note: list of questions should be the same type
+
     avg_question_length = round(sum([len(q._question) for q in list_of_questions])/len(list_of_questions), 2)
     avg_context_length = round(sum([len(q._context) for q in list_of_questions])/len(list_of_questions), 2)
     return avg_question_length, avg_context_length
@@ -357,16 +359,23 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         question_id = data["id"]
         question = data["body"]
         q_type = data["type"]
-        answer_list = data["exact_answer"]
+        answer_list = None if "exact_answer" not in data else data["exact_answer"]
         snippets = data["snippets"]
         examples_from_question = []
 
+        if type(snippets) == str:  # sometimes, snippets list a string representation of a list
+            snippets = ast.literal_eval(snippets)  # convert to list from string
+
         flattened_answer_list = []
-        for answer in answer_list:  # flatten list of lists
-            if type(answer) == list:
-                flattened_answer_list.extend([sub_answer for sub_answer in answer])
-            else:
-                flattened_answer_list.append(answer)
+        if answer_list is not None:
+            for answer in answer_list:  # flatten list of lists
+                if type(answer) == list:
+                    flattened_answer_list.extend([sub_answer for sub_answer in answer])
+                else:
+                    flattened_answer_list.append(answer)
+
+        if len(flattened_answer_list) == 0:
+            flattened_answer_list.append(None)
 
         metrics = {  # this dictionary is combined with metrics from previous questions
             "num_questions": 1,
@@ -376,17 +385,17 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         }
 
         metrics["total_answers"] += len(flattened_answer_list)
-
         for snippet in snippets:
             context = snippet['text']
             # As we match to the context paragraph ourselves, we can remove whitespace without affecting start/end pos'
             context = context.strip()
 
             for answer in flattened_answer_list:  # for each of our candidate answers
-                answer = unidecode.unidecode(answer.lower())  # normalize the answer
+                answer = None if answer is None else unidecode.unidecode(answer.lower())  # normalize the answer
 
                 # if we're testing, we don't care about start and end positions
                 if testing:
+                    metrics["num_examples"] += 1
                     context = context.lower()
                     accent_stripped_context = unidecode.unidecode(context)
 
@@ -432,6 +441,9 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         snippets = data["snippets"]
         answer = None if "exact_answer" not in data else data["exact_answer"].lower()
 
+        if type(snippets) == str:  # sometimes, snippets list a string representation of a list
+            snippets = ast.literal_eval(snippets)  # convert to list from string
+
         metrics = {
             "num_examples": len(snippets),
             "num_questions": 1,
@@ -458,8 +470,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
     }
 
     combined_metrics = {q: {} for q in dataset.keys()}
-
-    c = 0
     for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
 
@@ -477,10 +487,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         example_list, question_metrics = fc(data_point)  # apply the right function for the question type
         combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples
-
-        c += 1
-        if c > 50: # todo remove
-            break
 
     # ------ DISPLAY METRICS -------
     total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])

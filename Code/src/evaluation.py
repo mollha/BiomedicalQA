@@ -150,9 +150,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             answer_starts, start_indices = torch.topk(start_logits, k=5, dim=1)
             answer_ends, end_indices = torch.topk(end_logits, k=5, dim=1)
 
-            print('answer starts', answer_starts)
-            print('answer ends', answer_ends)
-
             start_end_positions = [x for x in zip(start_indices, end_indices)]
 
             # iterate over our pairs of start and end indices

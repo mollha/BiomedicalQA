@@ -85,7 +85,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     Path(finetuned_checkpoint_dir).mkdir(exist_ok=True, parents=True)
 
     # -- Override general config with model specific config --
-    model_settings = {**get_model_config(model_size, pretrain=False), **get_data_specific_config(config['size'], config["dataset"])}
+    model_settings = {**get_model_config(model_size, pretrain=False), **get_data_specific_config(model_size, config["dataset"])}
 
     generator, discriminator, electra_tokenizer, \
     discriminator_config = build_electra_model(model_size, get_config=True)  # get basic model building blocks
@@ -141,8 +141,8 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
             else:
                 optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings, config["num_warmup_steps"])
 
-            for param_group in optimizer.param_groups:
-                print(param_group['lr'])
+            # for param_group in optimizer.param_groups:
+            #     print(param_group['lr'])
 
             building_from_pretrained = False
         else:
@@ -165,5 +165,4 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
 
         optimizer, scheduler = get_optimizer_and_scheduler(electra_for_qa, discriminator_config, model_settings, config["num_warmup_steps"])
 
-    print("finalised config leaving build checkpoints", config)
     return electra_for_qa, optimizer, scheduler, electra_tokenizer, config
