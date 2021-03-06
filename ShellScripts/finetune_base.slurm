@@ -9,10 +9,10 @@
 #SBATCH -c 1
 #SBATCH --gres=gpu
 #SBATCH --job-name=bs_finetune
-#SBATCH -p ug-gpu-small
-#SBATCH --qos=debug
-#SBATCH -t 2:0:0
-#SBATCH --mem=28g
+#SBATCH -p gpu-bigmem
+#SBATCH --qos=long-high-prio
+#SBATCH -t 1:0:0:0
+#SBATCH --mem=56g
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user molly.hayward@durham.ac.uk
 

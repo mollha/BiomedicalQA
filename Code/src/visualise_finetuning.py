@@ -17,6 +17,7 @@ Path(graphs_path).mkdir(exist_ok=True, parents=True)
 rc('font', **{'family': 'serif', 'serif': ['Times']})
 rc('text', usetex=True)
 
+
 def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=None, more_data=None,
                more_data_label=None, save_figure=True, color="b"):
     plt.plot(epochs, data, label=data_label, color=color)
@@ -38,7 +39,8 @@ def draw_graph(graph_title, data, data_label, epochs, checkpoint_name, y_label=N
         plt.show()
     return plt
 
-def create_subplots(checkpoint_name, metrics, losses):
+
+def create_yesno_subplots(checkpoint_name, metrics, losses):
     num_epochs = range(1, len(metrics) + 1)  # might need to add 1
 
     accuracy = [metric_dict["yesno"][0]["accuracy"] for metric_dict in metrics]
@@ -98,7 +100,66 @@ def create_subplots(checkpoint_name, metrics, losses):
     for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
     plt.subplots_adjust(hspace=0.6, wspace=0.45)
-    plt.savefig(str(graphs_path) + "/" + checkpoint_name + "_finetuning_subplot.png")  # this is saving them weird due to subplots
+    plt.savefig(str(graphs_path) + "/" + checkpoint_name + "_yesno_finetuning_subplot.png")  # this is saving them weird due to subplots
+    plt.show()
+    print("\nGraph creation complete.\n")
+
+def create_factoid_subplots(checkpoint_name, metrics, losses):
+    num_epochs = range(1, len(metrics) + 1)  # might need to add 1
+
+    strict_accuracy = [metric_dict["factoid"][0]["strict_accuracy"] for metric_dict in metrics]
+    lenient_accuracy = [metric_dict["factoid"][0]["leniant_accuracy"] for metric_dict in metrics]
+    mrr = [metric_dict["factoid"][0]["mrr"] for metric_dict in metrics]
+
+    plt.subplot(2, 2, 1)
+    draw_graph(graph_title="Strict Accuracy",
+               data=strict_accuracy,
+               data_label="Accuracy",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="r",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplot(2, 2, 2)
+    draw_graph(graph_title="Lenient Accuracy",
+               data=lenient_accuracy,
+               data_label="Accuracy",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="g",
+               save_figure=False)
+
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplot(2, 2, 3)
+    draw_graph(graph_title="MRR Score",
+               data=mrr,
+               data_label="Mean Reciprocal Rank (MRR)",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               color="c",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+
+    plt.subplot(2, 2, 4)
+    draw_graph(graph_title="Loss",
+               data=losses,
+               data_label="Loss",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name,
+               y_label="Loss",
+               color="C0",
+               save_figure=False)
+
+    for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
+
+    plt.subplots_adjust(hspace=0.6, wspace=0.45)
+    plt.savefig(str(graphs_path) + "/" + checkpoint_name + "_factoid_finetuning_subplot.png")  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")
 
@@ -151,8 +212,39 @@ def visualise_yes_no(checkpoint_name, metrics):
                epochs=num_epochs,
                checkpoint_name=checkpoint_name)
 
+def visualise_factoid(checkpoint_name, metrics):
+    num_epochs = range(1, len(metrics) + 1)  # might need to add 1
+    fig_size = (5, 5)
 
-def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
+    strict_accuracy = [metric_dict["factoid"][0]["strict_accuracy"] for metric_dict in metrics]
+    lenient_accuracy = [metric_dict["factoid"][0]["leniant_accuracy"] for metric_dict in metrics]
+    mrr = [metric_dict["factoid"][0]["mrr"] for metric_dict in metrics]
+
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Strict Accuracy",
+               data=strict_accuracy,
+               data_label="Accuracy",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
+
+
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="Lenient Accuracy",
+               data=lenient_accuracy,
+               data_label="Accuracy",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
+
+    plt.figure(3, figsize=fig_size)
+    draw_graph(graph_title="MRR Score",
+               data=mrr,
+               data_label="Mean Reciprocal Rank (MRR)",
+               epochs=num_epochs,
+               checkpoint_name=checkpoint_name)
+
+
+
+def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name, question_type):
 
     path_to_settings = os.path.join(path_to_checkpoint, "train_settings.bin")
     if os.path.isfile(path_to_settings):
@@ -174,8 +266,12 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
         raise Exception("Losses list does not contain any data.")
     print(losses)
 
-    visualise_yes_no(checkpoint_name, metrics)
-    create_subplots(checkpoint_name, metrics, losses)
+    if question_type == "yesno":
+        visualise_yes_no(checkpoint_name, metrics)
+        create_yesno_subplots(checkpoint_name, metrics, losses)
+    elif question_type == "factoid":
+        visualise_factoid(checkpoint_name, metrics)
+        create_factoid_subplots(checkpoint_name, metrics, losses)
 
     print("Graph creation complete.\n")
 
@@ -183,10 +279,10 @@ def load_stats_from_checkpoint(path_to_checkpoint, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "small_yesno_14_79670_29_103"    # e.g. small_10_50
+    chckpt_name = "small_factoid,list_18_64089_29_249"    # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
 
     checkpoint_path = (checkpoint_dir / chckpt_name).resolve()
-    load_stats_from_checkpoint(checkpoint_path, chckpt_name)
+    load_stats_from_checkpoint(checkpoint_path, chckpt_name, "factoid")
