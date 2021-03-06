@@ -67,7 +67,6 @@ class ELECTRALoss:
         is_replaced = is_replaced.masked_select(non_pad)  # -> 1d tensor
 
         # Logits is the tensor that is being mapped to probabilities by the Softmax
-
         # calculate discriminator accuracy
         # get tensor of correct and incorrect answers
         disc_predictions = torch.round(self.sigmoid_fc(disc_logits.float()))

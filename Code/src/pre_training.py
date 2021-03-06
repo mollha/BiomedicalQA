@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--checkpoint",
-        default="recent",
+        default="base_4_394143",
         type=str,
         help="The name of the checkpoint to use e.g. small_15_10230",
     )
@@ -165,7 +165,6 @@ if __name__ == "__main__":
     config = build_pretrained_from_checkpoint(config['size'], config['device'], checkpoint_dir, checkpoint_name, config)
 
     print(config)
-    raise Exception('jihubifuh')
 
     for param_group in optimizer.param_groups:
         print(param_group['lr'])
