@@ -37,15 +37,14 @@ config = {
 # Tried non-weighted / normal implementation of the model
 
 def condense_statistics(metrics):
-    print(metrics)
     all_metrics = {}
 
     for dataset_name in metrics:  # iterate over top-level dataset names
         all_metrics[dataset_name] = {}
 
         for question_type in metrics[dataset_name]:
-            print('question types checked:', question_type)
-            print(metrics[dataset_name][question_type])
+            # print('question types checked:', question_type)
+            # print(metrics[dataset_name][question_type])
             list_of_result_dicts = metrics[dataset_name][question_type]
             best_result = None
 
@@ -79,13 +78,13 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
 
     for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
         loader_all_question_types = eval_dataloader_dict[eval_dataset_name]
-        print('laoder all q types', loader_all_question_types)
+        # print('laoder all q types', loader_all_question_types)
         sys.stderr.write("\nEvaluating on test-set {}".format(eval_dataset_name))
 
         metrics_for_plotting = {k: [] for k in loader_all_question_types}
 
         for qt in loader_all_question_types:
-            print(qt)
+            # print(qt)
 
             eval_dataloader = loader_all_question_types[qt]
 
@@ -98,7 +97,7 @@ def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_datase
             else:
                 raise Exception("Question type in config must be factoid, list or yesno.")
 
-            print('metric results', metric_results)
+            # print('metric results', metric_results)
 
             # Our metric results dictionary will be empty if we're evaluating with non-golden bioasq.
             if len(metric_results) > 0:
@@ -198,7 +197,6 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
 
     # ------------- SAVE FINE-TUNED MODEL -------------
     save_checkpoint(qa_model, optimizer, scheduler, settings, checkpoint_dir, pre_training=False)
-    print(all_dataset_metrics)
     all_dataset_metrics, _ = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
     aggregated_metrics = condense_statistics(all_dataset_metrics)
 

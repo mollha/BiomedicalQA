@@ -226,7 +226,6 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
         # if text_start_pos and text_end_pos are -1 and -1, then we have a test question. It may or may not have an answer.
         if text_start_pos == -1 and text_end_pos == -1:
-            print(example._question_type)
             # -- Perform a doc stride here, this will give us more predictions to work with --
             tokenized_question = tokenizer.tokenize(question)
             tokenized_context = tokenizer.tokenize(short_context)
@@ -243,12 +242,8 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             context_input_ids = tokenizer.convert_tokens_to_ids(tokenized_context)
             context_attention_mask = len(context_input_ids) * [1]  # pay attention to all context input ids.
             context_token_type_ids = len(context_input_ids) * [1]  # token type ids are 1 for context tokens.
-            print('still here')
-            print('num context tokens', num_context_tokens)
-            print('num context tokens', num_context_tokens)
 
             for left_clip in range(0, len(context_input_ids), 20):
-                print('not here')
                 clipped_input_ids = context_input_ids[left_clip:min(left_clip + num_context_tokens, len(context_input_ids))]
                 clipped_attention_mask = context_attention_mask[left_clip:min(left_clip + num_context_tokens, len(context_input_ids))]
                 clipped_token_type_ids = context_token_type_ids[left_clip:min(left_clip + num_context_tokens, len(context_input_ids))]
@@ -262,8 +257,6 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                 all_attention_mask.extend([0] * (max_length - len(all_attention_mask)))  # do not attend to padded tokens
                 all_token_type_ids.extend([0] * (max_length - len(all_token_type_ids)))  # part of the context
 
-                print(tokenizer.convert_ids_to_tokens(all_input_ids))
-
                 # If it is not included, for impossible instances the target prediction
                 # for both start and end (tokenized) position is 0, i.e. the [CLS] token
                 # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
@@ -271,9 +264,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                                          all_attention_mask, all_token_type_ids,
                                          -1, -1, answer)
 
-                print(feature)
                 feature_list.append(feature)
-                print(feature_list)
 
             continue
 
