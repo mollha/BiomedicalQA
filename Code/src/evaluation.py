@@ -153,8 +153,8 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             start_end_positions = list(zip(start_indices, end_indices))
             start_end_probabilities = list(zip(answer_starts, answer_ends))
 
-            print('start_end_positions', start_end_positions)
-            print('start_end_probabilities', start_end_probabilities)
+            # print('start_end_positions', start_end_positions)
+            # print('start_end_probabilities', start_end_probabilities)
 
             # start_end_positions_and_probabilities.sort(key=lambda val: sum(val[0][0], val[0][1]))
 
@@ -208,7 +208,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
         pred_lists = results_by_question_id[q_id]["predictions"]
         # get all of our predictions for this question, sort by the sum of start and end probabilities
         pred_lists.sort(key=lambda val: val[1], reverse=True)
-        print('prediction lists', pred_lists)
+        # print('prediction lists', pred_lists)
 
         # For each factoid question in BioASQ, each participating system will have to return a list of up to 5 entity names
         # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
@@ -228,7 +228,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
 
         # swap the huge list of all predictions for our short-list of best predictions
         results_by_question_id[q_id]["predictions"] = best_predictions
-        print(best_predictions)
 
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
