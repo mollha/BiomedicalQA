@@ -215,9 +215,9 @@ if __name__ == "__main__":
                         help="The size of the electra model e.g. 'small', 'base' or 'large")
     parser.add_argument("--p-checkpoint", default="recent", type=str,
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
-    parser.add_argument("--f-checkpoint", default="", type=str,
+    parser.add_argument("--f-checkpoint", default="small_factoid,list_18_64089_29_249", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid,list", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
+    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
                         type=str,
                         help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
     parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq', 'boolq'], type=str,

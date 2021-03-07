@@ -150,35 +150,54 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             answer_starts, start_indices = torch.topk(start_logits, k=5, dim=1)
             answer_ends, end_indices = torch.topk(end_logits, k=5, dim=1)
 
-            start_end_positions = [x for x in zip(start_indices, end_indices)]
+            start_end_positions = list(zip(start_indices, end_indices))
+            start_end_probabilities = list(zip(answer_starts, answer_ends))
 
-            # iterate over our pairs of start and end indices
-            for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
-                # e.g. start_tensor = tensor([110,  33,  38, 111,  35]), end_tensor = tensor([20,  0, 90, 36, 62])
-                sub_start_end_positions = zip(start_tensor, end_tensor)  # zip the start and end positions
-                input_ids = batch.input_ids[index]
-                expected_answer = batch.answer_text[index]  # Note: this will could be None
+            print('start_end_positions', start_end_positions)
+            print('start_end_probabilities', start_end_probabilities)
+
+            # start_end_positions_and_probabilities.sort(key=lambda val: sum(val[0][0], val[0][1]))
+
+            # iterate over our pairs of start and end indices - each loop represents a new question
+            for index, (starts_tensor, ends_tensor) in enumerate(start_end_positions):
+                probabilities_of_starts, probabilities_of_ends = start_end_probabilities[index]
+                sub_start_end_positions = zip(starts_tensor, ends_tensor)  # zip the start and end positions
+                sub_start_end_probabilities = list(zip(probabilities_of_starts, probabilities_of_ends))
+
+                # get info about the current question
+                input_ids = batch.input_ids[index]  # get the input ids for the particular question we're looking at
+                expected_answer = batch.answer_text[index]  # Note: this will could be None for BioASQ test batches
                 question_id = batch.question_ids[index]
 
+
                 list_of_predictions = []  # gather all of the predictions for this question
-                for (s, e) in sub_start_end_positions:  # convert the start and end positions to answers.
+                for sub_index, (s, e) in enumerate(sub_start_end_positions):  # convert the start and end positions to answers.
+                    # get the probabilities associated with this prediction
+                    probability_of_start, probability_of_end = sub_start_end_probabilities[sub_index]
+
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
+
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
-                    # make sure we don't end up with special characters in our predicted
-                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)  # todo we need a way to do this that handles punctuation better
+                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+                    # todo we need a way to do this that handles punctuation better
 
-                    list_of_predictions.append(predicted_answer)
+                    # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
+                    # if neither start probability or end probability are negative
+                    if probability_of_start > 0 and probability_of_end > 0:
+                        list_of_predictions.append((predicted_answer, probability_of_start.item() + probability_of_end.item()))
 
                 if question_id in results_by_question_id:
-                    results_by_question_id[question_id]["predictions"].append(list_of_predictions)
+                    # todo we're modifiying this from a list of lists to extending the list
+                    results_by_question_id[question_id]["predictions"].extend(list_of_predictions)
 
-                    # make sure we don't put the same expected answer in the list over and over again.
-                    if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
-                        results_by_question_id[question_id]["expected_answers"].append(expected_answer)
+                    if type(expected_answer) == list:
+                        # make sure we don't put the same expected answer in the list over and over again.
+                        if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
+                            results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
-                    results_by_question_id[question_id] = {"predictions": [list_of_predictions],
+                    results_by_question_id[question_id] = {"predictions": list_of_predictions,
                                                            "expected_answers": [expected_answer]}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
@@ -187,29 +206,29 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
+        # get all of our predictions for this question, sort by the sum of start and end probabilities
+        pred_lists.sort(key=lambda val: val[1])
+        print('prediction lists', pred_lists)
 
-        # For each factoid question in BioASQ, each participating system will have to return a list* of up to 5 entity names
+        # For each factoid question in BioASQ, each participating system will have to return a list of up to 5 entity names
         # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
-        best_predictions = []
-        num_best_predictions = 0
         k = 5 if dataset == "bioasq" else 1
 
-        # iterate over this prediction list until we reach the end, or we have enough predictions.
-        for ordered_pred_list in zip(*pred_lists):  # zip each of the prediction lists found in here
-            for pred in ordered_pred_list:
-
-                if num_best_predictions >= k:
-                    break
-
-                # don't put repeats in our list.
-                if pred not in best_predictions:
-                    num_best_predictions += 1
-                    best_predictions.append(pred)
+        # pred_lists[: min(len(pred_lists), k)]  # take up to k of the best predictions
+        best_predictions = []
+        num_best_predictions = 0
+        for pred, probability in pred_lists:
             if num_best_predictions >= k:
                 break
 
+            # don't put repeats in our list.
+            if pred not in best_predictions:
+                num_best_predictions += 1
+                best_predictions.append(pred)
+
         # swap the huge list of all predictions for our short-list of best predictions
         results_by_question_id[q_id]["predictions"] = best_predictions
+        print(best_predictions)
 
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
@@ -218,8 +237,9 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
-    print('\nBest Predictions', predictions_list)
-    print('Expected Answers', ground_truth_list)
+    for i in range(len(predictions_list)):
+        print('expected answers', ground_truth_list[i])
+        print('predictions', predictions_list[i])
 
     if any(ground_truth_list):  # if any of the ground truth values are not None
         if dataset == "bioasq":
@@ -296,7 +316,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
 
-                    if dataset == "bioasq" and e - s > 100:
+                    if dataset == "bioasq" and e - s > 100: # todo this is tokens not characters
                         continue  # if length is more than 100 and we are evaluating on bioasq, skip this pair
 
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]

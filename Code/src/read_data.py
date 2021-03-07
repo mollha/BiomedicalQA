@@ -27,7 +27,6 @@ def update_dataset_metrics(total_metrics, additional_metrics):
 
 def get_question_stats(list_of_questions):
     # Note: list of questions should be the same type
-
     avg_question_length = round(sum([len(q._question) for q in list_of_questions])/len(list_of_questions), 2)
     avg_context_length = round(sum([len(q._context) for q in list_of_questions])/len(list_of_questions), 2)
     return avg_question_length, avg_context_length
@@ -470,6 +469,8 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
     }
 
     combined_metrics = {q: {} for q in dataset.keys()}
+
+    count = 0
     for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
 
@@ -487,6 +488,10 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         example_list, question_metrics = fc(data_point)  # apply the right function for the question type
         combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples
+
+        count += 1
+        if count > 5:
+            break
 
     # ------ DISPLAY METRICS -------
     total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
@@ -536,6 +541,7 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         elif qt == "factoid" or qt == "list":
             print('-', round(qt_metrics["total_answers"] / qt_metrics["num_questions"], 2), 'avg num answers.')
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
+
 
     if testing:
         return dataset

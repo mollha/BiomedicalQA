@@ -409,6 +409,12 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                                      end_token_position + number_of_prepended_tokens - left_clip,
                                      example._answer)
 
+            # # todo remove
+            # tokens = tokenizer.convert_ids_to_tokens(all_input_ids)[start_token_position + number_of_prepended_tokens - left_clip:end_token_position + number_of_prepended_tokens - left_clip]
+            # string = tokenizer.convert_tokens_to_string(tokens)
+            # print('Actual Answer', example._answer)
+            # print('Clipped Answer', string)
+
             feature_list.append(feature)
 
     print('\n------- COLLATING FEATURE METRICS -------')
