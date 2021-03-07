@@ -29,11 +29,9 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
     Given a model and a test-set, evaluate the model's performance on the test set.
     The evaluation metrics we use depend on the dataset we use. Although, currently for
     yes/no questions, we only have one evaluation dataset (bioasq).
-
     For this question type, we do not expect to see any impossible (unanswerable) questions.
     However, we do expect to get questions without an answer, answer-start and answer-end.
     These are given when we use a non-golden bioasq test set, so we can't actually evaluate them.
-
     :param yes_no_model: pytorch model trained on yes no (binary classification) questions.
     :param test_dataloader: a dataloader iterable containing the yes/no test data.
     :param training: flag indicating whether we are running this from finetuning or evaluation.
@@ -113,7 +111,6 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
 def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, dataset="bioasq"):
     """
     Given an extractive question answering model and some test data, perform evaluation.
-
     :param factoid_model: Pytorch model trained on factoid (and list) questions
     :param test_dataloader: Dataloader iterable containing test data on which to evaluate
     :param tokenizer: The tokenizer used for converting text to tokens.
@@ -127,6 +124,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
     factoid_model.eval()  # switch to evaluation mode
     with torch.no_grad():
         for eval_step, batch in enumerate(tqdm(test_dataloader, desc="Step")):
+            # question_ids = batch.question_ids
 
             inputs = {
                 "input_ids": batch.input_ids,
@@ -160,7 +158,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             # iterate over our pairs of start and end indices - each loop represents a new question
             for index, (starts_tensor, ends_tensor) in enumerate(start_end_positions):
                 probabilities_of_starts, probabilities_of_ends = start_end_probabilities[index]
-
                 sub_start_end_positions = zip(starts_tensor, ends_tensor)  # zip the start and end positions
                 sub_start_end_probabilities = list(zip(probabilities_of_starts, probabilities_of_ends))
 
@@ -168,73 +165,72 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                 input_ids = batch.input_ids[index]  # get the input ids for the particular question we're looking at
                 expected_answer = batch.answer_text[index]  # Note: this will could be None for BioASQ test batches
                 question_id = batch.question_ids[index]
-                offset = batch.offset[index]  # should be a number indicating how much was clipped from the left of the context
-                tokenized_context = batch.tokenized_context[index]
 
-                list_of_start_predictions = []  # gather all of the predictions for this question
-                list_of_end_predictions = []
+
+                list_of_predictions = []  # gather all of the predictions for this question
                 for sub_index, (s, e) in enumerate(sub_start_end_positions):  # convert the start and end positions to answers.
                     # get the probabilities associated with this prediction
                     probability_of_start, probability_of_end = sub_start_end_probabilities[sub_index]
-                    list_of_start_predictions.append((s + offset, probability_of_start.item()))
-                    list_of_end_predictions.append((e + offset, probability_of_end.item()))
+
+                    if e <= s:  # if end position is less than or equal to start position, skip this pair
+                        continue
+
+                    clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
+                    clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
+                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+                    # todo we need a way to do this that handles punctuation better
+
+                    # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
+                    # if neither start probability or end probability are negative
+                    if probability_of_start > 0 and probability_of_end > 0:
+                        list_of_predictions.append((predicted_answer, probability_of_start.item() + probability_of_end.item()))
 
                 if question_id in results_by_question_id:
                     # todo we're modifiying this from a list of lists to extending the list
-                    results_by_question_id[question_id]["start_predictions"].extend(list_of_start_predictions)
-                    results_by_question_id[question_id]["end_predictions"].extend(list_of_end_predictions)
+                    results_by_question_id[question_id]["predictions"].extend(list_of_predictions)
 
                     if type(expected_answer) == list:
                         # make sure we don't put the same expected answer in the list over and over again.
                         if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
                             results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
-                    results_by_question_id[question_id] = {"start_predictions": list_of_start_predictions,
-                                                           "end_predictions": list_of_end_predictions,
-                                                           "expected_answers": [expected_answer],
-                                                           "all_context_tokens": tokenized_context}
+                    results_by_question_id[question_id] = {"predictions": list_of_predictions,
+                                                           "expected_answers": [expected_answer]}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
     predictions_list, ground_truth_list = [], []
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
-        start_predictions = results_by_question_id[q_id]["start_predictions"]
-        end_predictions = results_by_question_id[q_id]["end_predictions"]
+        pred_lists = results_by_question_id[q_id]["predictions"]
+        # get all of our predictions for this question, sort by the sum of start and end probabilities
+        pred_lists.sort(key=lambda val: val[1], reverse=True)
+        # print('prediction lists', pred_lists)
 
-        start_predictions.sort(key=lambda val: val[1], reverse=True)
-        end_predictions.sort(key=lambda val: val[1], reverse=True)
-
-        # todo pair up start and end predictions better
-        start_end_predictions = [(s, e) for s, e in zip(start_predictions, end_predictions)]
-        context_tokens = results_by_question_id[q_id]["tokenized_context"]
-
-        answer_predictions = []
-        num_best_predictions = 0
-
+        # For each factoid question in BioASQ, each participating system will have to return a list of up to 5 entity names
+        # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
         k = 5 if dataset == "bioasq" else 1
-        for (s, e) in start_end_predictions:
+
+        # pred_lists[: min(len(pred_lists), k)]  # take up to k of the best predictions
+        best_predictions = []
+        num_best_predictions = 0
+        for pred, probability in pred_lists:
             if num_best_predictions >= k:
                 break
-            # todo we need a way to do this that handles punctuation better
-
-            clipped_ids = [t for t in context_tokens[s:e] if t not in special_tokens_ids]
-            clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
-            predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
 
             # don't put repeats in our list.
-            if predicted_answer not in answer_predictions:
+            if pred not in best_predictions:
                 num_best_predictions += 1
-                answer_predictions.append(predicted_answer)
+                best_predictions.append(pred)
 
         # swap the huge list of all predictions for our short-list of best predictions
-        results_by_question_id[q_id]["predictions"] = answer_predictions
+        results_by_question_id[q_id]["predictions"] = best_predictions
 
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
         if len(results_by_question_id[q_id]["expected_answers"]) > 1 or results_by_question_id[q_id]["expected_answers"][0] is not None:
             # predictions_list.append(predicted_answer)
-            predictions_list.append(answer_predictions)
+            predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
     for i in range(len(predictions_list)):
@@ -262,7 +258,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
     """
     Given a pytorch model trained on factoid / list questions, we need to evaluate this model on a given dataset.
     The evaluation metrics we choose are dependent on our choice of dataset.
-
     :param list_model: Pytorch model capable of answering factoid questions
     :param test_dataloader: Dataloader containing evaluation data
     :param tokenizer: Tokenizer used to convert strings into tokens
@@ -409,6 +404,3 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         return evaluation_metrics
     else:
         return results_by_question_id, evaluation_metrics
-
-
-

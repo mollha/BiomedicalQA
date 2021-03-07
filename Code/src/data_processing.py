@@ -66,7 +66,7 @@ class BinaryFeature:
 
 class FactoidFeature:
     def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
-                 answer_text, offset, tokenized_context):
+                 answer_text, offset):
         self._question_id = question_id
         self._input_ids = input_ids
         self._attention_mask = attention_mask
@@ -75,7 +75,6 @@ class FactoidFeature:
         self._answer_end = answer_end
         self._answer_text = None if answer_text is None else answer_text
         self._offset = offset
-        self._tokenized_context = tokenized_context
 
     def get_features(self):
         return (
@@ -87,7 +86,6 @@ class FactoidFeature:
             self._answer_start,
             self._answer_end,
             self._offset,
-            self._tokenized_context
         )
 
 
@@ -265,7 +263,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                 # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
                 feature = FactoidFeature(example._question_id, all_input_ids,
                                          all_attention_mask, all_token_type_ids,
-                                         -1, -1, answer, left_clip, context_input_ids)
+                                         -1, -1, answer, left_clip)
 
                 feature_list.append(feature)
 
@@ -410,7 +408,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                                      all_attention_mask, all_token_type_ids,
                                      start_token_position + number_of_prepended_tokens - left_clip,
                                      end_token_position + number_of_prepended_tokens - left_clip,
-                                     example._answer, left_clip, context_input_ids)
+                                     example._answer, left_clip)
 
             # # todo remove
             # tokens = tokenizer.convert_ids_to_tokens(all_input_ids)[start_token_position + number_of_prepended_tokens - left_clip:end_token_position + number_of_prepended_tokens - left_clip]
@@ -463,11 +461,10 @@ class BatchFeatures:
         # i.e. in the bioasq (non-golden) test dataset, answer_text, answer_start and answer_end is None
         self.answer_text = list(transposed_data[4])
 
-        if len(transposed_data) == 9:  # factoid
+        if len(transposed_data) == 8: # factoid
             self.answer_start = torch.tensor(transposed_data[5], device=device)
             self.answer_end = torch.tensor(transposed_data[6], device=device)
             self.offset = torch.tensor(transposed_data[7], device=device)
-            self.tokenized_context = torch.tensor(transposed_data[8], device=device)
         else: # yesno
             self.labels = torch.tensor(transposed_data[5], device=device, dtype=torch.float)
             self.weights = torch.tensor(transposed_data[6], device=device, dtype=torch.float)
