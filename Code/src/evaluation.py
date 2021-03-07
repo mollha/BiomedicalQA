@@ -217,8 +217,9 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             # predictions_list.append(predicted_answer)
             predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
-            # print('\nBest Predictions', best_predictions)
-            # print('Expected Answers', results_by_question_id[q_id]["expected_answers"])
+
+    print('\nBest Predictions', predictions_list)
+    print('Expected Answers', ground_truth_list)
 
     if any(ground_truth_list):  # if any of the ground truth values are not None
         if dataset == "bioasq":
