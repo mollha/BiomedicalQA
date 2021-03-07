@@ -207,7 +207,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
         # get all of our predictions for this question, sort by the sum of start and end probabilities
-        pred_lists.sort(key=lambda val: val[1])
+        pred_lists.sort(key=lambda val: val[1], reverse=True)
         print('prediction lists', pred_lists)
 
         # For each factoid question in BioASQ, each participating system will have to return a list of up to 5 entity names
