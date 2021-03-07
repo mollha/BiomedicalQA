@@ -470,7 +470,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
 
     combined_metrics = {q: {} for q in dataset.keys()}
 
-    count = 0
     for data_point in tqdm(bioasq_dict['questions'], desc="BioASQ Data \u2b62 Examples"):
         question_type = data_point["type"]
 
@@ -488,10 +487,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         example_list, question_metrics = fc(data_point)  # apply the right function for the question type
         combined_metrics[question_type] = update_dataset_metrics(combined_metrics[question_type], question_metrics)
         dataset[question_type].extend(example_list)  # collate examples
-
-        count += 1
-        if count > 5:
-            break
 
     # ------ DISPLAY METRICS -------
     total_questions = sum([combined_metrics[qt]["num_questions"] for qt in combined_metrics.keys() if len(combined_metrics[qt]) > 0])
