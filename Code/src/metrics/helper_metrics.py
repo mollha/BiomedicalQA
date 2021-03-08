@@ -5,7 +5,7 @@ import string
 def check_match(prediction, expected):
     """
     Defines the logic for checking if a prediction matches the expected answer.
-    We can decide what we constitute as a match. We aren't being leniant.
+    We can decide what we constitute as a match. We aren't being lenient.
     :return:
     """
 

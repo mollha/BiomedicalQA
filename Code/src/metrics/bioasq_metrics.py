@@ -157,18 +157,16 @@ def list_evaluation(predictions, ground_truth):
     total_recall = 0
     total_f1 = 0
     for idx, prediction in enumerate(predictions):  # for every prediction
+        print('Prediction (line 160):', prediction)
+
         # We expect each prediction to be a list of candidate answers,
         # The ground truth answer should also be a list of answers.
-
-        # get the corresponding ground truth answers
-        truth_values = ground_truth[idx]
-        # prediction_set = set(prediction)  # convert to set to check participation easily
+        truth_values = ground_truth[idx]  # get the corresponding ground truth answers
 
         # tns do not make sense in this case, as they are entities not in either list.
         tp, fn = 0, 0
 
         for truth_value in truth_values:  # for every truth value
-
             # search for a matching answer in candidate list
             match_found = False
             for candidate_answer in prediction:
@@ -179,7 +177,7 @@ def list_evaluation(predictions, ground_truth):
                     break
 
             # tp are entities that are in both lists
-            tp += 1 if match_found else 0
+            tp += 1 if match_found else 0  # if a match is found between truth value and candidate answer
             # fn are entities in truth_values but not in prediction
             fn += 1 if not match_found else 0
 

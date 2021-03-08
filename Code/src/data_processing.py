@@ -14,8 +14,10 @@ import random
 # ----------------------- SPECIFY DATASET PATHS -----------------------
 # the folder structure of bioasq is different to squad, as we need to download matching articles
 datasets = {
-    "bioasq": {"train": ["raw_data/training9b.json"],
-               "train": ["raw_data/enriched_training9b.json"],
+    "bioasq": {# "train": ["raw_data/training9b.json"],
+               "train": ["raw_data/enriched_training9b.json", "raw_data/2B_golden.json",
+                         "raw_data/3B_golden.json", "raw_data/4B_golden.json", "raw_data/5B_golden.json",
+                         "raw_data/6B_golden.json", "raw_data/7B_golden.json"],
                "test": ["raw_data/8B1_golden.json", "raw_data/8B2_golden.json", "raw_data/8B3_golden.json",
                         "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"],
                },
