@@ -204,9 +204,3 @@ def list_evaluation(predictions, ground_truth):
         "mean_average_f1": mean_average_f1,
     }
     return metrics
-
-
-# --------- EVALUATION HELPER FUNCTIONS ---------
-def split_questions_by_type():
-    # Split questions by question type so that they are evaluated separately
-    pass

@@ -405,8 +405,33 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
                     )
                 else:  # we're training, so we need to find where the answer matches in the passage.
                     matches = match_answer_to_passage("".join(answer), context)
+
+                    # if len(matches) > 0:
+                    #     print(context[matches[0][0]: matches[0][1]])
+                    #     raise Exception('skip')
+
                     if len(matches) == 0:  # there are no matches in the passage and the question is impossible
-                        continue
+                        # check to see if we have a configured start_pos and end_pos
+                        if 'start_pos' in snippet and 'end_pos' in snippet:
+                            # get the values and check if they are valid
+                            if snippet['start_pos'] is None or snippet['end_pos'] is None:
+                                metrics["num_skipped_examples"] += 1
+                                continue
+                            possible_answer = context[snippet['start_pos']: snippet['end_pos']]
+                            if unidecode.unidecode(possible_answer.lower()) == answer:
+                                matches = [[snippet['start_pos'], snippet['end_pos']]]
+                            else:
+                                metrics["num_skipped_examples"] += 1
+                                continue
+                        else:
+                            print('\nQID of skipped question', data["id"])
+                            print('skipped question content', data["body"])
+                            print('type of skipped question', data["type"])
+                            print('answer of skipped question', answer)
+                            print('struggle Snippet', context)
+                            metrics["num_skipped_examples"] += 1
+
+                            continue
 
                     # we have at least one match, iterate through each match
                     # and create an example for each get the matching text
@@ -536,7 +561,6 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
         elif qt == "factoid" or qt == "list":
             print('-', round(qt_metrics["total_answers"] / qt_metrics["num_questions"], 2), 'avg num answers.')
             print('-', qt_metrics["num_skipped_examples"], 'examples were skipped.\n')
-
 
     if testing:
         return dataset
