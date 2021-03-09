@@ -12,6 +12,7 @@ word_nums = [
       ]
 
 
+
 def combine_tokens(token_list: list) -> str:
     build_string = []
 
@@ -191,7 +192,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
 
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
-                    predicted_answer = tokenizer.combine_tokens(clipped_tokens)
+                    predicted_answer = combine_tokens(clipped_tokens)
                     # todo we need a way to do this that handles punctuation better
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
@@ -333,7 +334,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
                     # make sure we don't end up with special characters in our predicted
                     # todo we need a way to do this that handles punctuation better
-                    predicted_answer = tokenizer.combine_tokens(clipped_tokens)
+                    predicted_answer = combine_tokens(clipped_tokens)
 
                     s_prob, e_prob = sub_start_end_probabilities[pos_index]
                     list_of_probability_pairs.append((s_prob, e_prob))
