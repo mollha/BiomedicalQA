@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from models import *
 from data_processing import *
+import string
 from metrics.bioasq_metrics import yes_no_evaluation, factoid_evaluation, list_evaluation
 from metrics.squad_metrics import squad_evaluation
 
@@ -9,6 +10,20 @@ word_nums = [
         "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
         "sixteen", "seventeen", "eighteen", "nineteen",
       ]
+
+
+def combine_tokens(token_list: list) -> str:
+    build_string = []
+
+    for token in token_list:
+        if '#' not in token and token not in string.punctuation:  # the start of a word and not punctuation
+            build_string.append(" " + token)
+        else:
+            raw_token = token.strip().lstrip('#')
+            build_string.append(raw_token)
+
+    return ''.join(build_string).strip()
+
 
 def contains_k(text: str):
     # Given a piece of text, check if text contains k. e.g. give two examples of...
@@ -166,7 +181,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                 expected_answer = batch.answer_text[index]  # Note: this will could be None for BioASQ test batches
                 question_id = batch.question_ids[index]
 
-
                 list_of_predictions = []  # gather all of the predictions for this question
                 for sub_index, (s, e) in enumerate(sub_start_end_positions):  # convert the start and end positions to answers.
                     # get the probabilities associated with this prediction
@@ -177,7 +191,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
 
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
-                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+                    predicted_answer = tokenizer.combine_tokens(clipped_tokens)
                     # todo we need a way to do this that handles punctuation better
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
@@ -319,7 +333,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
                     # make sure we don't end up with special characters in our predicted
                     # todo we need a way to do this that handles punctuation better
-                    predicted_answer = tokenizer.convert_tokens_to_string(clipped_tokens)
+                    predicted_answer = tokenizer.combine_tokens(clipped_tokens)
 
                     s_prob, e_prob = sub_start_end_probabilities[pos_index]
                     list_of_probability_pairs.append((s_prob, e_prob))

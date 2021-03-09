@@ -39,11 +39,13 @@ config = {
 def condense_statistics(metrics):
 
     def get_best_metric(metric_name, list_of_result_dicts):
-        best_result = -float('inf')
+        best_metric_result = -float('inf')
+        best_result = None
         best_epoch = None
         for i, x in enumerate(list_of_result_dicts):
-            if x[metric_name] > best_result:
-                best_result = x[metric_name]
+            if x[metric_name] > best_metric_result:
+                best_metric_result = x[metric_name]
+                best_result = x
                 best_epoch = i
 
         return best_result, best_epoch
