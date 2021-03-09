@@ -37,6 +37,17 @@ config = {
 # Tried non-weighted / normal implementation of the model
 
 def condense_statistics(metrics):
+
+    def get_best_metric(metric_name, list_of_result_dicts):
+        best_result = -float('inf')
+        best_epoch = None
+        for i, x in enumerate(list_of_result_dicts):
+            if x[metric_name] > best_result:
+                best_result = x[metric_name]
+                best_epoch = i
+
+        return best_result, best_epoch
+
     all_metrics = {}
 
     for dataset_name in metrics:  # iterate over top-level dataset names
@@ -45,19 +56,25 @@ def condense_statistics(metrics):
         for question_type in metrics[dataset_name]:
             # print('question types checked:', question_type)
             # print(metrics[dataset_name][question_type])
-            list_of_result_dicts = metrics[dataset_name][question_type]
-            best_result = None
 
+            list_of_result_dicts = metrics[dataset_name][question_type]
             if question_type == "yesno":  # official eval metric is f1_ma
-                best_result = max(list_of_result_dicts, key=lambda x: x['f1_ma'])
+                best_result, best_epoch = get_best_metric("f1_ma", list_of_result_dicts)
+
+                for i, x in enumerate(list_of_result_dicts):
+                    if x["f1_ma"] > best_result:
+                        best_result = x["f1_ma"]
+                        best_epoch = i
             elif question_type == "factoid":  # official eval metric is mrr
                 try:
-                    best_result = max(list_of_result_dicts, key=lambda x: x['mrr'])
+                    best_result, best_epoch = get_best_metric("mrr", list_of_result_dicts)
                 except KeyError:
+                    best_result, best_epoch = get_best_metric("exact_match", list_of_result_dicts)
                     # use exact_match if the dataset isn't bioasq (i.e. is squad)
-                    best_result = max(list_of_result_dicts, key=lambda x: x['exact_match'])
             elif question_type == "list":
-                best_result = max(list_of_result_dicts, key=lambda x: x['mean_average_f1'])
+                best_result, best_epoch = get_best_metric("mean_average_f1", list_of_result_dicts)
+            else:
+                raise Exception('Invalid question type.')
 
             metric_names = {key: [] for key in metrics[dataset_name][question_type][0]}
             for metric_dict in metrics[dataset_name][question_type]:  # condense this list of dicts into one avg dict
@@ -67,7 +84,7 @@ def condense_statistics(metrics):
                 values = metric_names[metric_name]
                 metric_names[metric_name] = 0 if len(values) == 0 else sum(values) / len(values)
 
-            all_metrics[dataset_name][question_type] = {"avg": metric_names, "best": best_result}
+            all_metrics[dataset_name][question_type] = {"avg": metric_names, "best": best_result, "epoch_of_best": best_epoch}
 
     return all_metrics
 
