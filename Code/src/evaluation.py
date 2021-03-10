@@ -12,7 +12,6 @@ word_nums = [
       ]
 
 
-
 def combine_tokens(token_list: list) -> str:
     build_string = []
 
