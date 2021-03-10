@@ -68,9 +68,10 @@ class BinaryFeature:
 
 
 class FactoidFeature:
-    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
+    def __init__(self, question_id, question, input_ids, attention_mask, token_type_ids, answer_start, answer_end,
                  answer_text, offset):
         self._question_id = question_id
+        self._question = question
         self._input_ids = input_ids
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
@@ -264,7 +265,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
                 # If it is not included, for impossible instances the target prediction
                 # for both start and end (tokenized) position is 0, i.e. the [CLS] token
                 # This is -1 for examples and 0 for features, as tokenized pos in features & char pos in examples
-                feature = FactoidFeature(example._question_id, all_input_ids,
+                feature = FactoidFeature(example._question_id, example._question, all_input_ids,
                                          all_attention_mask, all_token_type_ids,
                                          -1, -1, answer, left_clip)
 
@@ -407,7 +408,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
 
             # we are now accounting for the doc stride in our start and end positions, hence the terrible results
             # Now we're ready to create a feature
-            feature = FactoidFeature(example._question_id, all_input_ids,
+            feature = FactoidFeature(example._question_id, example._question, all_input_ids,
                                      all_attention_mask, all_token_type_ids,
                                      start_token_position + number_of_prepended_tokens - left_clip,
                                      end_token_position + number_of_prepended_tokens - left_clip,

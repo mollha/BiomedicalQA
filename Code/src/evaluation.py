@@ -308,6 +308,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             # This will give us k predictions per feature in the batch
             answer_starts, start_indices = torch.topk(start_logits, k=100, dim=1)
             answer_ends, end_indices = torch.topk(end_logits, k=100, dim=1)
+
             start_end_positions = [x for x in zip(start_indices, end_indices)]
             start_end_probabilities = [x for x in zip(answer_starts, answer_ends)]
 
@@ -336,7 +337,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
 
                     # make sure we don't end up with special characters in our predicted
-                    # todo we need a way to do this that handles punctuation better
                     predicted_answer = combine_tokens(clipped_tokens)
 
                     s_prob, e_prob = sub_start_end_probabilities[pos_index]
