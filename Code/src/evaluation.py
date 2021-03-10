@@ -18,7 +18,7 @@ def combine_tokens(token_list: list) -> str:
 
     for token in token_list:
         if '#' not in token and token not in string.punctuation:  # the start of a word and not punctuation
-            if len(build_string) > 0 or build_string[-1] != "-":
+            if len(build_string) > 0 and build_string[-1] != "-":
                 build_string.append(" " + token)
             else:
                 build_string.append(token)
