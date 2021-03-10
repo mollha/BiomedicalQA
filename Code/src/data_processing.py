@@ -83,6 +83,7 @@ class FactoidFeature:
     def get_features(self):
         return (
             self._question_id,
+            self._question,
             self._input_ids,
             self._attention_mask,
             self._token_type_ids,
