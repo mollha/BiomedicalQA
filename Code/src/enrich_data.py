@@ -49,8 +49,8 @@ if __name__ == "__main__":
     base_path = Path(__file__).parent
 
     dataset_dir = (base_path / '../datasets/bioasq/raw_data').resolve()
-    path_to_file = str(dataset_dir) + '/enriched_data3.json'  # TODO CHANGE
-    path_to_new_file = str(dataset_dir) + '/enriched_training9b.json'
+    path_to_file = str(dataset_dir) + '/enriched_training8b.json'  # TODO CHANGE
+    path_to_new_file = str(dataset_dir) + '/new_enriched_training8b.json'
 
     with open(path_to_file, 'rb') as f:
         bioasq_dict = json.load(f)

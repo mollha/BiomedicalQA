@@ -18,7 +18,10 @@ def combine_tokens(token_list: list) -> str:
 
     for token in token_list:
         if '#' not in token and token not in string.punctuation:  # the start of a word and not punctuation
-            build_string.append(" " + token)
+            if len(build_string) > 0 or build_string[-1] != "-":
+                build_string.append(" " + token)
+            else:
+                build_string.append(token)
         else:
             raw_token = token.strip().lstrip('#')
             build_string.append(raw_token)
@@ -406,6 +409,9 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                 results_by_question_id[q_id]["expected_answers"][0] is not None:
             predictions_list.append(predicted_answer)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
+
+    print('\nList Ground truths', ground_truth_list)
+    print('\nList Predictions', predictions_list)
 
     if any(ground_truth_list):  # if any of the ground truth values are not None
         if dataset == "bioasq":
