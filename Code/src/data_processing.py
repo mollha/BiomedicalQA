@@ -33,8 +33,9 @@ datasets = {
 
 # ------------- DEFINE TRAINING FEATURE CLASSES ------------
 class BinaryFeature:
-    def __init__(self, question_id, input_ids, attention_mask, token_type_ids, answer_text, weights=(1.0, 1.0)):
+    def __init__(self, question_id, question, input_ids, attention_mask, token_type_ids, answer_text, weights=(1.0, 1.0)):
         self._question_id = question_id
+        self._question = question
         self._input_ids = input_ids
         self._attention_mask = attention_mask
         self._token_type_ids = token_type_ids
@@ -56,6 +57,7 @@ class BinaryFeature:
     def get_features(self):
         return (
             self._question_id,
+            self._question,
             self._input_ids,
             self._attention_mask,
             self._token_type_ids,
@@ -215,7 +217,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
             input_ids = tokenized_input["input_ids"]
             attention_mask = tokenized_input["attention_mask"]
             token_type_ids = tokenized_input["token_type_ids"]
-            feature = BinaryFeature(example._question_id, input_ids, attention_mask,
+            feature = BinaryFeature(example._question_id, example._question, input_ids, attention_mask,
                                     token_type_ids, example._answer, yesno_weights)
             feature_list.append(feature)
             continue
@@ -453,22 +455,23 @@ class BatchFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"  # device
 
         self.question_ids = list(transposed_data[0])
-        self.input_ids = torch.tensor(transposed_data[1], device=device)
-        self.attention_mask = torch.tensor(transposed_data[2], device=device)
-        self.token_type_ids = torch.tensor(transposed_data[3], device=device)
+        self.question = list(transposed_data[1])
+        self.input_ids = torch.tensor(transposed_data[2], device=device)
+        self.attention_mask = torch.tensor(transposed_data[3], device=device)
+        self.token_type_ids = torch.tensor(transposed_data[4], device=device)
 
         # if we have test features, we might not have answer_text, answer_start, answer_end or is_impossible
         # for squad and most of bioasq test datasets, we have most of these fields. (except answer_start and answer_end)
         # i.e. in the bioasq (non-golden) test dataset, answer_text, answer_start and answer_end is None
-        self.answer_text = list(transposed_data[4])
+        self.answer_text = list(transposed_data[5])
 
-        if len(transposed_data) == 8: # factoid
-            self.answer_start = torch.tensor(transposed_data[5], device=device)
-            self.answer_end = torch.tensor(transposed_data[6], device=device)
-            self.offset = torch.tensor(transposed_data[7], device=device)
+        if len(transposed_data) == 9:  # factoid
+            self.answer_start = torch.tensor(transposed_data[6], device=device)
+            self.answer_end = torch.tensor(transposed_data[7], device=device)
+            self.offset = torch.tensor(transposed_data[8], device=device)
         else: # yesno
-            self.labels = torch.tensor(transposed_data[5], device=device, dtype=torch.float)
-            self.weights = torch.tensor(transposed_data[6], device=device, dtype=torch.float)
+            self.labels = torch.tensor(transposed_data[6], device=device, dtype=torch.float)
+            self.weights = torch.tensor(transposed_data[7], device=device, dtype=torch.float)
 
 
 

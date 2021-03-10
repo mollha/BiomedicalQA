@@ -318,6 +318,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                 input_ids = batch.input_ids[index]
                 expected_answer = batch.answer_text[index]
                 question_id = batch.question_ids[index]
+                question_text = batch.question[index]
 
                 start_probabilities, end_probabilities = start_end_probabilities[index]
                 sub_start_end_probabilities = list(zip(start_probabilities, end_probabilities))
@@ -352,13 +353,16 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                 else:
                     results_by_question_id[question_id] = {"predictions": [list_of_predictions],
                                                            "prediction_probabilities": [list_of_probability_pairs],
-                                                           "expected_answers": [expected_answer]}
+                                                           "expected_answers": [expected_answer],
+                                                           "question": question_text}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
     predictions_list, ground_truth_list = [], []
-    k = 100 if contains_k("") is None else contains_k("")  # todo this properly
 
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
+        question_text = results_by_question_id[q_id]["question"]
+        k = 100 if contains_k(question_text) is None else contains_k(question_text)  # todo this properly
+
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
@@ -371,7 +375,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         best_predictions = []
         num_best_predictions = 0
 
-        probability_threshold = 0.2
+        probability_threshold = 0
 
         zipped_predictions = list(zip(*pred_lists))
         zipped_probabilities = list(zip(*prob_lists))

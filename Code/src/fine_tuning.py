@@ -92,7 +92,6 @@ def condense_statistics(metrics):
 
 
 def evaluate_during_training(qa_model, dataset, eval_dataloader_dict, all_dataset_metrics):
-
     metrics_for_plotting = {}
 
     for eval_dataset_name in eval_dataloader_dict:  # evaluate each of the evaluation datasets
