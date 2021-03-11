@@ -250,9 +250,9 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
-    for i in range(len(predictions_list)):
-        print('expected answers', ground_truth_list[i])
-        print('predictions', predictions_list[i])
+    # for i in range(len(predictions_list)):
+    #     print('expected answers', ground_truth_list[i])
+    #     print('predictions', predictions_list[i])
 
     if any(ground_truth_list):  # if any of the ground truth values are not None
         if dataset == "bioasq":
@@ -402,11 +402,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
     for i in range(len(predictions_list)):
-        print('expected answers', ground_truth_list[i])
-        print('predictions', predictions_list[i])
-
-    print('\nList Ground truths', ground_truth_list)
-    print('\nList Predictions', predictions_list)
+        print('\nList expected answers', ground_truth_list[i])
+        print('List predictions', predictions_list[i])
 
     if any(ground_truth_list):  # if any of the ground truth values are not None
         if dataset == "bioasq":
