@@ -38,9 +38,9 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
         data_dict = json.load(infile)
 
     # now we need to add our predictions into the data_dict
-    data_dict["system"] = "MHMastersProject"  # system name
+    data_dict["system"] = "MollyHaywardSmall"  # system name
     data_dict["username"] = "molly_ha"  # username
-    data_dict["password"] = ""  # pw
+    data_dict["password"] = "0YZs2cWM9ysT7VN"  # pw
 
     # iterate through every question
     questions = data_dict["questions"]
@@ -69,7 +69,7 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
 if __name__ == "__main__":
 
     # ---- Manually set configuration here ----
-    yes_no_checkpoint = "small_yesno_14_79670_29_103"
+    yes_no_checkpoint = "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
     factoid_checkpoint = "small_factoid,list_18_64089_29_249"
     list_checkpoint = factoid_checkpoint # use the same checkpoint for factoid and list
 

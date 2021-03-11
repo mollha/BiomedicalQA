@@ -88,7 +88,7 @@ large_finetune_config = {
 reconfigure_small_settings = {
     "boolq": {},  # the bool_q dataset with the small model needs a lower learning rate.
     "bioasq": {},  # "lr": 1e-4
-    "squad": {"lr": 1e-4},
+    "squad": {},
 }  # todo we can define here how the settings transition for different datasets if we want to.
 
 reconfigure_base_settings = {
