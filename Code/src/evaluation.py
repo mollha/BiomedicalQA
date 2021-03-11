@@ -313,52 +313,51 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             start_end_probabilities = [x for x in zip(answer_starts, answer_ends)]
 
             # iterate over our pairs of start and end indices
-            for index, (start_tensor, end_tensor) in enumerate(start_end_positions):
-                # e.g. start_tensor = tensor([110,  33,  38, 111,  35]), end_tensor = tensor([20,  0, 90, 36, 62])
-                sub_start_end_positions = zip(start_tensor, end_tensor)  # zip the start and end positions
+            for index, (starts_tensor, ends_tensor) in enumerate(start_end_positions):
+                probabilities_of_starts, probabilities_of_ends = start_end_probabilities[index]
+                sub_start_end_positions = zip(starts_tensor, ends_tensor)  # zip the start and end positions
+                sub_start_end_probabilities = list(zip(probabilities_of_starts, probabilities_of_ends))
+
                 input_ids = batch.input_ids[index]
                 expected_answer = batch.answer_text[index]
                 question_id = batch.question_ids[index]
                 question_text = batch.question[index]
 
-                start_probabilities, end_probabilities = start_end_probabilities[index]
-                sub_start_end_probabilities = list(zip(start_probabilities, end_probabilities))
-
                 list_of_predictions = []  # gather all of the predictions for this question
-                list_of_probability_pairs = []
-                for pos_index, (s, e) in enumerate(sub_start_end_positions):  # convert the start and end positions to answers.
+                for sub_index, (s, e) in enumerate(sub_start_end_positions):  # convert the start and end positions to answers.
+                    # get the probabilities associated with this prediction
+                    probability_of_start, probability_of_end = sub_start_end_probabilities[sub_index]
+
                     if e <= s:  # if end position is less than or equal to start position, skip this pair
                         continue
 
-                    if dataset == "bioasq" and e - s > 100: # todo this is tokens not characters
-                        continue  # if length is more than 100 and we are evaluating on bioasq, skip this pair
-
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
-
-                    # make sure we don't end up with special characters in our predicted
                     predicted_answer = combine_tokens(clipped_tokens)
 
-                    s_prob, e_prob = sub_start_end_probabilities[pos_index]
-                    list_of_probability_pairs.append((s_prob, e_prob))
-                    list_of_predictions.append(predicted_answer)
+                    if dataset == "bioasq" and len(predicted_answer) > 100:
+                        continue  # if length is more than 100 and we are evaluating on bioasq, skip this pair
 
-                # --- Perform probability thresholding on the list of predictions ---
+                    # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
+                    # if neither start probability or end probability are negative
+                    if probability_of_start > 0 and probability_of_end > 0:
+                        list_of_predictions.append(
+                            (predicted_answer, probability_of_start.item() + probability_of_end.item()))
+
                 if question_id in results_by_question_id:
-                    results_by_question_id[question_id]["predictions"].append(list_of_predictions)
-                    results_by_question_id[question_id]["prediction_probabilities"].append(list_of_probability_pairs)
-                    # make sure we don't put the same expected answer in the list over and over again.
-                    if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
-                        results_by_question_id[question_id]["expected_answers"].append(expected_answer)
+                    results_by_question_id[question_id]["predictions"].extend(list_of_predictions)
+
+                    if type(expected_answer) == list:
+                        # make sure we don't put the same expected answer in the list over and over again.
+                        if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
+                            results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
-                    results_by_question_id[question_id] = {"predictions": [list_of_predictions],
-                                                           "prediction_probabilities": [list_of_probability_pairs],
+                    results_by_question_id[question_id] = {"predictions": list_of_predictions,
                                                            "expected_answers": [expected_answer],
                                                            "question": question_text}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
     predictions_list, ground_truth_list = [], []
-
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
         question_text = results_by_question_id[q_id]["question"]
         k = 100 if contains_k(question_text) is None else contains_k(question_text)  # todo this properly
@@ -366,7 +365,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
         pred_lists = results_by_question_id[q_id]["predictions"]
-        prob_lists = results_by_question_id[q_id]["prediction_probabilities"]
+        pred_lists.sort(key=lambda val: val[1], reverse=True)
 
         # For each list question, each participating system will have to return a single list* of entity names, numbers,
         # or similar short expressions, jointly taken to constitute a single answer (e.g., the most common symptoms of
@@ -375,43 +374,36 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         best_predictions = []
         num_best_predictions = 0
 
-        probability_threshold = 0
+        # decide what our probability threshold is going to be
+        # we only want to do this if k is not 100 (i.e. default)
+        if k == 100:  # perform probability thresholding
+            # find the prediction with the highest probability
+            prediction, highest_probability = pred_lists[0]  # most probable
+            probability_threshold = highest_probability * 0.9
+            pred_lists = [(pred, prob) for pred, prob in pred_lists if prob > probability_threshold]
 
-        zipped_predictions = list(zip(*pred_lists))
-        zipped_probabilities = list(zip(*prob_lists))
-
-        # iterate over this prediction list until we reach the end, or we have enough predictions.
-        for idx, ordered_pred_list in enumerate(zipped_predictions):  # zip each of the prediction lists found in here
-            ordered_prob_list = zipped_probabilities[idx]
-            for pred_idx, pred in enumerate(ordered_pred_list):
-                s_prob, e_prob = ordered_prob_list[pred_idx]
-
-                # if our prediction does not meet the probability threshold
-                # todo we need to be more certain that our answer contains correct answers than with factoid questions
-                if s_prob < probability_threshold or e_prob < probability_threshold:
-                    continue
-
-                if num_best_predictions >= k:
-                    break
-
-                # Avoid putting repeats in our list.
-                # list predictions are counted negatively if they aren't part of the golden list
-                if predicted_answer not in best_predictions:
-                    num_best_predictions += 1
-                    best_predictions.append(pred)
-
+        for pred, probability in pred_lists:
             if num_best_predictions >= k:
                 break
 
-        # swap the huge list of all predictions for our short-list of best predictions
-        results_by_question_id[q_id]["predictions"] = best_predictions
+            # don't put repeats in our list.
+            if pred not in best_predictions:
+                num_best_predictions += 1
+                best_predictions.append(pred)
 
+        results_by_question_id[q_id]["predictions"] = best_predictions
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
+
         if len(results_by_question_id[q_id]["expected_answers"]) > 1 or \
                 results_by_question_id[q_id]["expected_answers"][0] is not None:
-            predictions_list.append(predicted_answer)
+            # predictions_list.append(predicted_answer)
+            predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
+
+    for i in range(len(predictions_list)):
+        print('expected answers', ground_truth_list[i])
+        print('predictions', predictions_list[i])
 
     print('\nList Ground truths', ground_truth_list)
     print('\nList Predictions', predictions_list)
