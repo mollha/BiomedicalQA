@@ -38,7 +38,7 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
         data_dict = json.load(infile)
 
     # now we need to add our predictions into the data_dict
-    data_dict["system"] = "MollyDU"  # system name
+    data_dict["system"] = "MHMastersProject"  # system name
     data_dict["username"] = "molly_ha"  # username
     data_dict["password"] = ""  # pw
 
