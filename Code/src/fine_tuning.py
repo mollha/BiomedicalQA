@@ -22,7 +22,7 @@ config = {
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 2000,  # set this really high for now.
+    "update_steps": 500,  # set this really high for now.
     "pretrained_settings": {
         "epochs": 0,
         "steps": 0,
@@ -203,6 +203,7 @@ def fine_tune(train_dataloader, eval_dataloader_dict, qa_model, scheduler, optim
                          .format(settings["steps_trained"], settings["global_step"]))
         all_dataset_metrics, plotting_metrics = evaluate_during_training(qa_model, settings["dataset"], eval_dataloader_dict, all_dataset_metrics)
         finetune_statistics["metrics"].append(copy.deepcopy(plotting_metrics))
+
 
         # update loss function statistics
         finetune_statistics["losses"].append(finetune_statistics["avg_loss"][0] / finetune_statistics["avg_loss"][1])  # bank stats
