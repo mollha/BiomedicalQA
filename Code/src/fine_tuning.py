@@ -62,11 +62,6 @@ def condense_statistics(metrics):
             list_of_result_dicts = metrics[dataset_name][question_type]
             if question_type == "yesno":  # official eval metric is f1_ma
                 best_result, best_epoch = get_best_metric("f1_ma", list_of_result_dicts)
-
-                for i, x in enumerate(list_of_result_dicts):
-                    if x["f1_ma"] > best_result:
-                        best_result = x["f1_ma"]
-                        best_epoch = i
             elif question_type == "factoid":  # official eval metric is mrr
                 try:
                     best_result, best_epoch = get_best_metric("mrr", list_of_result_dicts)
