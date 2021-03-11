@@ -43,7 +43,7 @@ def load_stats_from_checkpoint(path_to_checkpoint):
         with open(path_to_loss_fc, 'rb') as input_file:
             loss_function = pickle.load(input_file)
 
-    loss_function.get_statistics()
+    print(loss_function.mid_epoch_stats)
 
     combined_losses, generator_losses, discriminator_losses, discriminator_accuracy, \
     discriminator_precision, discriminator_recall = loss_function.get_statistics()
@@ -190,7 +190,7 @@ def create_separate_plots(statistics, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "small_17_12583"  # e.g. small_10_50
+    chckpt_name = "base_1_64283"  # e.g. small_10_50
 
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")

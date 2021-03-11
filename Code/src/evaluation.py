@@ -209,6 +209,10 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                     if type(expected_answer) == list:
                         # make sure we don't put the same expected answer in the list over and over again.
                         if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
+                            results_by_question_id[question_id]["expected_answers"].extend(expected_answer)
+                    elif type(expected_answer) == str:
+                        # make sure we don't put the same expected answer in the list over and over again.
+                        if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
                             results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
                     results_by_question_id[question_id] = {"predictions": list_of_predictions,
