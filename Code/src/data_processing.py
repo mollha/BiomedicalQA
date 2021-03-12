@@ -22,7 +22,7 @@ datasets = {
                # },
                # "test": ["raw_data/9B1_golden.json"],
                # },
-                "test": ["raw_data/9B1_golden.json"],
+                "test": ["raw_data/8B1_golden.json"],
                 },
     "boolq": {"train": ["combined.jsonl"],
                "test": ["my_test.jsonl"],
