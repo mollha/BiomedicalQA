@@ -259,10 +259,10 @@ if __name__ == "__main__":
         raise Exception("k must be an integer between 1 and 100. Got {}".format(args.k))
 
     if args.f_checkpoint != "" and args.f_checkpoint != "recent":
-        if args.size not in args.f_checkpoint:
-            raise Exception(
-                "If using a fine-tuned checkpoint, the model size of the checkpoint must match provided model size."
-                "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --size small")
+        # if args.size not in args.f_checkpoint:
+        #     raise Exception(
+        #         "If using a fine-tuned checkpoint, the model size of the checkpoint must match provided model size."
+        #         "e.g. --f-checkpoint small_factoid_15_10230_12_20420 --size small")
         if not any([q in args.f_checkpoint for q in args.question_type]):
             raise Exception(
                 "If using a fine-tuned checkpoint, the question type of the checkpoint must match question type."
