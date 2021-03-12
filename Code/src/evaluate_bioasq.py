@@ -38,7 +38,7 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
         data_dict = json.load(infile)
 
     # now we need to add our predictions into the data_dict
-    data_dict["system"] = "MollyHaywardSmall"  # system name
+    data_dict["system"] = "MollyHaywardBase"  # system name
     data_dict["username"] = "molly_ha"  # username
     data_dict["password"] = "0YZs2cWM9ysT7VN"  # pw
 
@@ -47,7 +47,8 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
     for question in questions:
         question_id = question["id"]
         # we keep body for now so we can skim check our answers.
-        keep_keys = ["id", "body", "type", "snippets"]  # todo remove body and type in final submission if necessary
+        #  "body", "type", "snippets"
+        keep_keys = ["id"]  # todo remove body and type in final submission if necessary
 
         # delete all of the extra stuff in the question
         q_keys = [k for k in question.keys()]
