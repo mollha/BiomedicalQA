@@ -69,12 +69,12 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
 if __name__ == "__main__":
 
     # ---- Manually set configuration here ----
-    yes_no_checkpoint = "small_yesno_0_0_86_56"  # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
-    factoid_checkpoint = "small_factoid,list_18_64089_29_249"
+    yes_no_checkpoint = "small_yesno_0_0_86_56" # "base_yesno_0_0_4_344" # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
+    factoid_checkpoint = "small_factoid,list_0_0_24_0" # "base_factoid,list_1_104283_15_520" # "small_factoid,list_18_64089_29_249"
     list_checkpoint = factoid_checkpoint # use the same checkpoint for factoid and list
 
     selected_dataset = "bioasq"
-    evaluate_on_dataset = "raw_data/BioASQ-task1bPhaseB-testset1.json"
+    evaluate_on_dataset = "raw_data/BioASQ-task9bPhaseB-testset1.json"
 
     number_of_factoid_predictions = 5
     number_of_list_predictions = 100
@@ -164,9 +164,17 @@ if __name__ == "__main__":
                                                                    dataset=selected_dataset)
         else:
             raise Exception("No other question types permitted except factoid, yesno and list.")
-        print(results_by_question_id)
-        results_by_question_id_dictionary = {**results_by_question_id_dictionary, **results_by_question_id}
 
+        print('\n{} questions'.format(question_type))
+        for qid in results_by_question_id:
+            print('{}: {}'.format(qid, results_by_question_id[qid]))
+        results_by_question_id_dictionary.update(results_by_question_id)
+
+    # print(results_by_question_id_dictionary)
+    # for key in results_by_question_id_dictionary:
+    #     print('\n{} questions'.format(key))
+    #     for qid in results_by_question_id_dictionary[key]:
+    #         print('{}: {}'.format(qid, results_by_question_id_dictionary[key][qid]))
     # iterate through our predictions for each dataset and write them to text files
     selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
 

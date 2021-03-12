@@ -1,3 +1,5 @@
+import copy
+
 from tqdm import tqdm
 from models import *
 from data_processing import *
@@ -195,16 +197,15 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                     clipped_ids = [t for t in input_ids[int(s):int(e)] if t not in special_tokens_ids]
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     predicted_answer = combine_tokens(clipped_tokens)
-                    # todo we need a way to do this that handles punctuation better
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
                     # if neither start probability or end probability are negative
                     if probability_of_start > 0 and probability_of_end > 0:
                         list_of_predictions.append((predicted_answer, probability_of_start.item() + probability_of_end.item()))
 
+
                 if question_id in results_by_question_id:
-                    # todo we're modifiying this from a list of lists to extending the list
-                    results_by_question_id[question_id]["predictions"].extend(list_of_predictions)
+                    results_by_question_id[question_id]["predictions"].extend(copy.deepcopy(list_of_predictions))
 
                     if type(expected_answer) == list:
                         # make sure we don't put the same expected answer in the list over and over again.
@@ -215,7 +216,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                         if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
                             results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
-                    results_by_question_id[question_id] = {"predictions": list_of_predictions,
+                    results_by_question_id[question_id] = {"predictions": copy.deepcopy(list_of_predictions),
                                                            "expected_answers": [expected_answer]}
 
     # group together the most likely predictions. (i.e. corresponding positions in prediction lists)
@@ -234,6 +235,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
 
         # pred_lists[: min(len(pred_lists), k)]  # take up to k of the best predictions
         best_predictions = []
+        best_probabilities = []
         num_best_predictions = 0
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
@@ -243,9 +245,14 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             if pred not in best_predictions:
                 num_best_predictions += 1
                 best_predictions.append(pred)
+                best_probabilities.append(pred)
+
+        print("best_predictions", best_predictions)
+        print("best_probabilities", best_probabilities)
 
         # swap the huge list of all predictions for our short-list of best predictions
-        results_by_question_id[q_id]["predictions"] = best_predictions
+        results_by_question_id[q_id]["predictions"] = copy.deepcopy(best_predictions)
+        results_by_question_id[q_id]["probabilities"] = copy.deepcopy(best_probabilities)
 
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
@@ -320,8 +327,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             for index, (starts_tensor, ends_tensor) in enumerate(start_end_positions):
                 probabilities_of_starts, probabilities_of_ends = start_end_probabilities[index]
                 sub_start_end_positions = zip(starts_tensor, ends_tensor)  # zip the start and end positions
-                sub_start_end_probabilities = list(zip(probabilities_of_starts, probabilities_of_ends))
 
+                sub_start_end_probabilities = list(zip(probabilities_of_starts, probabilities_of_ends))
                 input_ids = batch.input_ids[index]
                 expected_answer = batch.answer_text[index]
                 question_id = batch.question_ids[index]
@@ -344,19 +351,18 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
                     # if neither start probability or end probability are negative
-                    if probability_of_start > 0 and probability_of_end > 0:
-                        list_of_predictions.append(
-                            (predicted_answer, probability_of_start.item() + probability_of_end.item()))
+                    # if probability_of_start > 0 and probability_of_end > 0:
+                    list_of_predictions.append(
+                        (predicted_answer, probability_of_start.item() + probability_of_end.item()))
 
                 if question_id in results_by_question_id:
-                    results_by_question_id[question_id]["predictions"].extend(list_of_predictions)
-
+                    results_by_question_id[question_id]["predictions"].extend(copy.deepcopy(list_of_predictions))
                     if type(expected_answer) == list:
                         # make sure we don't put the same expected answer in the list over and over again.
                         if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
                             results_by_question_id[question_id]["expected_answers"].append(expected_answer)
                 else:
-                    results_by_question_id[question_id] = {"predictions": list_of_predictions,
+                    results_by_question_id[question_id] = {"predictions": copy.deepcopy(list_of_predictions),
                                                            "expected_answers": [expected_answer],
                                                            "question": question_text}
 
@@ -364,7 +370,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
     predictions_list, ground_truth_list = [], []
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
         question_text = results_by_question_id[q_id]["question"]
-        k = 100 if contains_k(question_text) is None else contains_k(question_text)  # todo this properly
+        k = 20 if contains_k(question_text) is None else contains_k(question_text)
 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -380,11 +386,11 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
         # decide what our probability threshold is going to be
         # we only want to do this if k is not 100 (i.e. default)
-        if k == 100:  # perform probability thresholding
+        if k == 20:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = highest_probability * 0.95
-            pred_lists = [(pred, prob) for pred, prob in pred_lists if prob > probability_threshold]
+            probability_threshold = highest_probability / 0.8 if highest_probability < 0 else highest_probability * 0.8
+            pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
 
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
@@ -395,7 +401,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                 num_best_predictions += 1
                 best_predictions.append(pred)
 
-        results_by_question_id[q_id]["predictions"] = best_predictions
+        results_by_question_id[q_id]["predictions"] = copy.deepcopy(best_predictions)
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
 
