@@ -370,7 +370,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
     predictions_list, ground_truth_list = [], []
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
         question_text = results_by_question_id[q_id]["question"]
-        k = 20 if contains_k(question_text) is None else contains_k(question_text)
+        k = 100 if contains_k(question_text) is None else contains_k(question_text)
 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -386,10 +386,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
         # decide what our probability threshold is going to be
         # we only want to do this if k is not 100 (i.e. default)
-        if k == 20:  # perform probability thresholding
+        if k == 100:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = highest_probability / 0.8 if highest_probability < 0 else highest_probability * 0.8
+            probability_threshold = highest_probability / 0.85 if highest_probability < 0 else highest_probability * 0.85
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
 
         for pred, probability in pred_lists:
@@ -397,7 +397,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                 break
 
             # don't put repeats in our list.
-            if pred not in best_predictions:
+            cleaned_best_pred = [p.replace(" ", "").strip().lower() for p in best_predictions]
+            if pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
                 num_best_predictions += 1
                 best_predictions.append(pred)
 
