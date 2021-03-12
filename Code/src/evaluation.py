@@ -245,7 +245,7 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             if pred not in best_predictions:
                 num_best_predictions += 1
                 best_predictions.append(pred)
-                best_probabilities.append(pred)
+                best_probabilities.append(probability)
 
         print("best_predictions", best_predictions)
         print("best_probabilities", best_probabilities)
