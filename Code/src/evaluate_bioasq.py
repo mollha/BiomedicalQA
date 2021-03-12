@@ -61,6 +61,8 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
             if type(pred) == list:
                 pred = [[p] for p in pred]
             question["exact_answer"] = pred
+        else:
+            question["exact_answer"] = []
 
     with open(path_to_write_file, 'w') as outfile:
         json.dump(data_dict, outfile)
