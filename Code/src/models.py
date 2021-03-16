@@ -170,10 +170,22 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     if os.path.isfile(path_to_scheduler):
         scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
 
-    path_to_model = os.path.join(path_to_checkpoint, "model.pt")
-    if os.path.isfile(path_to_model):
-        model.load_state_dict(torch.load(path_to_model, map_location=torch.device(device)))
-        model.to(device)
+    if pre_training:
+
+        path_to_model = os.path.join(path_to_checkpoint, "model.pt")
+        if os.path.isfile(path_to_model):
+            model.load_state_dict(torch.load(path_to_model, map_location=torch.device(device)))
+            model.to(device)
+
+        path_to_generator = os.path.join(path_to_checkpoint, "generator")
+        path_to_discriminator = os.path.join(path_to_checkpoint, "discriminator")
+
+        Ele
+
+
+
+
+
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
     loss_function = None
@@ -217,7 +229,12 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_t
         torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
 
         if pre_training:
-            torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
+            # save the discriminator
+            model.discriminator.save_pretrained(save_directory=os.path.join(save_dir, "discriminator"))
+            # save the generator
+            model.generator.save_pretrained(save_directory=os.path.join(save_dir, "generator"))
+
+            # torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
 
         if loss_function is not None:
             with open(os.path.join(save_dir, "loss_function.pkl"), 'wb') as output:  # Overwrites any existing file.
@@ -274,13 +291,18 @@ def build_electra_model(model_size: str, get_config=False):
         sys.stderr.write("\nUsing biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
         electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)  # get tokenizer from save file
     else:
-        sys.stderr.write("\nPath {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
-        electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
+        raise Exception("No tokenizer provided.")
+
+    # else:
+    #     sys.stderr.write("\nPath {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
+    #     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
+
+    discriminator_config.vocab_size = electra_tokenizer.get_vocab_size()
+    generator_config.vocab_size = electra_tokenizer.get_vocab_size()
 
     # create model components e.g. generator and discriminator
-    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{model_size}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config) \
-        .from_pretrained(f'google/electra-{model_size}-discriminator')
+    generator = ElectraForMaskedLM(generator_config) # .from_pretrained(f'google/electra-{model_size}-generator')
+    discriminator = ElectraForPreTraining(discriminator_config) # .from_pretrained(f'google/electra-{model_size}-discriminator')
 
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
