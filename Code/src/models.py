@@ -170,22 +170,18 @@ def load_checkpoint(path_to_checkpoint: str, model: torch.nn.Module, optimizer: 
     if os.path.isfile(path_to_scheduler):
         scheduler.load_state_dict(torch.load(path_to_scheduler, map_location=torch.device(device)))
 
+    path_to_discriminator = os.path.join(path_to_checkpoint, "discriminator")
     if pre_training:
-
         path_to_model = os.path.join(path_to_checkpoint, "model.pt")
         if os.path.isfile(path_to_model):
             model.load_state_dict(torch.load(path_to_model, map_location=torch.device(device)))
             model.to(device)
 
         path_to_generator = os.path.join(path_to_checkpoint, "generator")
-        path_to_discriminator = os.path.join(path_to_checkpoint, "discriminator")
-
-        Ele
-
-
-
-
-
+        model.generator = model.generator.from_pretrained(path_to_generator)
+        model.discriminator = model.discriminator.from_pretrained(path_to_discriminator)
+    else:
+        model = model.from_pretrained(path_to_discriminator)
 
     settings = torch.load(os.path.join(path_to_checkpoint, "train_settings.bin"))
     loss_function = None
@@ -234,6 +230,9 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_t
             # save the generator
             model.generator.save_pretrained(save_directory=os.path.join(save_dir, "generator"))
 
+        else:
+            # model is the discriminator
+            model.save_pretrained(save_directory=os.path.join(save_dir, "discriminator"))
             # torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
 
         if loss_function is not None:
@@ -301,8 +300,8 @@ def build_electra_model(model_size: str, get_config=False):
     generator_config.vocab_size = electra_tokenizer.get_vocab_size()
 
     # create model components e.g. generator and discriminator
-    generator = ElectraForMaskedLM(generator_config) # .from_pretrained(f'google/electra-{model_size}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config) # .from_pretrained(f'google/electra-{model_size}-discriminator')
+    generator = ElectraForMaskedLM(generator_config)  # .from_pretrained(f'google/electra-{model_size}-generator')
+    discriminator = ElectraForPreTraining(discriminator_config)  # .from_pretrained(f'google/electra-{model_size}-discriminator')
 
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
