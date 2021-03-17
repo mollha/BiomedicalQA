@@ -296,8 +296,10 @@ def build_electra_model(model_size: str, get_config=False):
     #     sys.stderr.write("\nPath {} does not exist - using google electra tokenizer.".format(path_to_biotokenizer))
     #     electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-generator')
 
-    discriminator_config.vocab_size = electra_tokenizer.get_vocab_size()
-    generator_config.vocab_size = electra_tokenizer.get_vocab_size()
+    discriminator_config.vocab_size = electra_tokenizer.vocab_size
+    generator_config.vocab_size = electra_tokenizer.vocab_size
+
+    print(electra_tokenizer.vocab_size)
 
     # create model components e.g. generator and discriminator
     generator = ElectraForMaskedLM(generator_config)  # .from_pretrained(f'google/electra-{model_size}-generator')

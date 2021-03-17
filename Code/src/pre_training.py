@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--checkpoint",
-        default="base_5_35788",
+        default="recent",
         type=str,
         help="The name of the checkpoint to use e.g. small_15_10230",
     )
