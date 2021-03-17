@@ -146,7 +146,7 @@ class ParseXMLFiles:
 # find way to collect dataset stats
 if __name__ == "__main__":
     base_path = pathlib.Path(__file__).parent
-    max_dataset_size = 14000000
+    max_dataset_size = 30000000
 
     # Process each file in the Dataset directory
     raw_data_directory = (base_path / './datasets/PubMed/raw_data').resolve()
