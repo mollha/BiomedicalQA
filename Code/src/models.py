@@ -18,7 +18,7 @@ small_pretrain_config = {
     "mask_prob": 0.15,
     "lr": 5e-4,
     "batch_size": 128,
-    "max_steps": 1450000,
+    "max_steps": 1450000, # 4687500
     "max_length": 128,
     "generator_size_divisor": 4,
     'adam_bias_correction': False

@@ -170,7 +170,12 @@ if __name__ == "__main__":
     for file in xml_files:
         with open(file, 'r') as f:
             print("Parsing file {}".format(str(file)))
-            response = xml_parser.parse_xml_file(f.read())
+
+            try:
+                response = xml_parser.parse_xml_file(f.read())
+            except OSError:
+                # ignore this file
+                continue
 
             if not response:
                 break
