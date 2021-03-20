@@ -8,10 +8,10 @@
 #SBATCH -N 1
 #SBATCH -c 1
 #SBATCH --gres=gpu
-#SBATCH -p ug-gpu-small
+#SBATCH -p gpu-bigmem
 #SBATCH --qos=long-high-prio
-#SBATCH -t 12:0:0
-#SBATCH --mem=28g
+#SBATCH -t 7-0:0:0
+#SBATCH --mem=56g
 #SBATCH --qos=long-high-prio
 
 # Source the bash profile (required to use the module command)
