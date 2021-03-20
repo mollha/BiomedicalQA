@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
             try:
                 response = xml_parser.parse_xml_file(f.read())
-            except OSError:
+            except Exception:
                 # ignore this file
                 continue
 
