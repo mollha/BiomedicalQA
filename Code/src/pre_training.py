@@ -23,7 +23,7 @@ config = {
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
-    "update_steps": 20000,
+    "update_steps": 40000,
 }
 
 
