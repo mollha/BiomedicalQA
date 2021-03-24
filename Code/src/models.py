@@ -28,7 +28,7 @@ base_pretrain_config = {
     "mask_prob": 0.15,
     "lr": (2e-4 / 8),  # we divide by 8 as we decreased batch size by 8
     "batch_size": 32,  # "batch_size": 256,
-    "max_steps": (10 ** 6) * 8, # (10 ** 6) * 8,  # we multiply by 8 as we decreased batch size by 8
+    "max_steps": (10 ** 6) * 8,  # (10 ** 6) * 8,  # we multiply by 8 as we decreased batch size by 8
     "max_length": 256,
     "generator_size_divisor": 3,
     'adam_bias_correction': False
@@ -304,6 +304,8 @@ def build_electra_model(model_size: str, get_config=False):
     # create model components e.g. generator and discriminator
     generator = ElectraForMaskedLM(generator_config)  # .from_pretrained(f'google/electra-{model_size}-generator')
     discriminator = ElectraForPreTraining(discriminator_config)  # .from_pretrained(f'google/electra-{model_size}-discriminator')
+
+    print(generator.electra.embeddings.word_embeddings.weight.shape)
 
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight

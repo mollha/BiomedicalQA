@@ -26,7 +26,7 @@ def find_text_files(directory):
 
 def train_bio_tokenizer_from_scratch(path_to_output: str):
     """
-    Generates the electra-pubmed-vocab.txt file in bio_tokenizer. The general-vocab file should be downloaded from:
+    Generates the electra-pubmed-vocab.txt file in old_bio_tokenizer. The general-vocab file should be downloaded from:
     https://huggingface.co/google/electra-small-discriminator/resolve/main/vocab.txt
 
     :param path_to_output:
@@ -111,7 +111,7 @@ def create_tokenizers(additional_vocab_path, path_to_output: str):
 
 
 if __name__ == "__main__":
-    path_to_output_dir = (base_path / "bio_tokenizer").resolve()
+    path_to_output_dir = (base_path / "new_bio_tokenizer").resolve()
     Path(path_to_output_dir).mkdir(exist_ok=True, parents=True)
 
     path_to_electra_pubmed = Path(path_to_output_dir / "electra-pubmed-vocab.txt").resolve()

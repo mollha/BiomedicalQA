@@ -18,7 +18,7 @@ config = {
         'metrics': [],
     },
     'num_workers': 3 if torch.cuda.is_available() else 0,
-    "max_epochs": 100,  # can override the val in config
+    "max_epochs": 30,  # can override the val in config
     "current_epoch": 0,  # track the current epoch in config for saving checkpoints
     "steps_trained": 0,  # track the steps trained in config for saving checkpoints
     "global_step": -1,  # total steps over all epochs
@@ -229,7 +229,7 @@ if __name__ == "__main__":
                         help="The size of the electra model e.g. 'small', 'base' or 'large")
     parser.add_argument("--p-checkpoint", default="recent", type=str,
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
-    parser.add_argument("--f-checkpoint", default="small_factoid,list_18_64089_29_249", type=str,
+    parser.add_argument("--f-checkpoint", default="empty", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
     parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
                         type=str,

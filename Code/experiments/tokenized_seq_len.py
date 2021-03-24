@@ -42,7 +42,7 @@ if __name__ == "__main__":
     text_files = find_text_files(processed_data_directory)
 
     # locate our tokenizer directory
-    pre_trained_tok_dir = (base_path / "../pre_training/bio_tokenizer").resolve()
+    pre_trained_tok_dir = (base_path / "../pre_training/old_bio_tokenizer").resolve()
 
     tokenizer_paths = [str((pre_trained_tok_dir / "bio_electra_tokenizer_general_vocab").resolve()),
                        str((pre_trained_tok_dir / "bio_electra_tokenizer_pubmed_vocab").resolve()),
