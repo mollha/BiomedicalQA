@@ -74,10 +74,10 @@ if __name__ == "__main__":
     # ---- Manually set configuration here ----
     yes_no_checkpoint = "small_yesno_3_129918_29_103" # "base_yesno_0_0_4_344" #  # "base_yesno_0_0_4_344" # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
     factoid_checkpoint = "small_factoid,list_3_149918_8_0" # "base_factoid,list_1_104283_15_520" #"small_factoid,list_0_0_24_0" # "base_factoid,list_1_104283_15_520" # "small_factoid,list_18_64089_29_249"
-    list_checkpoint = factoid_checkpoint # use the same checkpoint for factoid and list
+    list_checkpoint = factoid_checkpoint  # use the same checkpoint for factoid and list
 
     selected_dataset = "bioasq"
-    evaluate_on_dataset = "raw_data/BioASQ-task9bPhaseB-testset1.json"
+    evaluate_on_dataset = "raw_data/BioASQ-task9bPhaseB-testset2.json"
 
     number_of_factoid_predictions = 5
     number_of_list_predictions = 100
