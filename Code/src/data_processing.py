@@ -20,7 +20,7 @@ datasets = {
                #          "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"],
                # "test": ["raw_data/8B_golden.json"],
                # },
-               "test": ["raw_data/9B1_golden.json", "raw_data/9B1_golden.json"],
+               "test": ["raw_data/9B1_golden.json", "raw_data/9B2_golden.json"],
                # },
                #  "test": ["raw_data/8B_golden.json"],
                 },
