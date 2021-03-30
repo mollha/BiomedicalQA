@@ -15,7 +15,7 @@ import random
 # the folder structure of bioasq is different to squad, as we need to download matching articles
 datasets = {
     "bioasq": {#"train": ["raw_data/training8b.json"],
-               "train": ["raw_data/training9b.json"],
+               "train": ["raw_data/training8b.json"],
                # "test": ["raw_data/8B1_golden.json", "raw_data/8B2_golden.json", "raw_data/8B3_golden.json",
                #          "raw_data/8B4_golden.json", "raw_data/8B5_golden.json"],
                # "test": ["raw_data/8B_golden.json"],
@@ -474,7 +474,7 @@ class BatchFeatures:
             self.answer_start = torch.tensor(transposed_data[6], device=device)
             self.answer_end = torch.tensor(transposed_data[7], device=device)
             self.offset = torch.tensor(transposed_data[8], device=device)
-        else: # yesno
+        else:  # yesno
             self.labels = torch.tensor(transposed_data[6], device=device, dtype=torch.float)
             self.weights = torch.tensor(transposed_data[7], device=device, dtype=torch.float)
 

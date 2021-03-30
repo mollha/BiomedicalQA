@@ -38,7 +38,7 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
         data_dict = json.load(infile)
 
     # now we need to add our predictions into the data_dict
-    data_dict["system"] = "MollyHaywardSmall"  # system name
+    data_dict["system"] = "MollyHaywardBase"  # system name
     data_dict["username"] = "molly_ha"  # username
     data_dict["password"] = "0YZs2cWM9ysT7VN"  # pw
 
@@ -56,13 +56,17 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
             if key not in keep_keys:
                 del question[key]
 
+
         if question_id in predictions:  # if we have a prediction for this question
             pred = predictions[question_id]["predictions"]
             if type(pred) == list:
                 pred = [[p] for p in pred]
             question["exact_answer"] = pred
+            question["ideal_answer"] = ""
         else:
-            question["exact_answer"] = None
+            question["exact_answer"] = ""
+            question["ideal_answer"] = ""
+
 
     with open(path_to_write_file, 'w') as outfile:
         json.dump(data_dict, outfile)
@@ -72,8 +76,8 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
 if __name__ == "__main__":
 
     # ---- Manually set configuration here ----
-    yes_no_checkpoint = "small_yesno_3_129918_29_103" # "base_yesno_0_0_4_344" #  # "base_yesno_0_0_4_344" # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
-    factoid_checkpoint = "small_factoid,list_3_149918_8_0" # "base_factoid,list_1_104283_15_520" #"small_factoid,list_0_0_24_0" # "base_factoid,list_1_104283_15_520" # "small_factoid,list_18_64089_29_249"
+    yes_no_checkpoint = "base_yesno_0_440000_9_274" # "base_yesno_0_0_4_344" #  # "base_yesno_0_0_4_344" # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
+    factoid_checkpoint = "base_factoid,list_0_440000_9_712" # "small_factoid,list_3_149918_8_0" # "base_factoid,list_1_104283_15_520" #"small_factoid,list_0_0_24_0" # "base_factoid,list_1_104283_15_520" # "small_factoid,list_18_64089_29_249"
     list_checkpoint = factoid_checkpoint  # use the same checkpoint for factoid and list
 
     selected_dataset = "bioasq"
@@ -143,7 +147,6 @@ if __name__ == "__main__":
         config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
         # get only the data relevant to this specific question type
         raw_dataset = raw_test_dataset[question_type]
-
         print("Converting raw text to features.")
         features = convert_examples_to_features(raw_dataset, electra_tokenizer, config["max_length"])
 

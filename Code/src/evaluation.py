@@ -198,6 +198,9 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     predicted_answer = combine_tokens(clipped_tokens)
 
+                    if len(predicted_answer) > 100:
+                        continue
+
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
                     # if neither start probability or end probability are negative
                     if probability_of_start > 0 and probability_of_end > 0:
@@ -346,7 +349,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     predicted_answer = combine_tokens(clipped_tokens)
 
-                    if dataset == "bioasq" and len(predicted_answer) > 100:
+                    if len(predicted_answer) > 100:
                         continue  # if length is more than 100 and we are evaluating on bioasq, skip this pair
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
@@ -370,7 +373,13 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
     predictions_list, ground_truth_list = [], []
     for q_id in results_by_question_id:  # Gather all predictions for a particular question
         question_text = results_by_question_id[q_id]["question"]
-        k = 100 if contains_k(question_text) is None else contains_k(question_text)
+        custom_length = False
+
+        if contains_k(question_text) is not None:
+            custom_length = True
+            k = min(20, contains_k(question_text))
+        else:
+            k = 10
 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -386,7 +395,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
         # decide what our probability threshold is going to be
         # we only want to do this if k is not 100 (i.e. default)
-        if k == 100:  # perform probability thresholding
+        if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
             probability_threshold = highest_probability / 0.85 if highest_probability < 0 else highest_probability * 0.85
