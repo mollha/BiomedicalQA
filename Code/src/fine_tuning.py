@@ -312,7 +312,7 @@ if __name__ == "__main__":
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
     raw_train_dataset, yesno_weights = dataset_function(train_dataset_file_paths, question_types=config["question_type"])
-    yesno_weights = (yesno_weights[0], yesno_weights[1] * 2)
+    yesno_weights = (yesno_weights[0]*2, yesno_weights[1])
     print("Yes no weights are {}".format(yesno_weights))
 
     # combine the features from these datasets.
