@@ -7,7 +7,7 @@ from utils import *
 from evaluation import evaluate_factoid, evaluate_yesno, evaluate_list
 from data_processing import *
 from build_checkpoints import build_finetuned_from_checkpoint
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader, RandomSampler, WeightedRandomSampler
 
 # ------------- DEFINE TRAINING AND EVALUATION SETTINGS -------------
 config = {
@@ -325,6 +325,9 @@ if __name__ == "__main__":
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
     # Random Sampler used during training. We create a single data_loader for training.
+
+    # do weighted random sampler
+    WeightedRandomSampler
     train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----
