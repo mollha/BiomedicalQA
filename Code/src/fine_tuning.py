@@ -332,7 +332,7 @@ if __name__ == "__main__":
         sampler = RandomSampler(train_dataset)
     else:
         sampler_weights = [yesno_weights[1] if f[6] == 1 else yesno_weights[0] for f in train_dataset]
-        sampler = WeightedRandomSampler(weights=sampler_weights, num_samples=len(train_dataset), replacement=True)
+        sampler = WeightedRandomSampler(weights=sampler_weights, num_samples=len(train_dataset), replacement=False)
 
     train_data_loader = DataLoader(train_dataset, sampler=sampler, batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
