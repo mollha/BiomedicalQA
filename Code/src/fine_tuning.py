@@ -320,7 +320,9 @@ if __name__ == "__main__":
     train_features = []
     for qt in config["question_type"]:  # iterate through our chosen question types
         raw_train_dataset_by_question = raw_train_dataset[qt]
-        sub_train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer, config["max_length"], yesno_weights)
+
+        # todo might need to aadd back yesno weights
+        sub_train_features = convert_examples_to_features(raw_train_dataset_by_question, electra_tokenizer, config["max_length"], (1.0, 1.0))
         train_features.extend(sub_train_features)
 
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
