@@ -231,7 +231,7 @@ if __name__ == "__main__":
                         help="The name of the pre-training checkpoint to use e.g. small_15_10230.")
     parser.add_argument("--f-checkpoint", default="empty", type=str,
                         help="The name of the fine-tuning checkpoint to use e.g. small_factoid_15_10230_2_30487")
-    parser.add_argument("--question-type", default="factoid", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
+    parser.add_argument("--question-type", default="yesno", choices=['factoid', 'yesno', 'list', 'factoid,list', 'list,factoid', 'yesno,list,factoid'],
                         type=str,
                         help="Types supported by fine-tuned model - e.g. choose one of 'factoid', 'yesno', 'list', 'list,factoid' or 'factoid,list'")
     parser.add_argument("--dataset", default="bioasq", choices=['squad', 'bioasq', 'boolq'], type=str,
@@ -326,9 +326,11 @@ if __name__ == "__main__":
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
 
-    sampler = RandomSampler(train_dataset) if yesno_weights is None else WeightedRandomSampler(weights=yesno_weights,
-                                                                                               num_samples=len(train_dataset), replacement=True)
-    # Random Sampler used during training. We create a single data_loader for training.
+    if yesno_weights is None:
+        sampler = RandomSampler(train_dataset)
+    else:
+        sampler_weights = [yesno_weights[1] if f[6] == 1 else yesno_weights[0] for f in train_dataset]
+        sampler = WeightedRandomSampler(weights=sampler_weights, num_samples=len(train_dataset), replacement=True)
 
     train_data_loader = DataLoader(train_dataset, sampler=sampler, batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
