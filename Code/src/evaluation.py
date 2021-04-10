@@ -79,11 +79,8 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             # print('logits', logits)
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
-            class_probabilities = torch.sigmoid(logits)
-            # print('\nYes probability', yes_probability)
-            # class_probabilities = torch.softmax(logits, dim=1)
-            # print('class probabilities', class_probabilities)
-            # print('classes', class_probabilities)
+            class_probabilities = torch.softmax(logits, dim=1)
+            # class_probabilities = torch.sigmoid(logits)
 
 
             for question_idx, question_id in enumerate(batch.question_ids):
@@ -254,9 +251,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                 best_predictions.append(pred)
                 best_probabilities.append(probability)
 
-        print("best_predictions", best_predictions)
-        print("best_probabilities", best_probabilities)
-
         # swap the huge list of all predictions for our short-list of best predictions
         results_by_question_id[q_id]["predictions"] = copy.deepcopy(best_predictions)
         results_by_question_id[q_id]["probabilities"] = copy.deepcopy(best_probabilities)
@@ -267,10 +261,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             # predictions_list.append(predicted_answer)
             predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
-
-    # for i in range(len(predictions_list)):
-    #     print('expected answers', ground_truth_list[i])
-    #     print('predictions', predictions_list[i])
 
     if any(ground_truth_list):  # if any of the ground truth values are not None
         if dataset == "bioasq":
@@ -402,7 +392,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = highest_probability / 0.85 if highest_probability < 0 else highest_probability * 0.85
+            probability_threshold = (highest_probability / 0.90) if highest_probability < 0 else highest_probability * 0.90
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
 
         for pred, probability in pred_lists:
