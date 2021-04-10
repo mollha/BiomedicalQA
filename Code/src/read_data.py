@@ -285,8 +285,9 @@ def read_boolq(paths_to_files: list, testing=False, question_types=[]):
                   percentage_no_examples))
 
     try:
-        yesno_weights = (max(metrics["num_yes_examples"], metrics["num_no_examples"]) / metrics["num_no_examples"],
-                         max(metrics["num_yes_examples"], metrics["num_no_examples"]) / metrics["num_yes_examples"])
+        # yesno_weights = (max(metrics["num_yes_examples"], metrics["num_no_examples"]) / metrics["num_no_examples"],
+        #                  max(metrics["num_yes_examples"], metrics["num_no_examples"]) / metrics["num_yes_examples"])
+        yesno_weights = (1 / metrics["num_no_examples"], 1 / metrics["num_yes_examples"])
     except ZeroDivisionError:
         yesno_weights = (1.0, 1.0)
 
@@ -542,9 +543,14 @@ def read_bioasq(paths_to_files: list, testing=False, question_types=[]):
                   .format(qt_metrics["num_no_questions"], percentage_no_questions, qt_metrics["num_no_examples"],
                           percentage_no_examples))
             try:
+                # yesno_weights = (
+                # max(qt_metrics["num_yes_examples"], qt_metrics["num_no_examples"]) / qt_metrics["num_no_examples"],
+                # max(qt_metrics["num_yes_examples"], qt_metrics["num_no_examples"]) / qt_metrics["num_yes_examples"])
                 yesno_weights = (
-                max(qt_metrics["num_yes_examples"], qt_metrics["num_no_examples"]) / qt_metrics["num_no_examples"],
-                max(qt_metrics["num_yes_examples"], qt_metrics["num_no_examples"]) / qt_metrics["num_yes_examples"])
+                    1 / qt_metrics["num_no_examples"],
+                    1 / qt_metrics["num_yes_examples"]
+                )
+
             except ZeroDivisionError:
                 yesno_weights = (1.0, 1.0)
 

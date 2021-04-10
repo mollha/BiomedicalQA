@@ -376,6 +376,7 @@ def convert_examples_to_features(examples, tokenizer, max_length, yesno_weights=
         # We also perform padding here and create our features.
 
         # Note: the question token type ids are 0s, the context token type ids are 1s
+        # Note: the question token type ids are 0s, the context token type ids are 1s
         num_answer_tokens = end_token_position - start_token_position
 
         # if the max short context length is less than the answer length, then we can't use this example :(
