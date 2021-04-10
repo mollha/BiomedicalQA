@@ -314,7 +314,6 @@ if __name__ == "__main__":
     raw_train_dataset, yesno_weights = dataset_function(train_dataset_file_paths, question_types=config["question_type"])
 
     if yesno_weights is not None:
-        yesno_weights = (yesno_weights[0]*2, yesno_weights[1])
         print("Yes no weights are {}".format(yesno_weights))
 
     # combine the features from these datasets.
@@ -326,9 +325,12 @@ if __name__ == "__main__":
 
     print("Created {} train features of length {}.".format(len(train_features), config["max_length"]))
     train_dataset = QADataset(train_features)
+
+    sampler = RandomSampler(train_dataset) if yesno_weights is None else WeightedRandomSampler(weights=yesno_weights,
+                                                                                               num_samples=len(train_dataset), replacement=True)
     # Random Sampler used during training. We create a single data_loader for training.
 
-    train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"], collate_fn=collate_wrapper)
+    train_data_loader = DataLoader(train_dataset, sampler=sampler, batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----
     sys.stderr.write("\nReading raw test dataset(s) for '{}'".format(selected_dataset))
