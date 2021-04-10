@@ -79,7 +79,10 @@ def evaluate_yesno(yes_no_model, test_dataloader, training=False, dataset="bioas
             # print('logits', logits)
             # treat outputs as if they correspond to a yes/no question
             # dim=1 makes sure we produce an answer start for each x in batch
+            yes_probability = torch.sigmoid(logits)
+            print('\nYes probability')
             class_probabilities = torch.softmax(logits, dim=1)
+            print('class probabilities', class_probabilities)
             # print('classes', class_probabilities)
 
             for question_idx, question_id in enumerate(batch.question_ids):

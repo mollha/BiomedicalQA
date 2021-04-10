@@ -312,8 +312,10 @@ if __name__ == "__main__":
     # ----- PREPARE THE TRAINING DATASET -----
     sys.stderr.write("\nReading raw train dataset for '{}'".format(selected_dataset))
     raw_train_dataset, yesno_weights = dataset_function(train_dataset_file_paths, question_types=config["question_type"])
-    yesno_weights = (yesno_weights[0]*2, yesno_weights[1])
-    print("Yes no weights are {}".format(yesno_weights))
+
+    if yesno_weights is not None:
+        yesno_weights = (yesno_weights[0]*2, yesno_weights[1])
+        print("Yes no weights are {}".format(yesno_weights))
 
     # combine the features from these datasets.
     train_features = []
@@ -326,8 +328,6 @@ if __name__ == "__main__":
     train_dataset = QADataset(train_features)
     # Random Sampler used during training. We create a single data_loader for training.
 
-    # do weighted random sampler
-    WeightedRandomSampler
     train_data_loader = DataLoader(train_dataset, sampler=RandomSampler(train_dataset), batch_size=config["batch_size"], collate_fn=collate_wrapper)
 
     # ----- PREPARE THE EVALUATION DATASET -----
@@ -356,6 +356,9 @@ if __name__ == "__main__":
                                              finetune_checkpoint_dir, checkpoint_name, config["question_type"], config)
 
     print(config)
+
+
+    print(electra_for_qa)
 
     # ------ START THE FINE-TUNING LOOP ------
     fine_tune(train_data_loader, test_data_loader_dict, electra_for_qa, scheduler, optimizer, config,

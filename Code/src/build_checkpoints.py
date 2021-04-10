@@ -79,6 +79,9 @@ def get_optimizer_and_scheduler(model, model_config, model_settings, num_warmup_
 
 
 def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_dir, finetuned_checkpoint_dir, checkpoint_name, question_type, config={}):
+    ### todo we musn't be saving these finetuned models in a way that makes them possible to reload.
+    ### sort this out
+
     # -- Create the checkpoint directories if they don't exist --
     pretrained_checkpoint_name, finetuned_checkpoint_name = checkpoint_name
     Path(pretrained_checkpoint_dir).mkdir(exist_ok=True, parents=True)
@@ -121,10 +124,13 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         # ---- If we're training from a valid fine-tuned checkpoint ----
         if valid_finetune_checkpoint:
             if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
-                qa_model = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create extractive QA model
+                print(discriminator_config)
+                qa_model = ElectraForQuestionAnswering(discriminator_config)
+                # qa_model = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create extractive QA model
 
             elif "yesno" in question_type:  # check if the question_type is yes/no
-                qa_model = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create binary model
+                # qa_model = CostSensitiveSequenceClassification.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create binary model
+                qa_model = CostSensitiveSequenceClassification(discriminator_config)
             else:
                 raise Exception("Question type list must be contain factoid, list or yesno.")
 

@@ -225,14 +225,10 @@ def save_checkpoint(model, optimizer, scheduler, settings, checkpoint_dir, pre_t
         torch.save(scheduler.state_dict(), os.path.join(save_dir, "scheduler.pt"))
 
         if pre_training:
-            # save the discriminator
-            model.discriminator.save_pretrained(save_directory=os.path.join(save_dir, "discriminator"))
-            # save the generator
-            model.generator.save_pretrained(save_directory=os.path.join(save_dir, "generator"))
-
+            model.discriminator.save_pretrained(save_directory=os.path.join(save_dir, "discriminator"))  # save the discriminator
+            model.generator.save_pretrained(save_directory=os.path.join(save_dir, "generator"))  # save the generator
         else:
-            # model is the discriminator
-            model.save_pretrained(save_directory=os.path.join(save_dir, "discriminator"))
+            model.save_pretrained(save_directory=os.path.join(save_dir, "discriminator"))  # model is the discriminator
             # torch.save(model.discriminator.state_dict(), os.path.join(save_dir, "discriminator.pt"))
 
         if loss_function is not None:
@@ -428,6 +424,14 @@ class CostSensitiveSequenceClassification(ElectraForSequenceClassification):
         )
 
         sequence_output = discriminator_hidden_states[0]
+        # cls_hidden = sequence_output[:, 0, :]  # Get first CLS token
+        #
+        # print(sequence_output)
+        # print(cls_hidden)
+        #
+        # potential_logits = self.classifier(cls_hidden)
+        # print('potential logits shape', potential_logits.shape)
+
         logits = self.classifier(sequence_output)
 
         loss = None
