@@ -363,7 +363,6 @@ if __name__ == "__main__":
 
     print(config)
 
-
     print(electra_for_qa)
 
     # ------ START THE FINE-TUNING LOOP ------
