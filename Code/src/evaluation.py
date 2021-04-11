@@ -207,7 +207,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                     if probability_of_start > 0 and probability_of_end > 0:
                         list_of_predictions.append((predicted_answer, probability_of_start.item() + probability_of_end.item()))
 
-
                 if question_id in results_by_question_id:
                     results_by_question_id[question_id]["predictions"].extend(copy.deepcopy(list_of_predictions))
 
@@ -357,7 +356,13 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                     if type(expected_answer) == list:
                         # make sure we don't put the same expected answer in the list over and over again.
                         if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
+                            results_by_question_id[question_id]["expected_answers"].extend(expected_answer)
+
+                    elif type(expected_answer) == str:
+                        # make sure we don't put the same expected answer in the list over and over again.
+                        if expected_answer not in results_by_question_id[question_id]["expected_answers"]:
                             results_by_question_id[question_id]["expected_answers"].append(expected_answer)
+
                 else:
                     results_by_question_id[question_id] = {"predictions": copy.deepcopy(list_of_predictions),
                                                            "expected_answers": [expected_answer],
@@ -371,7 +376,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
         if contains_k(question_text) is not None:
             custom_length = True
-            k = min(20, contains_k(question_text))
+            k = min(10, contains_k(question_text))
         else:
             k = 10
 
@@ -409,9 +414,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         # We need to ensure that we don't try to evaluate the questions that don't have expected answers.
         # If either of the below conditions are true, i.e. we have at least one valid
 
-        if len(results_by_question_id[q_id]["expected_answers"]) > 1 or \
-                results_by_question_id[q_id]["expected_answers"][0] is not None:
-            # predictions_list.append(predicted_answer)
+        if len(results_by_question_id[q_id]["expected_answers"]) > 1 or results_by_question_id[q_id]["expected_answers"][0] is not None:
             predictions_list.append(best_predictions)
             ground_truth_list.append(results_by_question_id[q_id]["expected_answers"])
 
