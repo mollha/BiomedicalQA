@@ -375,7 +375,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             custom_length = True
             k = min(10, contains_k(question_text))
         else:
-            k = 5
+            k = 10
 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -394,7 +394,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = (highest_probability / 0.99) if highest_probability < 0 else highest_probability * 0.99
+            probability_threshold = (highest_probability / 0.95) if highest_probability < 0 else highest_probability * 0.95
             print('prob threshold', probability_threshold)
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
             print('pred_lists', pred_lists)
