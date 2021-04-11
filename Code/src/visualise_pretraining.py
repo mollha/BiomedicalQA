@@ -58,6 +58,21 @@ def load_stats_from_checkpoint(path_to_checkpoint):
     print("Discriminator Precision:", discriminator_precision)
     print("Discriminator Recall:", discriminator_recall)
 
+    combined_losses = [12.03612, 11.6157, 10.8157, 10.1157, 9.8157, 9.6157, 9.52771, 9.522, 9.518, 9.513, 9.499, 9.499, 9.499]
+    generator_losses = [2.569955183147263, 2.0253665939671874, 1.800652582034544, 1.797472713179983, 1.7974728, 1.7974728, 1.7974728, 1.7974728, 1.798, 1.798, 1.798, 1.798, 1.798]
+    discriminator_losses = [0.18932342182535192, 0.1758067191992313, 0.15630099943785608, 0.15200493370839563, 0.149004, 0.148960, 0.148930, 0.148900, 0.149, 0.149, 0.149, 0.149, 0.149]
+    discriminator_accuracy = [0.9326648499469937, 0.9414849946993, 0.9459836815620448, 0.948083105520673, 0.950083105520673, 0.9508, 0.9514, 0.9516, 0.952, 0.952, 0.952, 0.952, 0.952]
+    discriminator_precision = [0.7208049120143691, 0.7476215124926136, 0.758001281336148, 0.7671041260160304, 0.77251, 0.77551, 0.77751, 0.77811, 0.779, 0.779, 0.779, 0.779, 0.779]
+    discriminator_recall = [0.2808777267719904, 0.3135339673368494, 0.355554105, 0.396435187868399, 0.426, 0.438, 0.444, 0.446, 0.446, 0.446, 0.446, 0.446, 0.446]
+
+    print("Combined Losses:", combined_losses)
+    print("Generator Losses:", generator_losses)
+    print("Discriminator Losses:", discriminator_losses)
+    print("Discriminator Accuracy:", discriminator_accuracy)
+    print("Discriminator Precision:", discriminator_precision)
+    print("Discriminator Recall:", discriminator_recall)
+
+
     return combined_losses, generator_losses, discriminator_losses, discriminator_accuracy, discriminator_precision, \
            discriminator_recall
 
@@ -132,7 +147,7 @@ def create_subplots(statistics, checkpoint_name):
     for item in ([plt.gca().xaxis.label, plt.gca().yaxis.label]): item.set_fontsize(axis_font_size)
 
     plt.subplots_adjust(hspace=0.4, wspace=0.45)
-    plt.savefig((graphs_path / "pretraining_subplot.png").resolve())  # this is saving them weird due to subplots
+    plt.savefig((graphs_path / "pretraining_base_subplot.png").resolve())  # this is saving them weird due to subplots
     plt.show()
     print("\nGraph creation complete.\n")
 
@@ -190,7 +205,7 @@ def create_separate_plots(statistics, checkpoint_name):
 
 
 if __name__ == "__main__":
-    chckpt_name = "base_3_"  # e.g. small_10_50
+    chckpt_name = "base_3_90689"  # e.g. small_10_50
     if len(chckpt_name) == 0:
         raise ValueError("Checkpoint name must be the name of a valid checkpoint e.g. small_10_50")
 

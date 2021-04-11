@@ -392,7 +392,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = (highest_probability / 0.95) if highest_probability < 0 else highest_probability * 0.95
+            probability_threshold = (highest_probability / 0.97) if highest_probability < 0 else highest_probability * 0.97
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
 
         for pred, probability in pred_lists:
