@@ -171,9 +171,6 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
             start_end_positions = list(zip(start_indices, end_indices))
             start_end_probabilities = list(zip(answer_starts, answer_ends))
 
-            # print('start_end_positions', start_end_positions)
-            # print('start_end_probabilities', start_end_probabilities)
-
             # start_end_positions_and_probabilities.sort(key=lambda val: sum(val[0][0], val[0][1]))
 
             # iterate over our pairs of start and end indices - each loop represents a new question
@@ -378,7 +375,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             custom_length = True
             k = min(10, contains_k(question_text))
         else:
-            k = 10
+            k = 5
 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -398,7 +395,9 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
             probability_threshold = (highest_probability / 0.99) if highest_probability < 0 else highest_probability * 0.99
+            print('prob threshold', probability_threshold)
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
+            print('pred_lists', pred_lists)
 
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
@@ -406,7 +405,9 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # don't put repeats in our list.
             cleaned_best_pred = [p.replace(" ", "").strip().lower() for p in best_predictions]
-            if pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
+            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) == 0 for p in best_predictions]
+
+            if not any(overlap) and pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
                 num_best_predictions += 1
                 best_predictions.append(pred)
 
