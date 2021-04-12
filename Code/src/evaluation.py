@@ -389,15 +389,29 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         best_predictions = []
         num_best_predictions = 0
 
+        # scan through predictions, splitting up comma-separated predictions and those containing and
+        new_pred_list = []
+        for pred, prob in pred_lists:
+            # split into comma separated
+            for split_pred in pred.split(','):
+                c_split_pred = split_pred.strip(string.punctuation)
+                if " and " in c_split_pred:
+                    word1, word2 = c_split_pred[:c_split_pred.find(" and ")], c_split_pred[c_split_pred.find(" and ") + len(" and "):]
+                    new_pred_list.append((word1.strip(string.punctuation), prob))
+                    new_pred_list.append((word2.strip(string.punctuation), prob))
+                else:
+                    new_pred_list.append((c_split_pred, prob))
+        pred_lists = new_pred_list
+
         # decide what our probability threshold is going to be
         # we only want to do this if k is not 100 (i.e. default)
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
             probability_threshold = (highest_probability / 0.99) if highest_probability < 0 else highest_probability * 0.99
-            print('prob threshold', probability_threshold)
+            # print('prob threshold', probability_threshold)
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
-            print('pred_lists', pred_lists)
+            # print('pred_lists', pred_lists)
 
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
