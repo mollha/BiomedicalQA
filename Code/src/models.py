@@ -297,8 +297,9 @@ def build_electra_model(model_size: str, get_config=False):
     generator_config.vocab_size = electra_tokenizer.vocab_size
 
     # create model components e.g. generator and discriminator
-    generator = ElectraForMaskedLM(generator_config)  # .from_pretrained(f'google/electra-{model_size}-generator')
-    discriminator = ElectraForPreTraining(discriminator_config)  # .from_pretrained(f'google/electra-{model_size}-discriminator')
+    # TODO MAKE SURE TO DELETE THESE
+    generator = ElectraForMaskedLM(generator_config).from_pretrained(f'google/electra-{model_size}-generator')
+    discriminator = ElectraForPreTraining(discriminator_config).from_pretrained(f'google/electra-{model_size}-discriminator')
 
     discriminator.electra.embeddings = generator.electra.embeddings
     generator.generator_lm_head.weight = generator.electra.embeddings.word_embeddings.weight
