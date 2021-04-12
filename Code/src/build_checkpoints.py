@@ -160,7 +160,9 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         pretrained_model, _, _, electra_tokenizer, _, p_model_config =\
             build_pretrained_from_checkpoint(model_size, device, pretrained_checkpoint_dir, pretrained_checkpoint_name)
         config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
-        discriminator = pretrained_model.discriminator
+
+        # discriminator = pretrained_model.discriminator
+        discriminator = ElectraForPreTraining.from_pretrained(f'google/electra-{model_size}-discriminator')
 
         if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
             electra_for_qa = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)

@@ -281,12 +281,17 @@ def build_electra_model(model_size: str, get_config=False):
     generator_config.intermediate_size = discriminator_config.intermediate_size // model_config[
         "generator_size_divisor"]
 
-    path_to_biotokenizer = os.path.join(base_path, 'tokenization/bio_tokenizer/bio_electra_tokenizer_pubmed_vocab')
-    if os.path.exists(path_to_biotokenizer):
-        sys.stderr.write("\nUsing biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
-        electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)  # get tokenizer from save file
-    else:
-        raise Exception("No tokenizer provided.")
+    # path_to_biotokenizer = os.path.join(base_path, 'tokenization/bio_tokenizer/bio_electra_tokenizer_pubmed_vocab')
+    # if os.path.exists(path_to_biotokenizer):
+    #     sys.stderr.write("\nUsing biotokenizer from save file - {}".format('bio_electra_tokenizer_pubmed_vocab'))
+    #     electra_tokenizer = ElectraTokenizerFast.from_pretrained(path_to_biotokenizer)  # get tokenizer from save file
+    # else:
+        # raise Exception("No tokenizer provided.")
+
+    # deliberately use this
+    sys.stderr.write("\nUsing google electra tokenizer.")
+    electra_tokenizer = ElectraTokenizerFast.from_pretrained(f'google/electra-{model_size}-discriminator')
+
 
     discriminator_config.vocab_size = electra_tokenizer.vocab_size
     generator_config.vocab_size = electra_tokenizer.vocab_size
