@@ -419,9 +419,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # don't put repeats in our list.
             cleaned_best_pred = [p.replace(" ", "").strip().lower() for p in best_predictions]
-            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
+            # overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
+            # not any(overlap) and
 
-            if not any(overlap) and pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
+            if pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
                 num_best_predictions += 1
                 best_predictions.append(pred)
 
