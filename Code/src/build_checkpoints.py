@@ -159,7 +159,7 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
     if building_from_pretrained:
         pretrained_model, _, _, electra_tokenizer, _, p_model_config =\
             build_pretrained_from_checkpoint(model_size, device, pretrained_checkpoint_dir, pretrained_checkpoint_name)
-        config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
+        # config["pretrained_settings"] = {"epochs": p_model_config["current_epoch"], "steps": p_model_config["steps_trained"]}
 
         # discriminator = pretrained_model.discriminator
         discriminator = ElectraForPreTraining.from_pretrained(f'google/electra-{model_size}-discriminator')
