@@ -394,7 +394,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = (highest_probability / 0.90) if highest_probability < 0 else highest_probability * 0.90
+            probability_threshold = (highest_probability / 0.97) if highest_probability < 0 else highest_probability * 0.97
             print('prob threshold', probability_threshold)
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
             print('pred_lists', pred_lists)
@@ -405,7 +405,7 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # don't put repeats in our list.
             cleaned_best_pred = [p.replace(" ", "").strip().lower() for p in best_predictions]
-            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) == 0 for p in best_predictions]
+            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
 
             if not any(overlap) and pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
                 num_best_predictions += 1
