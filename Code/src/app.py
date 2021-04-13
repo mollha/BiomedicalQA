@@ -1,12 +1,10 @@
 from flask import Flask, render_template, request, json
 from flask_bootstrap import Bootstrap
-from app_helpers import process_question
-
-
+from gui.app_helpers import process_question
 from os import path, walk
 
 print('Initialising Project...')
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__, template_folder='gui/templates')
 
 print('Complete!\n')
 
