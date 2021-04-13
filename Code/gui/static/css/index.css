@@ -1,0 +1,21 @@
+body{
+    font-family: 'Roboto Mono', monospace;
+}
+
+#question-input, #context-input, #answer-input, #questin-type-input{
+    width: 80%;
+    font-family: 'Roboto Mono', monospace;
+}
+
+
+.row{
+    padding-top: 30px;
+}
+
+label{
+    font-size: 12px;
+}
+
+.cool-bg{
+    background-color: #cce5ff;
+}

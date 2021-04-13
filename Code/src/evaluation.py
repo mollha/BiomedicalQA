@@ -165,8 +165,11 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
 
             # Convert the batches of start and end logits into answer span position predictions
             # This will give us k predictions per feature in the batch
-            answer_starts, start_indices = torch.topk(start_logits, k=5, dim=1)
-            answer_ends, end_indices = torch.topk(end_logits, k=5, dim=1)
+            start_probabilities = torch.softmax(start_logits, dim=1)
+            end_probabilities = torch.softmax(end_logits, dim=1)
+
+            answer_starts, start_indices = torch.topk(start_probabilities, k=100, dim=1)
+            answer_ends, end_indices = torch.topk(end_probabilities, k=100, dim=1)
 
             start_end_positions = list(zip(start_indices, end_indices))
             start_end_probabilities = list(zip(answer_starts, answer_ends))
@@ -196,8 +199,8 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     predicted_answer = combine_tokens(clipped_tokens)
 
-                    if len(predicted_answer) > 100:
-                        continue
+                    if len(predicted_answer) > 60:
+                        continue  # if length is more than 60 it is too long, skip this pair
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
                     # if neither start probability or end probability are negative
@@ -233,6 +236,27 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
         # (e.g., up to 5 names of drugs), numbers, or similar short expressions, ordered by decreasing confidence.
         k = 5 if dataset == "bioasq" else 1
 
+        new_pred_list = []
+        for pred, prob in pred_lists:
+            # split into comma separated
+            for split_pred in pred.split(','):
+                c_split_pred = split_pred.strip(string.punctuation).strip()
+                if " and " in c_split_pred:
+                    word1, word2 = c_split_pred[:c_split_pred.find(" and ")], c_split_pred[
+                                                                              c_split_pred.find(" and ") + len(
+                                                                                  " and "):]
+                    word1_stripped = word1.strip(string.punctuation).strip()
+                    word2_stripped = word2.strip(string.punctuation).strip()
+
+                    if len(word1_stripped) > 0:
+                        new_pred_list.append((word1_stripped, prob))
+                    if len(word2_stripped) > 0:
+                        new_pred_list.append((word2_stripped, prob))
+                else:
+                    if len(c_split_pred) > 0:
+                        new_pred_list.append((c_split_pred, prob))
+        pred_lists = new_pred_list
+
         # pred_lists[: min(len(pred_lists), k)]  # take up to k of the best predictions
         best_predictions = []
         best_probabilities = []
@@ -240,9 +264,10 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
                 break
+            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
 
             # don't put repeats in our list.
-            if pred not in best_predictions:
+            if not any(overlap) and pred not in best_predictions:
                 num_best_predictions += 1
                 best_predictions.append(pred)
                 best_probabilities.append(probability)
@@ -310,8 +335,12 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # Convert the batches of start and end logits into answer span position predictions
             # This will give us k predictions per feature in the batch
-            answer_starts, start_indices = torch.topk(start_logits, k=100, dim=1)
-            answer_ends, end_indices = torch.topk(end_logits, k=100, dim=1)
+
+            start_probabilities = torch.softmax(start_logits, dim=1)
+            end_probabilities = torch.softmax(end_logits, dim=1)
+
+            answer_starts, start_indices = torch.topk(start_probabilities, k=100, dim=1)
+            answer_ends, end_indices = torch.topk(end_probabilities, k=100, dim=1)
 
             start_end_positions = [x for x in zip(start_indices, end_indices)]
             start_end_probabilities = [x for x in zip(answer_starts, answer_ends)]
@@ -339,8 +368,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                     clipped_tokens = tokenizer.convert_ids_to_tokens(clipped_ids, skip_special_tokens=True)
                     predicted_answer = combine_tokens(clipped_tokens)
 
-                    if len(predicted_answer) > 100:
-                        continue  # if length is more than 100 and we are evaluating on bioasq, skip this pair
+                    if len(predicted_answer) > 60:
+                        continue  # if length is more than 60 it is too long, skip this pair
 
                     # put our prediction in the list, alongside the probabilities (pred, start_prob + end_prob)
                     # if neither start probability or end probability are negative
@@ -373,9 +402,9 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
         if contains_k(question_text) is not None:
             custom_length = True
-            k = min(10, contains_k(question_text))
+            k = min(20, contains_k(question_text))
         else:
-            k = 10
+            k = 6
 
         # results_by_question_id[q_id]["predictions"] is a list of lists
         # we get a nested structure, where each sub-list is the pos pred for an example, sorted by most to least likely
@@ -394,13 +423,19 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         for pred, prob in pred_lists:
             # split into comma separated
             for split_pred in pred.split(','):
-                c_split_pred = split_pred.strip(string.punctuation)
+                c_split_pred = split_pred.strip(string.punctuation).strip()
                 if " and " in c_split_pred:
                     word1, word2 = c_split_pred[:c_split_pred.find(" and ")], c_split_pred[c_split_pred.find(" and ") + len(" and "):]
-                    new_pred_list.append((word1.strip(string.punctuation), prob))
-                    new_pred_list.append((word2.strip(string.punctuation), prob))
+                    word1_stripped = word1.strip(string.punctuation).strip()
+                    word2_stripped = word2.strip(string.punctuation).strip()
+
+                    if len(word1_stripped) > 0:
+                        new_pred_list.append((word1_stripped, prob))
+                    if len(word2_stripped) > 0:
+                        new_pred_list.append((word2_stripped, prob))
                 else:
-                    new_pred_list.append((c_split_pred, prob))
+                    if len(c_split_pred) > 0:
+                        new_pred_list.append((c_split_pred, prob))
         pred_lists = new_pred_list
 
         # decide what our probability threshold is going to be
@@ -408,10 +443,12 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            probability_threshold = (highest_probability / 0.95) if highest_probability < 0 else highest_probability * 0.95
-            # print('prob threshold', probability_threshold)
+            # probability_threshold = 0.1
+            probability_threshold = (highest_probability / 0.85) if highest_probability < 0 else highest_probability * 0.85
+            print('\nprob threshold', probability_threshold)
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
-            # print('pred_lists', pred_lists)
+
+        print('pred_lists', pred_lists)
 
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
@@ -419,10 +456,10 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # don't put repeats in our list.
             cleaned_best_pred = [p.replace(" ", "").strip().lower() for p in best_predictions]
-            # overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
+            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
             # not any(overlap) and
 
-            if pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
+            if not any(overlap) and pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:
                 num_best_predictions += 1
                 best_predictions.append(pred)
 

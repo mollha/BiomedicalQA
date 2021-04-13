@@ -121,7 +121,6 @@ def build_finetuned_from_checkpoint(model_size, device, pretrained_checkpoint_di
         # ---- If we're training from a valid fine-tuned checkpoint ----
         if valid_finetune_checkpoint:
             if "factoid" in question_type or "list" in question_type:  # check if the question_type is list or factoid
-                print(discriminator_config)
                 qa_model = ElectraForQuestionAnswering(discriminator_config)
                 # qa_model = ElectraForQuestionAnswering.from_pretrained(pretrained_model_name_or_path=None, state_dict=discriminator.state_dict(), config=discriminator_config)  # create extractive QA model
 
