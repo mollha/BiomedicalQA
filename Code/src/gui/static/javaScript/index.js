@@ -12,21 +12,21 @@ document.addEventListener("DOMContentLoaded", function(){
 	];
 
 	const factoid_examples = [
-		["Which cells produce Interleukin 17A?", "Several studies have shown an increased expression/release of Th17 related cytokine, IL-17A in ASD.", ["TH17"]]
+		["Which cells produce Interleukin 17A?", "Several studies have shown an increased expression/release of Th17 related cytokine, IL-17A in ASD.", ["TH17"]],
+		// ["", "", []]
+
 	];
 
 	const list_examples = [
 		["List two medication included in the Juluca pill.", "Dolutegravir/rilpivirine (Juluca\u00ae) is the first two-drug single-tablet regimen (STR) to be approved for the treatment of HIV-1 infection in adults.", ["dolutegravir" , "rilpivirine"]],
-		["Which drugs are included in the EE-4A regimen for Wilm\u0027s tumor?", "Five patients received treatment regimen EE-4A, dactinomycin, and vincristine.", ["dactinomycin", "vincristine"]]
+		["Which drugs are included in the EE-4A regimen for Wilm\u0027s tumor?", "Five patients received treatment regimen EE-4A, dactinomycin, and vincristine.", ["dactinomycin", "vincristine"]],
+		["Name two rotavirus vaccines.", "Two rotavirus vaccines, Rotateq and Rotarix, are licensed for global use; however, the protection they confer to unvaccinated individuals through indirect effects remains unknown.", ["Rotateq", "Rotarix"]],
+		["Which symptoms comprise Abdominal aortic aneurysm rupture Triad?", "The correct diagnosis based on the classic triad of shock, acute abdominal pain, and pulsatile abdominal mass was made in only one of 19 (5.3%) patients. Only 50% of abdominal aortic aneurysms present with the classic triad of hypotension, back pain and a pulsatile abdominal mass. Some of these patients present with the classic triad of symptoms such as abdominal pain, pulsatile abdominal mass and shock.", ["shock", "acute abdominal pain", "pulsatile abdominal mass"]]
 	];
 
 	function get_next_example(examples, q_type){
-		console.log(examples);
 		let idx_of_increment = ['yesno', 'factoid', 'list'].indexOf(q_type);
-		console.log(idx_of_increment);
-		console.log(increments[idx_of_increment]);
 		increments[idx_of_increment] = (increments[idx_of_increment] + 1) % examples.length;
-		console.log(increments[idx_of_increment]);
 		return examples[increments[idx_of_increment]]
 	}
 

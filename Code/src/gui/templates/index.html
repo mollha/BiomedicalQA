@@ -9,6 +9,8 @@
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.3/css/all.css" integrity="sha384-SZXxX4whJ79/gErwcOYf+zWLeJdY/qpuqC4cAa9rOGUstPomtqpuNWT9wdPEn2fk" crossorigin="anonymous">
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+
+
 <link href="https://fonts.googleapis.com/css?family=Roboto+Mono&display=swap" rel="stylesheet">
 <nav class="navbar shadow-lg navbar-expand-lg navbar-light bg-light">
     <a class="navbar-brand" href="#">
@@ -27,7 +29,7 @@
     <div class="container ml-1">
     <br>
 <!--        #0c5460-->
-    <div class="card w-25 shadow center-block" style="background-color: #6a0f94; border-radius: 10px">
+    <div class="card w-25 p-0 shadow center-block" style="background-color: #6a0f94; border-radius: 10px">
         <h2 style="text-align: center; font-weight: bold; font-family: 'Roboto Mono', monospace; color: white; font-size: 28px">Explore BioELECTRA</h2>
     </div>
     <div class="row">
@@ -56,18 +58,18 @@
         </div>
     </div>
     <br>
-    <div class="row">
+    <div class="row p-1">
         <div class="col-md-6">
-            <div class="cool-bg p-3 card shadow-sm">
+            <div class="cool-bg p-3 card shadow">
             <label style="font-size: 20px;" for="expected-answer-input">Expected Answer</label><br>
-            <textarea disabled type="text" style="font-size: 18px;" class="w-100" id="expected-answer-input" name="expected-answer-input"></textarea>
+            <textarea disabled type="text" style="font-size: 18px; height: 120px" class="w-100" id="expected-answer-input" name="expected-answer-input"></textarea>
 
             </div>
         </div>
         <div class="col-md-6">
-            <div class="cool-bg p-3 card shadow-sm">
+            <div class="cool-bg p-3 card shadow">
             <label style="font-size: 20px;" for="answer-input">Predicted Answer</label><br>
-            <textarea disabled type="text" style="font-size: 18px;" class="w-100" id="answer-input" name="answer-input"></textarea>
+            <textarea disabled type="text" style="font-size: 18px; ; height: 120px" class="w-100" id="answer-input" name="answer-input"></textarea>
             </div>
         </div>
     </div>

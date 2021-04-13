@@ -4,8 +4,7 @@ from gui.app_helpers import process_question
 from os import path, walk
 
 print('Initialising Project...')
-app = Flask(__name__, template_folder='gui/templates')
-
+app = Flask(__name__, template_folder='gui/templates', static_folder='gui/static')
 print('Complete!\n')
 
 # -------------------------------- CONFIGURE TEMPLATE ROUTES -------------------------------
