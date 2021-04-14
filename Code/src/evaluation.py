@@ -264,8 +264,10 @@ def evaluate_factoid(factoid_model, test_dataloader, tokenizer, training=False, 
         for pred, probability in pred_lists:
             if num_best_predictions >= k:
                 break
-            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
 
+            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) == len(p.split()) or
+                       len(set.intersection(set(pred.split()), set(p.split()))) == len(pred.split()) for p in
+                       best_predictions]
             # don't put repeats in our list.
             if not any(overlap) and pred not in best_predictions:
                 num_best_predictions += 1
@@ -335,7 +337,6 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # Convert the batches of start and end logits into answer span position predictions
             # This will give us k predictions per feature in the batch
-
             start_probabilities = torch.softmax(start_logits, dim=1)
             end_probabilities = torch.softmax(end_logits, dim=1)
 
@@ -438,14 +439,15 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
                         new_pred_list.append((c_split_pred, prob))
         pred_lists = new_pred_list
 
+        print('pred_lists', pred_lists)
+
         # decide what our probability threshold is going to be
         # we only want to do this if k is not 100 (i.e. default)
         if not custom_length:  # perform probability thresholding
             # find the prediction with the highest probability
             prediction, highest_probability = pred_lists[0]  # most probable
-            # probability_threshold = 0.1
-            probability_threshold = (highest_probability / 0.85) if highest_probability < 0 else highest_probability * 0.85
-            print('\nprob threshold', probability_threshold)
+            probability_threshold = 0.1
+            # probability_threshold = (highest_probability / 0.5) if highest_probability < 0 else highest_probability * 0.5
             pred_lists = [(pred, prob) for pred, prob in pred_lists if prob >= probability_threshold]
 
         print('pred_lists', pred_lists)
@@ -456,7 +458,8 @@ def evaluate_list(list_model, test_dataloader, tokenizer, training=False, datase
 
             # don't put repeats in our list.
             cleaned_best_pred = [p.replace(" ", "").strip().lower() for p in best_predictions]
-            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) > 0 for p in best_predictions]
+            overlap = [len(set.intersection(set(pred.split()), set(p.split()))) == len(p.split()) or
+                       len(set.intersection(set(pred.split()), set(p.split()))) == len(pred.split()) for p in best_predictions]
             # not any(overlap) and
 
             if not any(overlap) and pred not in best_predictions and pred.replace(" ", "").strip().lower() not in cleaned_best_pred:

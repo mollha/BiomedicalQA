@@ -170,8 +170,8 @@ def make_example(question, context, qtype, testing=True):
 
 base_path = Path(__file__).parent
 
-yes_no_checkpoint = "small_yesno_3_129918_29_103"
-factoid_checkpoint = "small_factoid,list_3_149918_8_0"
+yes_no_checkpoint = "archive/small_yesno_0_0_1_1"
+factoid_checkpoint = "archive/small_factoid,list_0_0_17_192"
 
 number_of_factoid_predictions = 5
 number_of_list_predictions = 100

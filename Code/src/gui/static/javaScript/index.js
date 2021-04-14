@@ -8,12 +8,13 @@ document.addEventListener("DOMContentLoaded", function(){
 	let expected_answer_input = $('#expected-answer-input');
 
 	const yesno_examples = [
-		["Can Freund's complete adjuvant induce arthritis?", "Rheumatoid arthritis (RA) was induced by Freunds Complete Adjuvant (FCA; 1 mg/0.1 ml paraffin oil), injected subcutaneously on days 0, 30 and 40", ["yes"]]
+		["Can Freund's complete adjuvant induce arthritis?", "Rheumatoid arthritis (RA) was induced by Freunds Complete Adjuvant (FCA; 1 mg/0.1 ml paraffin oil), injected subcutaneously on days 0, 30 and 40", ["Yes"]],
+		["Can PRL3-zumab inhibit PRL3+ cancer cells in vitro and in vivo?", "We show that PRL3-zumab specifically inhibits PRL3+ cancer cells in vivo, but not in vitro.", ["No"]]
 	];
 
 	const factoid_examples = [
 		["Which cells produce Interleukin 17A?", "Several studies have shown an increased expression/release of Th17 related cytokine, IL-17A in ASD.", ["TH17"]],
-		// ["", "", []]
+		["Which biological process takes place in nuclear speckles?", "Here we demonstrate that mRNAs containing ALREX-promoting elements are trafficked through nuclear speckles. Nuclear speckles, a unique nuclear subcompartment, accumulate a family of proteins, namely, serine- and arginine-rich (SR) proteins. They play important roles in regulation of pre-mRNA splicing.", ["mRNA splicing"]]
 
 	];
 
@@ -30,25 +31,28 @@ document.addEventListener("DOMContentLoaded", function(){
 		return examples[increments[idx_of_increment]]
 	}
 
-	function populate_example(q_type){
-		let example = ["", "", ""]
-		if(q_type === "yesno"){
-			example = get_next_example(yesno_examples, q_type);
-		} else if(q_type === "factoid"){
-			example = get_next_example(factoid_examples, q_type);
-		} else if(q_type === "list"){ // list
-			 example = get_next_example(list_examples, q_type);
-		} else {
-			// resetting
-			document.getElementById("first-opt").selected = true;
+	async function reset_example(){
+		document.getElementById("first-opt").selected = true;
 			question_input.val("");
 			context_input.val("");
 			expected_answer_input.val("");
 			predicted_answer_input.val("");
-			return
-		}
+	}
 
-		console.log('Example', example);
+	function populate_example(q_type){
+		reset_example().then(() => {
+			let example = ["", "", ""]
+			if(q_type === "yesno"){
+				example = get_next_example(yesno_examples, q_type);
+			} else if(q_type === "factoid"){
+				example = get_next_example(factoid_examples, q_type);
+			} else if(q_type === "list") { // list
+				example = get_next_example(list_examples, q_type);
+			} else {
+				return;
+			}
+
+			console.log('Example', example);
 
 		question_type_input.val(q_type);
 		const question = example[0];
@@ -68,6 +72,9 @@ document.addEventListener("DOMContentLoaded", function(){
 			combined_answer = answer.pop();
 		}
 		expected_answer_input.val(combined_answer.charAt(0).toUpperCase() + combined_answer.slice(1));
+
+		})
+
 	}
 
 	//buttons
@@ -77,9 +84,9 @@ document.addEventListener("DOMContentLoaded", function(){
 	let list_button = document.getElementById("list-button");
 
 	reset_button.addEventListener('click', function (){ return populate_example("reset") });
-	factoid_button.addEventListener('click', function (){ populate_example("reset"); return populate_example("factoid")});
-	yesno_button.addEventListener('click', function (){ populate_example("reset"); return populate_example("yesno")});
-	list_button.addEventListener('click', function (){ populate_example("reset"); return populate_example("list")});
+	factoid_button.addEventListener('click', function (){ return populate_example("factoid")});
+	yesno_button.addEventListener('click', function (){ return populate_example("yesno")});
+	list_button.addEventListener('click', function (){ return populate_example("list")});
 
 
 	function invalid_input(element){
