@@ -13,3 +13,5 @@ The repository is organised as follows:
 - Papers - paper submission for masters' thesis
     |-- LiteratureSurvey
     |-- Project Paper
+  
+*requirements.txt contains the python packages required to run this project.
