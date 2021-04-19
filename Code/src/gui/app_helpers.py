@@ -170,8 +170,6 @@ def make_example(question, context, qtype, testing=True):
 
 base_path = Path(__file__).parent
 
-yes_no_checkpoint = "archive/small_yesno_0_0_1_1"
-factoid_checkpoint = "archive/small_factoid,list_0_0_17_192"
 
 number_of_factoid_predictions = 5
 number_of_list_predictions = 100
@@ -180,9 +178,14 @@ torch.backends.cudnn.benchmark = torch.cuda.is_available()
 # ---- Set torch backend and set seed ----
 torch.backends.cudnn.benchmark = torch.cuda.is_available()
 
-model_size = "small"
-max_length = 128
-batch_size = 128
+model_size = "base"
+max_length = 128 if model_size == "small" else 256
+batch_size = 128 if model_size == "small" else 32
+
+yes_no_checkpoint = "archive/small_yesno_0_0_1_1" if model_size == "small" else "archive/base_yesno_0_0_1_0"
+factoid_checkpoint = "archive/small_factoid,list_0_0_17_192" if model_size == "small" else "archive/base_factoid,list_0_0_10_800"
+
+
 device = "cuda" if cuda.is_available() else "cpu"
 base_path = Path(__file__).parent
 base_checkpoint_dir = (base_path / '../../checkpoints').resolve()
