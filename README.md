@@ -5,13 +5,13 @@ Project Supervised by Dr Noura Al-Moubayed
 
 
 The repository is organised as follows:
-- Code:
-    |-- checkpoints - saved model checkpoints
-    |-- datasets - pretraining and finetuning datasets
-    |-- src - source code
+- Code:<br />
+    &nbsp;&nbsp;&nbsp;|-- checkpoints - saved model checkpoints<br />
+    &nbsp;&nbsp;&nbsp;|-- datasets - pretraining and finetuning datasets<br />
+    &nbsp;&nbsp;&nbsp;|-- src - source code<br />
 - ShellScripts - slurm scripts for running experiments on NCC
-- Papers - paper submission for masters' thesis
-    |-- LiteratureSurvey
-    |-- Project Paper
+- Papers - paper submission for masters' thesis<br />
+    &nbsp;&nbsp;&nbsp;|-- LiteratureSurvey<br />
+    &nbsp;&nbsp;&nbsp;|-- Project Paper<br />
   
 *requirements.txt contains the python packages required to run this project.
