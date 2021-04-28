@@ -76,12 +76,12 @@ def write_predictions(path_to_read_file, path_to_write_file, predictions):
 if __name__ == "__main__":
 
     # ---- Manually set configuration here ----
-    yes_no_checkpoint = "small_yesno_3_129918_29_103" # "base_yesno_0_440000_9_274" # "base_yesno_0_0_4_344" #  # "base_yesno_0_0_4_344" # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
-    factoid_checkpoint = "small_factoid,list_3_149918_8_0" # "base_factoid,list_0_440000_9_712" # "small_factoid,list_3_149918_8_0" # "base_factoid,list_1_104283_15_520" #"small_factoid,list_0_0_24_0" # "base_factoid,list_1_104283_15_520" # "small_factoid,list_18_64089_29_249"
+    yes_no_checkpoint = "archive/base_yesno_0_0_1_0" # "base_yesno_0_440000_9_274" # "base_yesno_0_0_4_344" #  # "base_yesno_0_0_4_344" # "small_yesno_0_0_67_32" # "small_yesno_14_79670_29_103"
+    factoid_checkpoint = "archive/base_factoid,list_0_0_10_800" # "base_factoid,list_0_440000_9_712" # "small_factoid,list_3_149918_8_0" # "base_factoid,list_1_104283_15_520" #"small_factoid,list_0_0_24_0" # "base_factoid,list_1_104283_15_520" # "small_factoid,list_18_64089_29_249"
     list_checkpoint = factoid_checkpoint  # use the same checkpoint for factoid and list
 
     selected_dataset = "bioasq"
-    evaluate_on_dataset = "raw_data/BioASQ-task9bPhaseB-testset3.json"
+    evaluate_on_dataset = "raw_data/BioASQ-task9bPhaseB-testset4.json"
 
     number_of_factoid_predictions = 5
     number_of_list_predictions = 100
@@ -133,7 +133,7 @@ if __name__ == "__main__":
                 all_question_types[checkpoint_idx]))
             continue
 
-        model_size = checkpoint_name.split("_")[0]
+        model_size = "base"
         question_type = question_order[checkpoint_idx]
         sys.stderr.write("\nEvaluating checkpoint {} - model size is {} and question type is {}\n"
                          .format(checkpoint_name, model_size, question_type))
@@ -176,12 +176,6 @@ if __name__ == "__main__":
             print('{}: {}'.format(qid, results_by_question_id[qid]))
         results_by_question_id_dictionary.update(results_by_question_id)
 
-    # print(results_by_question_id_dictionary)
-    # for key in results_by_question_id_dictionary:
-    #     print('\n{} questions'.format(key))
-    #     for qid in results_by_question_id_dictionary[key]:
-    #         print('{}: {}'.format(qid, results_by_question_id_dictionary[key][qid]))
-    # iterate through our predictions for each dataset and write them to text files
     selected_dataset_dir = (all_datasets_dir / selected_dataset).resolve()
 
     # get the name of the file name
