@@ -12,6 +12,7 @@ The repository is organised as follows:
 - **ShellScripts**: slurm scripts for running experiments on NCC
 - **Papers**:<br />
     &nbsp;&nbsp;&nbsp;|-- **LiteratureSurvey.pdf**<br />
-    &nbsp;&nbsp;&nbsp;|-- **Project Paper.pdf**<br />
+    &nbsp;&nbsp;&nbsp;|-- **ProjectLog.pdf**<br />
+    &nbsp;&nbsp;&nbsp;|-- **ProjectPaper.pdf**<br />
   
 *requirements.txt contains the python packages required to run this project.
