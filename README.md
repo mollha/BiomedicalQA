@@ -13,9 +13,12 @@ The repository is organised as follows:
 - **Papers**:<br />
     &nbsp;&nbsp;&nbsp;|-- **LiteratureSurvey.pdf**<br />
     &nbsp;&nbsp;&nbsp;|-- **ProjectLog.pdf**<br />
-    &nbsp;&nbsp;&nbsp;|-- **ProjectPaper.pdf**<br />
+
+[comment]: <> (    &nbsp;&nbsp;&nbsp;|-- **ProjectPaper.pdf**<br />)
   
-*requirements.txt contains the python packages required to run this project.
+Note:
+- ProjectLog.pdf is a log of project progress including notes from supervisor meetings.
+- requirements.txt contains the python packages required to run this project.
 
 Datasets are not provided due to copyright, however, they can be acquired from the following locations:
 - Pubmed Pretraining Corpus: https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/
