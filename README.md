@@ -16,3 +16,9 @@ The repository is organised as follows:
     &nbsp;&nbsp;&nbsp;|-- **ProjectPaper.pdf**<br />
   
 *requirements.txt contains the python packages required to run this project.
+
+Datasets are not provided due to copyright, however, they can be acquired from the following locations:
+- Pubmed Pretraining Corpus: https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/
+- BoolQ: https://github.com/google-research-datasets/boolean-questions
+- SQuAD: https://rajpurkar.github.io/SQuAD-explorer/
+- BioASQ: http://participants-area.bioasq.org/datasets/
