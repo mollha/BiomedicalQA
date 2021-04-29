@@ -89,7 +89,6 @@ def pre_train(dataset, model, scheduler, tokenizer, optimizer, loss_function, se
             loss.backward()
 
             total_training_loss += loss.item()
-
             nn.utils.clip_grad_norm_(model.parameters(), 1.)
 
             # perform steps

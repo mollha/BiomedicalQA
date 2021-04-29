@@ -13,8 +13,7 @@ The repository is organised as follows:
 - **Papers**:<br />
     &nbsp;&nbsp;&nbsp;|-- **LiteratureSurvey.pdf**<br />
     &nbsp;&nbsp;&nbsp;|-- **ProjectLog.pdf**<br />
-
-[comment]: <> (    &nbsp;&nbsp;&nbsp;|-- **ProjectPaper.pdf**<br />)
+    &nbsp;&nbsp;&nbsp;|-- **ProjectPaper.pdf**<br />
   
 Note:
 - ProjectLog.pdf is a log of project progress including notes from supervisor meetings.
